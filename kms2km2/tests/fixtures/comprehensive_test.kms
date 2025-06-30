@@ -1,0 +1,61 @@
+/*
+@NAME = "Comprehensive Test"
+@DESCRIPTION = "Testing all KMS features"
+@FONTFAMILY = "Myanmar3"
+@TRACK_CAPSLOCK = "TRUE"
+@SMART_BACKSPACE = "TRUE"
+@EAT_ALL_UNUSED_KEYS = "FALSE"
+@US_LAYOUT_BASED = "TRUE"
+@TREAT_CTRL_ALT_AS_RALT = "FALSE"
+*/
+
+// Variables
+$consonants = "ကခဂဃင"
+$vowels = "ါာိီုူ"
+$medials = "ျြွှ"
+
+// Simple string mapping
+"ka" => "က"
+"kha" => "ခ"
+
+// Unicode mappings
+U0061 => U1000
+u0062 => u1001
+
+// Variable reference
+$consonants => "consonants_matched"
+
+// Variable wildcard rules
+$consonants[*] => $consonants[$1]
+$vowels[*] + "test" => $1 + "_vowel"
+$medials[^] + "x" => "not_medial"
+
+// Back-references
+"prefix" + ANY => "got_" + $2
+$consonants[*] + $vowels[*] => $2 + $1
+
+// Virtual key combinations
+<VK_SHIFT & VK_KEY_A> => "အ"
+<VK_CTRL & VK_ALT & VK_KEY_K> => "က္က"
+<VK_ALT_GR & VK_KEY_1> => "၁"
+
+// Single virtual keys
+<VK_SPACE> => " "
+<VK_BACK> => NULL
+<VK_TAB> => "\t"
+
+// States
+<VK_CFLEX> => ('zawgyi')
+('zawgyi') + "ka" => "က"
+('zawgyi') + ANY => $1 + ('zawgyi')
+
+// ANY keyword
+ANY + ANY + "test" => $1 + $2 + "_test"
+
+// NULL outputs
+"del1" => NULL
+$consonants[*] + <VK_BACK> => NULL
+
+// Escape sequences
+"\\n" => "\n"
+"\\u1000" => "\u1000"

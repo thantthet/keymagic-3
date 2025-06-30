@@ -1,0 +1,33 @@
+/*
+@NAME = "Simple Test"
+@DESCRIPTION = "A simple test keyboard"
+@FONTFAMILY = "Myanmar3"
+*/
+
+// Variable definitions
+$consonants = "ကခဂ"
+$vowels = "ါိီ"
+
+// Basic rules
+"ka" => "က"
+"kha" => "ခ"
+"ga" => "ဂ"
+
+// Variable reference rule
+$consonants => $consonants
+
+// Variable wildcard rule 
+$consonants[*] + "a" => $1 + "ာ"
+
+// Virtual key rule
+<VK_SHIFT & VK_KEY_A> => "အ"
+
+// ANY keyword rule
+ANY + "test" => $1 + "_TEST"
+
+// State rule
+< VK_CFLEX > => ('special_mode')
+('special_mode') + "a" => "special_a"
+
+// NULL output rule
+"delete" => NULL

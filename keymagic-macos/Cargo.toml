@@ -1,0 +1,17 @@
+[package]
+name = "keymagic-macos"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "macOS Input Method Kit integration for KeyMagic"
+
+[dependencies]
+keymagic-core = { path = "../keymagic-core" }
+
+[build-dependencies]
+# Add macOS-specific build dependencies here
+
+[lib]
+crate-type = ["cdylib"]

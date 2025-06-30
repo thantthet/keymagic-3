@@ -1,0 +1,14 @@
+[package]
+name = "keymagic-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core engine for KeyMagic input method editor"
+
+[dependencies]
+byteorder = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]

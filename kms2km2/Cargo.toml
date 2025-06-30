@@ -1,0 +1,24 @@
+[package]
+name = "kms2km2"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "KeyMagic Script (KMS) to KM2 binary format converter"
+
+[dependencies]
+keymagic-core = { path = "../keymagic-core" }
+logos = { workspace = true }
+byteorder = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+
+[[bin]]
+name = "kms2km2"
+path = "src/bin/kms2km2.rs"
+
+[[bin]]
+name = "km2_dump"
+path = "src/bin/km2_dump.rs"

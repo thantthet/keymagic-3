@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "keymagic-core",
+    "kms2km2",
+    "keymagic-ibus",
+    "keymagic-macos",
+    "keymagic-windows",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+authors = ["KeyMagic Contributors"]
+edition = "2021"
+license = "GPL-2.0"
+repository = "https://github.com/keymagic/keymagic-rust"
+
+[workspace.dependencies]
+byteorder = "1.5"
+thiserror = "1.0"
+anyhow = "1.0"
+logos = "0.14"
+clap = { version = "4.5", features = ["derive"] }
+unicode-normalization = "0.1"

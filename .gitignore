@@ -1,0 +1,36 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock file (uncomment if you want to ignore it for libraries)
+# Cargo.lock
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test outputs
+*.km2
+!kms2km2/tests/fixtures/*.km2
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Debug files
+core.*
+*.core
+
+# OS specific
+Thumbs.db
+.DS_Store
