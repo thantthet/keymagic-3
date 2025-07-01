@@ -156,7 +156,7 @@ All opcodes are 2-byte values (16-bit integers):
 | 0x00F6 | opAND | Logical AND | Combines conditions |
 | 0x00F7 | opNANYOF | Match char NOT in set | Variable index |
 | 0x00F8 | opANY | Match any character | None |
-| 0x00F9 | opSWITCH | State switch | State string |
+| 0x00F9 | opSWITCH | State switch | State index |
 
 ### Rule Encoding Examples
 
@@ -193,7 +193,7 @@ KMS: `< VK_CFLEX > => ('zg_key')`
 Binary encoding:
 ```
 LHS: opPREDEFINED, VK_CFLEX
-RHS: opSWITCH, "zg_key"
+RHS: opSWITCH, INDEX OF "zg_key"
 ```
 
 ## File Loading Process

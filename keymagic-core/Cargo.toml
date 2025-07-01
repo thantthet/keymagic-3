@@ -12,3 +12,6 @@ byteorder = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+kms2km2 = { path = "../kms2km2" }
+hex = "0.4"
+pretty_assertions = "1.4"
