@@ -1,129 +1,13 @@
 use keymagic_core::{Km2File, FileHeader, LayoutOptions, InfoEntry, StringEntry, Rule, RuleElement};
-use std::io::Write;
 use byteorder::{LittleEndian, WriteBytesExt, ByteOrder};
 
 /// Creates a KM2 binary file from a Km2File struct
 pub fn create_km2_binary(km2: &Km2File) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    // Use kms2km2's Km2Writer for writing binary data
     let mut buffer = Vec::new();
-    
-    // Write header
-    buffer.write_all(&km2.header.magic_code)?;
-    buffer.write_u8(km2.header.major_version)?;
-    buffer.write_u8(km2.header.minor_version)?;
-    buffer.write_u16::<LittleEndian>(km2.header.string_count)?;
-    buffer.write_u16::<LittleEndian>(km2.header.info_count)?;
-    buffer.write_u16::<LittleEndian>(km2.header.rule_count)?;
-    buffer.write_u8(km2.header.layout_options.track_caps)?;
-    buffer.write_u8(km2.header.layout_options.auto_bksp)?;
-    buffer.write_u8(km2.header.layout_options.eat)?;
-    buffer.write_u8(km2.header.layout_options.pos_based)?;
-    buffer.write_u8(km2.header.layout_options.right_alt)?;
-    
-    // Write strings
-    for string in &km2.strings {
-        let utf16: Vec<u16> = string.value.encode_utf16().collect();
-        buffer.write_u16::<LittleEndian>(utf16.len() as u16)?;
-        for ch in utf16 {
-            buffer.write_u16::<LittleEndian>(ch)?;
-        }
-    }
-    
-    // Write info entries
-    for info in &km2.info {
-        buffer.write_all(&info.id)?;
-        buffer.write_u16::<LittleEndian>(info.data.len() as u16)?;
-        buffer.write_all(&info.data)?;
-    }
-    
-    // Write rules
-    for rule in &km2.rules {
-        // Write LHS length and elements
-        let lhs_size = calculate_rule_elements_size(&rule.lhs);
-        buffer.write_u16::<LittleEndian>(lhs_size as u16)?;
-        write_rule_elements(&mut buffer, &rule.lhs)?;
-        
-        // Write RHS length and elements
-        let rhs_size = calculate_rule_elements_size(&rule.rhs);
-        buffer.write_u16::<LittleEndian>(rhs_size as u16)?;
-        write_rule_elements(&mut buffer, &rule.rhs)?;
-    }
-    
+    let writer = kms2km2::binary::Km2Writer::new(&mut buffer);
+    writer.write_km2_file(km2).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
     Ok(buffer)
-}
-
-fn calculate_rule_elements_size(elements: &[RuleElement]) -> usize {
-    let mut size = 0;
-    for element in elements {
-        size += 2; // opcode
-        match element {
-            RuleElement::String(s) => {
-                size += 2; // string length
-                size += s.encode_utf16().count() * 2; // UTF-16 chars
-            }
-            RuleElement::Variable(_) | RuleElement::Reference(_) | 
-            RuleElement::Predefined(_) | RuleElement::Modifier(_) |
-            RuleElement::AnyOf(_) | RuleElement::NotAnyOf(_) | 
-            RuleElement::Switch(_) => {
-                size += 2; // index/value
-            }
-            RuleElement::And | RuleElement::Any => {
-                // No additional data
-            }
-        }
-    }
-    size
-}
-
-fn write_rule_elements(buffer: &mut Vec<u8>, elements: &[RuleElement]) -> Result<(), Box<dyn std::error::Error>> {
-    use keymagic_core::*;
-    
-    for element in elements {
-        match element {
-            RuleElement::String(s) => {
-                buffer.write_u16::<LittleEndian>(OP_STRING)?;
-                let utf16: Vec<u16> = s.encode_utf16().collect();
-                buffer.write_u16::<LittleEndian>(utf16.len() as u16)?;
-                for ch in utf16 {
-                    buffer.write_u16::<LittleEndian>(ch)?;
-                }
-            }
-            RuleElement::Variable(idx) => {
-                buffer.write_u16::<LittleEndian>(OP_VARIABLE)?;
-                buffer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-            RuleElement::Reference(idx) => {
-                buffer.write_u16::<LittleEndian>(OP_REFERENCE)?;
-                buffer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-            RuleElement::Predefined(vk) => {
-                buffer.write_u16::<LittleEndian>(OP_PREDEFINED)?;
-                buffer.write_u16::<LittleEndian>(*vk)?;
-            }
-            RuleElement::Modifier(flags) => {
-                buffer.write_u16::<LittleEndian>(OP_MODIFIER)?;
-                buffer.write_u16::<LittleEndian>(*flags)?;
-            }
-            RuleElement::AnyOf(idx) => {
-                buffer.write_u16::<LittleEndian>(OP_ANYOF)?;
-                buffer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-            RuleElement::NotAnyOf(idx) => {
-                buffer.write_u16::<LittleEndian>(OP_NANYOF)?;
-                buffer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-            RuleElement::Any => {
-                buffer.write_u16::<LittleEndian>(OP_ANY)?;
-            }
-            RuleElement::And => {
-                buffer.write_u16::<LittleEndian>(OP_AND)?;
-            }
-            RuleElement::Switch(idx) => {
-                buffer.write_u16::<LittleEndian>(OP_SWITCH)?;
-                buffer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Creates a basic Km2File with default header

@@ -66,6 +66,9 @@ impl Km2Loader {
             right_alt: if minor_version >= 5 { cursor.read_u8()? } else { 0 },
         };
         
+        // Skip C++ struct padding byte
+        cursor.read_u8()?;
+        
         Ok(FileHeader {
             magic_code,
             major_version,
@@ -121,14 +124,14 @@ impl Km2Loader {
         let mut rules = Vec::with_capacity(count);
         
         for i in 0..count {
-            // Read LHS
+            // Read LHS (size is in 16-bit units, convert to bytes)
             let lhs_len = cursor.read_u16::<LittleEndian>()? as usize;
-            let lhs = Self::read_rule_elements(cursor, lhs_len)
+            let lhs = Self::read_rule_elements(cursor, lhs_len * 2)
                 .map_err(|_| Km2Error::InvalidRule(i))?;
             
-            // Read RHS
+            // Read RHS (size is in 16-bit units, convert to bytes)
             let rhs_len = cursor.read_u16::<LittleEndian>()? as usize;
-            let rhs = Self::read_rule_elements(cursor, rhs_len)
+            let rhs = Self::read_rule_elements(cursor, rhs_len * 2)
                 .map_err(|_| Km2Error::InvalidRule(i))?;
             
             rules.push(Rule { lhs, rhs });
@@ -215,6 +218,7 @@ mod tests {
         data.extend_from_slice(&0u16.to_le_bytes()); // info count
         data.extend_from_slice(&0u16.to_le_bytes()); // rule count
         data.extend_from_slice(&[0, 0, 0, 0, 0]); // layout options
+        data.push(0); // padding byte
         
         let result = Km2Loader::load(&data);
         assert!(result.is_ok());
