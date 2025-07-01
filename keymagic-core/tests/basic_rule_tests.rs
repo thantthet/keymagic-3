@@ -27,7 +27,8 @@ fn test_simple_string_mapping() {
     // Type 'a' to complete "ka"
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
     assert_eq!(result.commit_text, Some("က".to_string()));
-    assert_eq!(result.composing_text, None);
+    assert_eq!(result.composing_text, Some("က".to_string()));
+    assert_eq!(result.delete_count, 1); // Delete the 'k' from composing
 }
 
 #[test]
@@ -50,6 +51,8 @@ fn test_single_char_mapping() {
     engine.load_keyboard(&binary).unwrap();
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
     assert_eq!(result.commit_text, Some("\u{200B}test".to_string()));
+    assert_eq!(result.composing_text, Some("\u{200B}test".to_string()));
+    assert_eq!(result.delete_count, 0); // No previous composing text
 }
 
 #[test]
@@ -71,9 +74,11 @@ fn test_unicode_to_unicode_mapping() {
     let mut engine = KeyMagicEngine::new();
     engine.load_keyboard(&binary).unwrap();
     
-    engine.process_key_event(key_input_from_char('a'));
+    engine.process_key_event(key_input_from_char('a')).unwrap();
     let result = engine.process_key_event(key_input_from_char('b')).unwrap();
     assert_eq!(result.commit_text, Some("\u{1000}".to_string()));
+    assert_eq!(result.composing_text, Some("\u{1000}".to_string()));
+    assert_eq!(result.delete_count, 1); // Delete 'a' from composing
 }
 
 #[test]
@@ -85,8 +90,8 @@ fn test_variable_substitution_in_rules() {
     let output_idx = add_string(&mut km2, "result");
     
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Variable(input_idx + 1)],
-        vec![BinaryFormatElement::Variable(output_idx + 1)]
+        vec![BinaryFormatElement::Variable(input_idx)],
+        vec![BinaryFormatElement::Variable(output_idx)]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -102,6 +107,8 @@ fn test_variable_substitution_in_rules() {
     let result = engine.process_key_event(key_input_from_char('t')).unwrap();
     
     assert_eq!(result.commit_text, Some("result".to_string()));
+    assert_eq!(result.composing_text, Some("result".to_string()));
+    assert_eq!(result.delete_count, 3); // Delete "tes" from composing
 }
 
 #[test]
@@ -133,24 +140,30 @@ fn test_multiple_rules() {
     // Test "ka"
     let mut engine = KeyMagicEngine::new();
     engine.load_keyboard(&binary).unwrap();
-    engine.process_key_event(key_input_from_char('k'));
+    engine.process_key_event(key_input_from_char('k')).unwrap();
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
     assert_eq!(result.commit_text, Some("က".to_string()));
+    assert_eq!(result.composing_text, Some("က".to_string()));
+    assert_eq!(result.delete_count, 1);
     
     // Test "kha"
     let mut engine = KeyMagicEngine::new();
     engine.load_keyboard(&binary).unwrap();
-    engine.process_key_event(key_input_from_char('k'));
-    engine.process_key_event(key_input_from_char('h'));
+    engine.process_key_event(key_input_from_char('k')).unwrap();
+    engine.process_key_event(key_input_from_char('h')).unwrap();
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
     assert_eq!(result.commit_text, Some("ခ".to_string()));
+    assert_eq!(result.composing_text, Some("ခ".to_string()));
+    assert_eq!(result.delete_count, 2);
     
     // Test "ga"
     let mut engine = KeyMagicEngine::new();
     engine.load_keyboard(&binary).unwrap();
-    engine.process_key_event(key_input_from_char('g'));
+    engine.process_key_event(key_input_from_char('g')).unwrap();
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
     assert_eq!(result.commit_text, Some("ဂ".to_string()));
+    assert_eq!(result.composing_text, Some("ဂ".to_string()));
+    assert_eq!(result.delete_count, 1);
 }
 
 #[test]
@@ -179,7 +192,8 @@ fn test_null_output() {
     
     // Should commit empty string (NULL output)
     assert_eq!(result.commit_text, Some("".to_string()));
-    assert_eq!(result.composing_text, None);
+    assert_eq!(result.composing_text, Some("".to_string()));
+    assert_eq!(result.delete_count, 5); // Delete "delet" from composing
 }
 
 #[test]
@@ -194,9 +208,9 @@ fn test_complex_pattern() {
     // Rule: $prefix + "test" + $suffix => "result"
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Variable(prefix_idx + 1),
+            BinaryFormatElement::Variable(prefix_idx),
             BinaryFormatElement::String("test".to_string()),
-            BinaryFormatElement::Variable(suffix_idx + 1)
+            BinaryFormatElement::Variable(suffix_idx)
         ],
         vec![BinaryFormatElement::String("result".to_string())]
     );
@@ -214,6 +228,8 @@ fn test_complex_pattern() {
     let result = engine.process_key_event(key_input_from_char('x')).unwrap();
     
     assert_eq!(result.commit_text, Some("result".to_string()));
+    assert_eq!(result.composing_text, Some("result".to_string()));
+    assert_eq!(result.delete_count, 9); // Delete "pretestfi" from composing
 }
 
 #[test]
@@ -251,4 +267,6 @@ fn test_overlapping_patterns() {
     
     // Should match "ah" => "အ" not "h" => "ဟ"
     assert_eq!(result.commit_text, Some("အ".to_string()));
+    assert_eq!(result.composing_text, Some("အ".to_string()));
+    assert_eq!(result.delete_count, 1); // Delete 'a' from composing
 }

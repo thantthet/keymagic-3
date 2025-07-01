@@ -16,8 +16,9 @@ pub enum RuleElement {
     /// Match any single character NOT in variable
     VariableNotAnyOf(usize),
     
-    /// Match with index modifier (for output)
-    VariableIndexed(usize, u16),
+    /// Variable with back-reference index (for output)
+    /// The u16 is a back-reference index (e.g., $1) that provides the character index
+    VariableWithBackRef(usize, u16),
     
     /// Virtual key with modifiers
     VirtualKey {
@@ -210,15 +211,13 @@ impl MatchRule {
                 }
                 
                 BinaryFormatElement::Variable(idx) => {
-                    // Check if followed by modifier with index
+                    // Check if followed by modifier with back-reference index
                     if i + 1 < elements.len() {
-                        if let BinaryFormatElement::Modifier(index) = &elements[i + 1] {
-                            if *index < FLAG_ANYOF { // Numeric index, not a flag
-                                result.push(RuleElement::VariableIndexed(*idx, *index));
-                                i += 1; // Skip the modifier
-                            } else {
-                                result.push(RuleElement::Variable(*idx));
-                            }
+                        if let BinaryFormatElement::Modifier(backref_idx) = &elements[i + 1] {
+                            // In RHS, modifier after variable is a back-reference index
+                            // It's not a flag like ANYOF/NANYOF
+                            result.push(RuleElement::VariableWithBackRef(*idx, *backref_idx));
+                            i += 1; // Skip the modifier
                         } else {
                             result.push(RuleElement::Variable(*idx));
                         }

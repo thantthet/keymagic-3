@@ -26,12 +26,32 @@ impl EngineOutput {
             consumed: false,
         }
     }
+    
+    /// Create an output that consumes the key but produces no visible output
+    pub fn consume() -> Self {
+        Self {
+            commit_text: None,
+            composing_text: None,
+            delete_count: 0,
+            consumed: true,
+        }
+    }
 
     /// Create an output that commits text
     pub fn commit(text: String) -> Self {
         Self {
-            commit_text: Some(text),
-            composing_text: None,
+            commit_text: Some(text.clone()),
+            composing_text: Some(text),
+            delete_count: 0,
+            consumed: true,
+        }
+    }
+    
+    /// Create an output that commits text with custom composing text
+    pub fn commit_with_composing(commit: String, composing: Option<String>) -> Self {
+        Self {
+            commit_text: Some(commit),
+            composing_text: composing,
             delete_count: 0,
             consumed: true,
         }

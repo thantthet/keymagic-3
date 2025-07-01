@@ -14,7 +14,7 @@ fn test_variable_string_literals() {
     // Create a rule that uses the variable: $consonants[*] => "consonants"
     add_rule(&mut km2, 
         vec![
-            BinaryFormatElement::Variable(var_idx + 1), // 1-based index
+            BinaryFormatElement::Variable(var_idx),
             BinaryFormatElement::Modifier(FLAG_ANYOF)
         ],
         vec![BinaryFormatElement::String("consonants".to_string())]
@@ -45,7 +45,7 @@ fn test_variable_unicode_concatenation() {
     // Create a rule: $vowels[*] => "vowels"
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Variable(var_idx + 1),
+            BinaryFormatElement::Variable(var_idx),
             BinaryFormatElement::Modifier(FLAG_ANYOF)
         ],
         vec![BinaryFormatElement::String("vowels".to_string())]
@@ -79,7 +79,7 @@ fn test_variable_concatenation() {
     // Rule using combined variable
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Variable(combined_idx + 1),
+            BinaryFormatElement::Variable(combined_idx),
             BinaryFormatElement::Modifier(FLAG_ANYOF)
         ],
         vec![BinaryFormatElement::String("combined".to_string())]
@@ -115,8 +115,8 @@ fn test_variable_in_rule_output() {
     add_rule(&mut km2,
         vec![BinaryFormatElement::String("a".to_string())],
         vec![
-            BinaryFormatElement::Variable(cons_idx + 1),
-            BinaryFormatElement::Variable(vowel_idx + 1)
+            BinaryFormatElement::Variable(cons_idx),
+            BinaryFormatElement::Variable(vowel_idx)
         ]
     );
     
@@ -141,7 +141,7 @@ fn test_predefined_unicode_variables() {
     add_rule(&mut km2,
         vec![BinaryFormatElement::String("zws".to_string())],
         vec![
-            BinaryFormatElement::Variable(zws_idx + 1),
+            BinaryFormatElement::Variable(zws_idx),
             BinaryFormatElement::String("test".to_string())
         ]
     );
@@ -172,7 +172,7 @@ fn test_variable_with_mixed_content() {
     // Pattern: Variable + Modifier(OP_ANYOF)
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Variable(mixed_idx + 1),
+            BinaryFormatElement::Variable(mixed_idx),
             BinaryFormatElement::Modifier(FLAG_ANYOF)
         ],
         vec![BinaryFormatElement::String("matched".to_string())]

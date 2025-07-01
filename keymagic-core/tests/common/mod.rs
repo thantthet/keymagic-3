@@ -38,15 +38,14 @@ pub fn add_info_text(km2: &mut Km2File, id: &str, text: &str) {
     km2.header.info_count = km2.info.len() as u16;
 }
 
-/// Adds a string to the strings table and returns its index
+/// Adds a string to the strings table and returns its 1-based index
 #[allow(dead_code)]
 pub fn add_string(km2: &mut Km2File, value: &str) -> usize {
-    let index = km2.strings.len();
     km2.strings.push(StringEntry {
         value: value.to_string(),
     });
     km2.header.string_count = km2.strings.len() as u16;
-    index
+    km2.strings.len() // Return 1-based index
 }
 
 /// Adds a rule to the Km2File
