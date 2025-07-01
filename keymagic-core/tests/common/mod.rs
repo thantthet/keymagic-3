@@ -1,5 +1,4 @@
 use keymagic_core::{Km2File, FileHeader, LayoutOptions, InfoEntry, StringEntry, Rule, RuleElement};
-use byteorder::{LittleEndian, WriteBytesExt, ByteOrder};
 
 /// Creates a KM2 binary file from a Km2File struct
 pub fn create_km2_binary(km2: &Km2File) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -29,12 +28,8 @@ pub fn create_km2_with_options(options: LayoutOptions) -> Km2File {
 
 /// Adds an info entry to a Km2File with text data
 pub fn add_info_text(km2: &mut Km2File, id: &str, text: &str) {
-    // Convert text to UTF-16LE bytes
-    let utf16: Vec<u16> = text.encode_utf16().collect();
-    let mut data = Vec::new();
-    for ch in utf16 {
-        data.write_u16::<LittleEndian>(ch).unwrap();
-    }
+    // Convert text to UTF-8 bytes (matching kms2km2 compiler behavior)
+    let data = text.as_bytes().to_vec();
     
     km2.info.push(InfoEntry {
         id: id.as_bytes().try_into().unwrap_or([0; 4]),
@@ -61,13 +56,9 @@ pub fn add_rule(km2: &mut Km2File, lhs: Vec<RuleElement>, rhs: Vec<RuleElement>)
     km2.header.rule_count = km2.rules.len() as u16;
 }
 
-/// Decode UTF-16LE text from bytes
-pub fn decode_utf16le_text(data: &[u8]) -> String {
-    let mut u16_vec = Vec::new();
-    for chunk in data.chunks_exact(2) {
-        u16_vec.push(LittleEndian::read_u16(chunk));
-    }
-    String::from_utf16_lossy(&u16_vec)
+/// Decode UTF-8 text from bytes
+pub fn decode_utf8_text(data: &[u8]) -> String {
+    String::from_utf8_lossy(data).to_string()
 }
 
 /// Helper to create a KeyInput from a character

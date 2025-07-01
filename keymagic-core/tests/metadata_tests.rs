@@ -17,7 +17,7 @@ fn test_metadata_name() {
     
     let name_entry = &loaded.info[0];
     assert_eq!(&name_entry.id, b"name");
-    let text = decode_utf16le_text(&name_entry.data);
+    let text = decode_utf8_text(&name_entry.data);
     assert_eq!(text, "Myanmar Unicode");
 }
 
@@ -32,7 +32,7 @@ fn test_metadata_description() {
     
     let desc_entry = &loaded.info[0];
     assert_eq!(&desc_entry.id, b"desc");
-    let text = decode_utf16le_text(&desc_entry.data);
+    let text = decode_utf8_text(&desc_entry.data);
     assert_eq!(text, "Test keyboard layout");
 }
 
@@ -47,7 +47,7 @@ fn test_metadata_font_family() {
     
     let font_entry = &loaded.info[0];
     assert_eq!(&font_entry.id, b"font");
-    let text = decode_utf16le_text(&font_entry.data);
+    let text = decode_utf8_text(&font_entry.data);
     assert_eq!(text, "Myanmar3");
 }
 
