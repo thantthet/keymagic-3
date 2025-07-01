@@ -1,4 +1,6 @@
 
+use std::collections::HashMap;
+
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 pub struct FileHeader {
@@ -44,6 +46,80 @@ pub struct InfoEntry {
     pub data: Vec<u8>,
 }
 
+/// A wrapper around keyboard metadata info entries that provides convenient access methods
+#[derive(Debug, Clone, Default)]
+pub struct Metadata {
+    entries: HashMap<[u8; 4], Vec<u8>>,
+}
+
+impl Metadata {
+    /// Create a new Metadata instance from a vector of InfoEntry
+    pub fn new(entries: Vec<InfoEntry>) -> Self {
+        let mut map = HashMap::new();
+        for entry in entries {
+            map.insert(entry.id, entry.data);
+        }
+        Self { entries: map }
+    }
+    
+    /// Get an info entry's data by its ID
+    pub fn get(&self, id: &[u8; 4]) -> Option<&Vec<u8>> {
+        self.entries.get(id)
+    }
+    
+    /// Get an info entry's data as UTF-8 string
+    pub fn get_string(&self, id: &[u8; 4]) -> Option<String> {
+        self.get(id)
+            .map(|data| String::from_utf8_lossy(data).into_owned())
+    }
+    
+    /// Get the keyboard name
+    pub fn name(&self) -> Option<String> {
+        self.get_string(INFO_NAME)
+    }
+    
+    /// Get the keyboard description
+    pub fn description(&self) -> Option<String> {
+        self.get_string(INFO_DESC)
+    }
+    
+    /// Get the font family
+    pub fn font_family(&self) -> Option<String> {
+        self.get_string(INFO_FONT)
+    }
+    
+    /// Get the hotkey string
+    pub fn hotkey(&self) -> Option<String> {
+        self.get_string(INFO_HTKY)
+    }
+    
+    /// Get the icon data
+    pub fn icon(&self) -> Option<&[u8]> {
+        self.get(INFO_ICON)
+            .map(|data| data.as_slice())
+    }
+    
+    /// Check if a specific info entry exists
+    pub fn has(&self, id: &[u8; 4]) -> bool {
+        self.entries.contains_key(id)
+    }
+    
+    /// Get the number of info entries
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    
+    /// Check if metadata is empty
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+    
+    /// Iterate over all entries
+    pub fn iter(&self) -> impl Iterator<Item = (&[u8; 4], &Vec<u8>)> {
+        self.entries.iter()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub lhs: Vec<RuleElement>,
@@ -70,6 +146,13 @@ pub struct Km2File {
     pub strings: Vec<StringEntry>,
     pub info: Vec<InfoEntry>,
     pub rules: Vec<Rule>,
+}
+
+impl Km2File {
+    /// Get a Metadata wrapper for convenient access to info entries
+    pub fn metadata(&self) -> Metadata {
+        Metadata::new(self.info.clone())
+    }
 }
 
 impl FileHeader {
