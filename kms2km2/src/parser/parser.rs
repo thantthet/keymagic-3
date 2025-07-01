@@ -59,11 +59,22 @@ impl<'a> Parser<'a> {
         // In a real implementation, we'd modify the lexer to preserve option comments
         let mut options = HashMap::new();
         
-        // For now, we'll scan the raw input for option patterns
+        // First check for multi-line comments /* */
         if let Some(start) = self.lexer.input.find("/*") {
             if let Some(end) = self.lexer.input[start..].find("*/") {
                 let comment = &self.lexer.input[start..start + end + 2];
                 for (key, value) in parse_options_from_comment(comment) {
+                    options.insert(key, value);
+                }
+            }
+        }
+        
+        // Also check for single-line comments //
+        for line in self.lexer.input.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("//") && trimmed.contains('@') {
+                // Pass the line with // prefix to the parser
+                for (key, value) in parse_options_from_comment(trimmed) {
                     options.insert(key, value);
                 }
             }

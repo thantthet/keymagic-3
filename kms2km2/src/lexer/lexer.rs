@@ -61,10 +61,11 @@ impl<'a> Lexer<'a> {
 pub fn parse_options_from_comment(comment: &str) -> Vec<(String, String)> {
     let mut options = Vec::new();
     
-    // Remove comment markers
+    // Remove comment markers (both /* */ and //)
     let content = comment
         .trim_start_matches("/*")
         .trim_end_matches("*/")
+        .trim_start_matches("//")
         .trim();
     
     // Parse each line for @OPTION = "VALUE" pattern
