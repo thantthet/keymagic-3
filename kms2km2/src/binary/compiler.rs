@@ -356,14 +356,11 @@ impl Compiler {
         }
         
         if let Some(hotkey) = options.get("HOTKEY") {
-            // Parse hotkey string like "CTRL + SHIFT + Z"
-            let hotkey_data = self.parse_hotkey(hotkey);
-            if !hotkey_data.is_empty() {
-                entries.push(InfoEntry {
-                    id: *INFO_HTKY,
-                    data: hotkey_data,
-                });
-            }
+            // Store hotkey as raw UTF-8 string (matching original C++ implementation)
+            entries.push(InfoEntry {
+                id: *INFO_HTKY,
+                data: self.string_to_utf8(hotkey),
+            });
         }
         
         // TODO: Handle ICON
@@ -403,38 +400,4 @@ impl Compiler {
         }
     }
 
-    fn parse_hotkey(&self, hotkey: &str) -> Vec<u8> {
-        // Parse hotkey string like "CTRL + SHIFT + Z"
-        let mut modifiers: u8 = 0;
-        let mut vk_code: u8 = 0;
-        
-        let parts: Vec<&str> = hotkey.split('+').map(|s| s.trim()).collect();
-        
-        for part in &parts {
-            match part.to_uppercase().as_str() {
-                "CTRL" | "CONTROL" => modifiers |= 0x01,
-                "SHIFT" => modifiers |= 0x02,
-                "ALT" => modifiers |= 0x04,
-                // Last part should be the key
-                key => {
-                    // Try to find the virtual key
-                    if key.len() == 1 {
-                        // Single character key
-                        let ch = key.chars().next().unwrap();
-                        if ch >= 'A' && ch <= 'Z' {
-                            vk_code = 0x41 + (ch as u8 - b'A'); // VK_A = 0x41
-                        } else if ch >= '0' && ch <= '9' {
-                            vk_code = 0x30 + (ch as u8 - b'0'); // VK_0 = 0x30
-                        }
-                    }
-                }
-            }
-        }
-        
-        if vk_code != 0 {
-            vec![modifiers, vk_code]
-        } else {
-            vec![]
-        }
-    }
 }
