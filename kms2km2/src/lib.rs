@@ -8,7 +8,7 @@ use std::path::Path;
 use std::fs::{File, read_to_string};
 use std::io::BufWriter;
 
-pub fn convert_kms_to_km2(input_path: &Path, output_path: &Path) -> Result<(), KmsError> {
+pub fn convert_kms_to_km2(input_path: &Path, output_path: &Path) -> std::result::Result<(), KmsError> {
     // Compile KMS file
     let km2 = compile_kms_file(input_path)?;
     
@@ -21,7 +21,7 @@ pub fn convert_kms_to_km2(input_path: &Path, output_path: &Path) -> Result<(), K
     Ok(())
 }
 
-pub fn compile_kms_file(input_path: &Path) -> Result<Km2File, KmsError> {
+pub fn compile_kms_file(input_path: &Path) -> std::result::Result<Km2File, KmsError> {
     // Read input file
     let input = read_to_string(input_path)?;
     

@@ -2,11 +2,10 @@ use std::path::Path;
 use std::fs;
 use kms2km2::{convert_kms_to_km2, compile_kms_file};
 use keymagic_core::*;
-use keymagic_core::types::opcodes::*;
 
 #[test]
 fn test_simple_conversion() {
-    let input_path = Path::new("kms2km2/tests/fixtures/simple_test.kms");
+    let input_path = Path::new("tests/fixtures/simple_test.kms");
     let output_path = Path::new("target/simple_test.km2");
     
     // Ensure output doesn't exist
@@ -99,7 +98,7 @@ fn test_state_handling() {
 
 #[test]
 fn test_comprehensive_conversion() {
-    let input_path = Path::new("kms2km2/tests/fixtures/comprehensive_test.kms");
+    let input_path = Path::new("tests/fixtures/comprehensive_test.kms");
     let output_path = Path::new("target/comprehensive_test.km2");
     
     // Convert

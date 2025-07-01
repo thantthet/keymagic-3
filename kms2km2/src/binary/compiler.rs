@@ -23,7 +23,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile(mut self, ast: KmsFile) -> Result<Km2File, KmsError> {
+    pub fn compile(mut self, ast: KmsFile) -> std::result::Result<Km2File, KmsError> {
         // First, compile all variables
         for var in &ast.variables {
             self.compile_variable(var)?;
@@ -61,7 +61,7 @@ impl Compiler {
         })
     }
 
-    fn compile_variable(&mut self, var: &VariableDecl) -> Result<(), KmsError> {
+    fn compile_variable(&mut self, var: &VariableDecl) -> std::result::Result<(), KmsError> {
         let var_name = var.name.trim_start_matches('$');
         
         // Compile the variable value to a string
@@ -74,7 +74,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_value_elements(&mut self, elements: &[ValueElement]) -> Result<String, KmsError> {
+    fn compile_value_elements(&mut self, elements: &[ValueElement]) -> std::result::Result<String, KmsError> {
         let mut result = String::new();
         
         for elem in elements {
@@ -105,7 +105,7 @@ impl Compiler {
         Ok(result)
     }
 
-    fn process_string_escapes(&self, s: &str) -> Result<String, KmsError> {
+    fn process_string_escapes(&self, s: &str) -> std::result::Result<String, KmsError> {
         let mut result = String::new();
         let mut chars = s.chars();
         
@@ -162,14 +162,14 @@ impl Compiler {
         Ok(result)
     }
 
-    fn compile_rule(&mut self, rule: &crate::parser::RuleDecl) -> Result<Rule, KmsError> {
+    fn compile_rule(&mut self, rule: &crate::parser::RuleDecl) -> std::result::Result<Rule, KmsError> {
         let lhs = self.compile_pattern(&rule.lhs)?;
         let rhs = self.compile_output(&rule.rhs)?;
         
         Ok(Rule { lhs, rhs })
     }
 
-    fn compile_pattern(&mut self, pattern: &[PatternElement]) -> Result<Vec<RuleElement>, KmsError> {
+    fn compile_pattern(&mut self, pattern: &[PatternElement]) -> std::result::Result<Vec<RuleElement>, KmsError> {
         let mut elements = Vec::new();
         
         for elem in pattern {
@@ -249,7 +249,7 @@ impl Compiler {
         Ok(elements)
     }
 
-    fn compile_output(&mut self, output: &[OutputElement]) -> Result<Vec<RuleElement>, KmsError> {
+    fn compile_output(&mut self, output: &[OutputElement]) -> std::result::Result<Vec<RuleElement>, KmsError> {
         let mut elements = Vec::new();
         
         for elem in output {
@@ -375,7 +375,7 @@ impl Compiler {
         s.as_bytes().to_vec()
     }
 
-    fn scan_for_states(&mut self, pattern: &[PatternElement]) -> Result<(), KmsError> {
+    fn scan_for_states(&mut self, pattern: &[PatternElement]) -> std::result::Result<(), KmsError> {
         for elem in pattern {
             if let PatternElement::State(state) = elem {
                 self.register_state(state);
@@ -384,7 +384,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn scan_for_states_output(&mut self, output: &[OutputElement]) -> Result<(), KmsError> {
+    fn scan_for_states_output(&mut self, output: &[OutputElement]) -> std::result::Result<(), KmsError> {
         for elem in output {
             if let OutputElement::State(state) = elem {
                 self.register_state(state);

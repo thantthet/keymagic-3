@@ -11,7 +11,7 @@ impl<W: Write> Km2Writer<W> {
         Self { writer }
     }
 
-    pub fn write_km2_file(mut self, km2: &Km2File) -> Result<(), KmsError> {
+    pub fn write_km2_file(mut self, km2: &Km2File) -> std::result::Result<(), KmsError> {
         // Write header
         self.write_header(&km2.header)?;
         
@@ -33,7 +33,7 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn write_header(&mut self, header: &FileHeader) -> Result<(), KmsError> {
+    fn write_header(&mut self, header: &FileHeader) -> std::result::Result<(), KmsError> {
         // Magic code
         self.writer.write_all(&header.magic_code)?;
         
@@ -59,7 +59,7 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn write_string(&mut self, s: &str) -> Result<(), KmsError> {
+    fn write_string(&mut self, s: &str) -> std::result::Result<(), KmsError> {
         let utf16: Vec<u16> = s.encode_utf16().collect();
         
         // Write length (number of UTF-16 code units)
@@ -73,7 +73,7 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn write_info(&mut self, info: &InfoEntry) -> Result<(), KmsError> {
+    fn write_info(&mut self, info: &InfoEntry) -> std::result::Result<(), KmsError> {
         // Write ID (4 bytes)
         self.writer.write_all(&info.id)?;
         
@@ -86,7 +86,7 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn write_rule(&mut self, rule: &Rule) -> Result<(), KmsError> {
+    fn write_rule(&mut self, rule: &Rule) -> std::result::Result<(), KmsError> {
         // Write LHS
         self.write_rule_elements(&rule.lhs)?;
         
@@ -96,7 +96,7 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn write_rule_elements(&mut self, elements: &[RuleElement]) -> Result<(), KmsError> {
+    fn write_rule_elements(&mut self, elements: &[RuleElement]) -> std::result::Result<(), KmsError> {
         // Calculate total size in opcodes
         let mut size = 0u16;
         for elem in elements {
@@ -132,7 +132,7 @@ impl<W: Write> Km2Writer<W> {
         }
     }
 
-    fn write_rule_element(&mut self, elem: &RuleElement) -> Result<(), KmsError> {
+    fn write_rule_element(&mut self, elem: &RuleElement) -> std::result::Result<(), KmsError> {
         match elem {
             RuleElement::String(s) => {
                 self.writer.write_u16::<LittleEndian>(OP_STRING)?;
