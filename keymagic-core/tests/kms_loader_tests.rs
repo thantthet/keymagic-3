@@ -27,32 +27,22 @@ fn test_load_myansan_kms() {
     // Verify we have expected metadata entries
     assert_eq!(km2_file.info.len(), 4, "Should have 4 info entries");
     
-    // Check keyboard name (ID is stored in little-endian format: "name" -> "eman")
-    let name_entry = km2_file.info.iter()
-        .find(|info| &info.id == b"eman")
-        .expect("Should have name metadata");
-    let name = String::from_utf8_lossy(&name_entry.data);
-    assert_eq!(name, "မြန်စံ (Smart)");
+    // Get metadata for convenient access
+    let metadata = km2_file.metadata();
     
-    // Check font family (ID: "font" -> "tnof")
-    let font_entry = km2_file.info.iter()
-        .find(|info| &info.id == b"tnof")
-        .expect("Should have font metadata");
-    let font = String::from_utf8_lossy(&font_entry.data);
-    assert_eq!(font, "Myanmar3");
+    // Check keyboard name using metadata
+    assert_eq!(metadata.name(), Some("မြန်စံ (Smart)".to_string()));
     
-    // Check description (ID: "desc" -> "csed")
-    let desc_entry = km2_file.info.iter()
-        .find(|info| &info.id == b"csed")
-        .expect("Should have description metadata");
-    let desc = String::from_utf8_lossy(&desc_entry.data);
+    // Check font family using metadata
+    assert_eq!(metadata.font_family(), Some("Myanmar3".to_string()));
+    
+    // Check description using metadata
+    let desc = metadata.description().expect("Should have description metadata");
     assert!(desc.contains("Converted into KeyMagic Layout"));
     
-    // Check hotkey (ID: "htky" -> "ykth")
-    let hotkey_entry = km2_file.info.iter()
-        .find(|info| &info.id == b"ykth")
-        .expect("Should have hotkey metadata");
-    assert_eq!(hotkey_entry.data.len(), 2, "Hotkey data should be 2 bytes");
+    // Check hotkey string using metadata
+    let hotkey = metadata.hotkey().expect("Should have hotkey metadata");
+    assert_eq!(hotkey, "CTRL+ALT+M");
     
     // Verify layout options based on the KMS file:
     // @TRACK_CAPSLOCK = "FALSE" => 0
