@@ -36,13 +36,14 @@ impl EngineState {
         self.input_history.clear();
     }
 
-    /// Toggle a state (enter if not active, exit if active)
-    pub fn toggle_state(&mut self, state_index: usize) {
-        if self.active_states.contains(&state_index) {
-            self.active_states.remove(&state_index);
-        } else {
-            self.active_states.insert(state_index);
-        }
+    /// Add a state as active (for transient states)
+    pub fn add_state(&mut self, state_index: usize) {
+        self.active_states.insert(state_index);
+    }
+    
+    /// Clear all active states
+    pub fn clear_states(&mut self) {
+        self.active_states.clear();
     }
 
     /// Check if a state is active

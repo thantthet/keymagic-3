@@ -59,12 +59,16 @@ impl<'a> RuleMatcher<'a> {
         let mut input_pos = 0;
         let mut element_index = 0;
         
-        // Check if this is a state-specific rule
-        if let Some(RuleElement::Switch(state_idx)) = rule.lhs.first() {
-            if !state.is_state_active(*state_idx) {
-                return None;
+        // Check all state requirements at the beginning of the rule
+        while element_index < rule.lhs.len() {
+            if let RuleElement::Switch(state_idx) = &rule.lhs[element_index] {
+                if !state.is_state_active(*state_idx) {
+                    return None;
+                }
+                element_index += 1;
+            } else {
+                break;
             }
-            element_index = 1; // Skip the state element
         }
         
         // Match remaining LHS elements
@@ -235,6 +239,9 @@ impl<'a> RuleMatcher<'a> {
                     if *idx > 0 && *idx <= match_result.captures.len() {
                         output.push_str(&match_result.captures[*idx - 1]);
                     }
+                }
+                RuleElement::Switch(_) => {
+                    // State switches don't produce output text
                 }
                 _ => {
                     // TODO: Handle other RHS elements

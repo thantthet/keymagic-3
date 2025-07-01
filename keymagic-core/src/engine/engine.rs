@@ -160,6 +160,12 @@ impl KeyMagicEngine {
             return Err(Error::Engine("No keyboard loaded".into()));
         }
 
+        // Store current states before clearing (for this input's matching)
+        let current_states = self.state.active_states.clone();
+        
+        // Clear transient states for next input
+        self.state.clear_states();
+
         // Handle special keys
         if input.vk_code == VirtualKey::Back {
             return self.handle_backspace();
@@ -180,6 +186,9 @@ impl KeyMagicEngine {
         let keyboard = self.keyboard.as_ref().unwrap();
         let matcher = RuleMatcher::new(keyboard);
         
+        // Temporarily restore states for matching
+        self.state.active_states = current_states;
+        
         // Try matching with full composing buffer
         if let Some(match_result) = matcher.find_match(&self.state.composing_buffer, Some(&input), &self.state) {
             // Apply the matched rule
@@ -189,9 +198,22 @@ impl KeyMagicEngine {
             let remaining = self.state.composing_buffer[match_result.consumed_length..].to_string();
             self.state.composing_buffer = remaining;
             
-            // Check for state switch in RHS
-            if let Some(RuleElement::Switch(state_idx)) = match_result.rule.rhs.first() {
-                self.state.toggle_state(*state_idx);
+            // Clear states again (they were used for matching)
+            self.state.clear_states();
+            
+            // Collect all state switches from RHS
+            for element in &match_result.rule.rhs {
+                if let RuleElement::Switch(state_idx) = element {
+                    self.state.add_state(*state_idx);
+                }
+            }
+            
+            // If RHS only contains state switches (and is not empty), don't produce output
+            let has_only_state_switches = !match_result.rule.rhs.is_empty() && 
+                match_result.rule.rhs.iter()
+                    .all(|e| matches!(e, RuleElement::Switch(_)));
+            
+            if has_only_state_switches {
                 return Ok(EngineOutput::pass_through());
             }
             
@@ -205,13 +227,18 @@ impl KeyMagicEngine {
                 Ok(EngineOutput::commit(final_output)
                     .with_delete(match_result.consumed_length))
             }
-        } else if keyboard.header.layout_options.eat != 0 {
-            // Eat the key if no match and eat option is enabled
-            self.state.clear_composing();
-            Ok(EngineOutput::pass_through().with_delete(1))
         } else {
-            // Update composing display
-            Ok(EngineOutput::composing(self.state.composing_buffer.clone()))
+            // Clear states (no match, so no state output)
+            self.state.clear_states();
+            
+            if keyboard.header.layout_options.eat != 0 {
+                // Eat the key if no match and eat option is enabled
+                self.state.clear_composing();
+                Ok(EngineOutput::pass_through().with_delete(1))
+            } else {
+                // Update composing display
+                Ok(EngineOutput::composing(self.state.composing_buffer.clone()))
+            }
         }
     }
 
@@ -237,21 +264,48 @@ impl KeyMagicEngine {
         let keyboard = self.keyboard.as_ref().unwrap();
         let matcher = RuleMatcher::new(keyboard);
         
+        // Store current states before clearing (for this input's matching)
+        let current_states = self.state.active_states.clone();
+        
+        // Clear transient states for next input
+        self.state.clear_states();
+        
+        // Temporarily restore states for matching
+        self.state.active_states = current_states;
+        
         // Try to match virtual key rules
         if let Some(match_result) = matcher.find_match("", Some(input), &self.state) {
             let output = matcher.apply_rule(&match_result);
             
-            // Check for state switch
-            if let Some(RuleElement::Switch(state_idx)) = match_result.rule.rhs.first() {
-                self.state.toggle_state(*state_idx);
+            // Clear states again (they were used for matching)
+            self.state.clear_states();
+            
+            // Collect all state switches from RHS
+            for element in &match_result.rule.rhs {
+                if let RuleElement::Switch(state_idx) = element {
+                    self.state.add_state(*state_idx);
+                }
+            }
+            
+            // If RHS only contains state switches (and is not empty), don't produce output
+            let has_only_state_switches = !match_result.rule.rhs.is_empty() && 
+                match_result.rule.rhs.iter()
+                    .all(|e| matches!(e, RuleElement::Switch(_)));
+            
+            if has_only_state_switches {
                 return Ok(EngineOutput::pass_through());
             }
             
             Ok(EngineOutput::commit(output))
-        } else if keyboard.header.layout_options.eat != 0 {
-            Ok(EngineOutput::pass_through())
         } else {
-            Ok(EngineOutput::pass_through())
+            // Clear states (no match, so no state output)
+            self.state.clear_states();
+            
+            if keyboard.header.layout_options.eat != 0 {
+                Ok(EngineOutput::pass_through())
+            } else {
+                Ok(EngineOutput::pass_through())
+            }
         }
     }
 

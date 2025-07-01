@@ -51,13 +51,7 @@ fn test_basic_state_toggle() {
     let result = engine.process_key_event(key_input_from_char('1')).unwrap();
     assert_eq!(result.commit_text, Some("၁".to_string()));
     
-    // Press Cflex again to exit state
-    engine.process_key_event(keymagic_core::KeyInput::new(
-        VirtualKey::Oem3, 
-        keymagic_core::engine::ModifierState::new()
-    )).unwrap();
-    
-    // Type '1' after exiting state - should output "1" again
+    // Type '1' again - state should be cleared, so output "1"
     let result = engine.process_key_event(key_input_from_char('1')).unwrap();
     assert_eq!(result.commit_text, Some("1".to_string()));
 }
@@ -119,20 +113,24 @@ fn test_multiple_states() {
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
     assert_eq!(result.commit_text, Some("A1".to_string()));
     
-    // Enter state2 (state1 still active)
+    // State1 is cleared after the input, type 'a' again - should output "a"
+    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
+    assert_eq!(result.commit_text, Some("a".to_string()));
+    
+    // Enter state2
     engine.process_key_event(keymagic_core::KeyInput::new(
         VirtualKey::F2, 
         keymagic_core::engine::ModifierState::new()
     )).unwrap();
     
-    // Type 'a' with both states active - state1 rule should take precedence (first in rules)
+    // Type 'a' in state2 - should output "A2"
     let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    assert_eq!(result.commit_text, Some("A1".to_string()));
+    assert_eq!(result.commit_text, Some("A2".to_string()));
 }
 
 #[test]
 fn test_state_with_any_wildcard() {
-    // Test: ('state') + ANY => $1 + ('state')
+    // Test: ('state') + ANY => $1 + $1
     let mut km2 = create_basic_km2();
     
     let state_idx = add_string(&mut km2, "special");
@@ -151,7 +149,7 @@ fn test_state_with_any_wildcard() {
         ],
         vec![
             RuleElement::Reference(1), // $1 - the matched character
-            RuleElement::Switch(state_idx + 1) // Maintain state
+            RuleElement::Reference(1)  // $1 - the matched character
         ]
     );
     
@@ -167,29 +165,7 @@ fn test_state_with_any_wildcard() {
     
     // Type 'x' - should pass through and maintain state
     let result = engine.process_key_event(key_input_from_char('x')).unwrap();
-    assert_eq!(result.commit_text, Some("x".to_string()));
-    
-    // Type 'y' - should still be in state
-    let result = engine.process_key_event(key_input_from_char('y')).unwrap();
-    assert_eq!(result.commit_text, Some("y".to_string()));
-    
-    // Test that state is maintained - type another character
-    let result = engine.process_key_event(key_input_from_char('z')).unwrap();
-    assert_eq!(result.commit_text, Some("z".to_string()));
-    
-    // Exit state
-    engine.process_key_event(keymagic_core::KeyInput::new(
-        VirtualKey::F3, 
-        keymagic_core::engine::ModifierState::new()
-    )).unwrap();
-    
-    // Type 'a' - should not match the state rule anymore
-    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    // With state exited, the ANY rule shouldn't match
-    // Since there's no other rule, the behavior depends on layout options
-    // Let's just verify we got out of the state by checking that it's not
-    // producing the same output as when in state
-    assert!(result.commit_text != Some("a".to_string()) || !result.consumed);
+    assert_eq!(result.commit_text, Some("xx".to_string()));
 }
 
 #[test]
@@ -252,12 +228,84 @@ fn test_state_based_digit_conversion() {
         keymagic_core::engine::ModifierState::new()
     )).unwrap();
     
-    // Type digits in Zawgyi mode
+    // Type digit '1' in Zawgyi mode
     let result = engine.process_key_event(key_input_from_char('1')).unwrap();
     assert_eq!(result.commit_text, Some("\u{100D}\u{1039}\u{100D}".to_string()));
     
+    // State is cleared after input, so type '2' normally (not in zawgyi mode)
+    let result = engine.process_key_event(key_input_from_char('2')).unwrap();
+    assert_eq!(result.commit_text, Some("၂".to_string()));
+    
+    // Enter Zawgyi mode again
+    engine.process_key_event(keymagic_core::KeyInput::new(
+        VirtualKey::Oem3, 
+        keymagic_core::engine::ModifierState::new()
+    )).unwrap();
+    
+    // Type digit '2' in Zawgyi mode
     let result = engine.process_key_event(key_input_from_char('2')).unwrap();
     assert_eq!(result.commit_text, Some("\u{100E}\u{1039}\u{100E}".to_string()));
+}
+
+#[test]
+fn test_multiple_active_states() {
+    // Test that multiple states can be active simultaneously
+    let mut km2 = create_basic_km2();
+    
+    let state1_idx = add_string(&mut km2, "state1");
+    let state2_idx = add_string(&mut km2, "state2");
+    
+    // Rule to enter both states at once
+    add_rule(&mut km2,
+        vec![RuleElement::Predefined(VirtualKey::F5 as u16)],
+        vec![
+            RuleElement::Switch(state1_idx + 1),
+            RuleElement::Switch(state2_idx + 1)
+        ]
+    );
+    
+    // Rule that only works when both states are active
+    add_rule(&mut km2,
+        vec![
+            RuleElement::Switch(state1_idx + 1),
+            RuleElement::Switch(state2_idx + 1),
+            RuleElement::String("x".to_string())
+        ],
+        vec![RuleElement::String("BOTH".to_string())]
+    );
+    
+    // Rule for state1 only
+    add_rule(&mut km2,
+        vec![
+            RuleElement::Switch(state1_idx + 1),
+            RuleElement::String("x".to_string())
+        ],
+        vec![RuleElement::String("S1".to_string())]
+    );
+    
+    // Default rule
+    add_rule(&mut km2,
+        vec![RuleElement::String("x".to_string())],
+        vec![RuleElement::String("x".to_string())]
+    );
+    
+    let binary = create_km2_binary(&km2).unwrap();
+    let mut engine = KeyMagicEngine::new();
+    engine.load_keyboard(&binary).unwrap();
+    
+    // Type 'x' without states - should output "x"
+    let result = engine.process_key_event(key_input_from_char('x')).unwrap();
+    assert_eq!(result.commit_text, Some("x".to_string()));
+    
+    // Enter both states
+    engine.process_key_event(keymagic_core::KeyInput::new(
+        VirtualKey::F5, 
+        keymagic_core::engine::ModifierState::new()
+    )).unwrap();
+    
+    // Type 'x' with both states active - should output "BOTH"
+    let result = engine.process_key_event(key_input_from_char('x')).unwrap();
+    assert_eq!(result.commit_text, Some("BOTH".to_string()));
 }
 
 #[test]

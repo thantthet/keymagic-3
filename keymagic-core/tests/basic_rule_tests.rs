@@ -177,7 +177,7 @@ fn test_null_output() {
     engine.process_key_event(key_input_from_char('t')).unwrap();
     let result = engine.process_key_event(key_input_from_char('e')).unwrap();
     
-    // Should clear the buffer
+    // Should commit empty string (NULL output)
     assert_eq!(result.commit_text, Some("".to_string()));
     assert_eq!(result.composing_text, None);
 }
