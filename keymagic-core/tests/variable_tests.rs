@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use keymagic_core::{RuleElement, km2::Km2Loader, KeyMagicEngine};
+use keymagic_core::{BinaryFormatElement, km2::Km2Loader, KeyMagicEngine, FLAG_ANYOF};
 
 #[test]
 fn test_variable_string_literals() {
@@ -11,10 +11,13 @@ fn test_variable_string_literals() {
     // Add the variable as a string
     let var_idx = add_string(&mut km2, "ကခဂဃင");
     
-    // Create a rule that uses the variable: $consonants => "consonants"
+    // Create a rule that uses the variable: $consonants[*] => "consonants"
     add_rule(&mut km2, 
-        vec![RuleElement::AnyOf(var_idx + 1)], // 1-based index
-        vec![RuleElement::String("consonants".to_string())]
+        vec![
+            BinaryFormatElement::Variable(var_idx + 1), // 1-based index
+            BinaryFormatElement::Modifier(FLAG_ANYOF)
+        ],
+        vec![BinaryFormatElement::String("consonants".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -39,10 +42,13 @@ fn test_variable_unicode_concatenation() {
     // Add variable with concatenated Unicode values
     let var_idx = add_string(&mut km2, "\u{1000}\u{1001}\u{1002}");
     
-    // Create a rule: $vowels => "vowels"
+    // Create a rule: $vowels[*] => "vowels"
     add_rule(&mut km2,
-        vec![RuleElement::AnyOf(var_idx + 1)],
-        vec![RuleElement::String("vowels".to_string())]
+        vec![
+            BinaryFormatElement::Variable(var_idx + 1),
+            BinaryFormatElement::Modifier(FLAG_ANYOF)
+        ],
+        vec![BinaryFormatElement::String("vowels".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -72,8 +78,11 @@ fn test_variable_concatenation() {
     
     // Rule using combined variable
     add_rule(&mut km2,
-        vec![RuleElement::AnyOf(combined_idx + 1)],
-        vec![RuleElement::String("combined".to_string())]
+        vec![
+            BinaryFormatElement::Variable(combined_idx + 1),
+            BinaryFormatElement::Modifier(FLAG_ANYOF)
+        ],
+        vec![BinaryFormatElement::String("combined".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -104,10 +113,10 @@ fn test_variable_in_rule_output() {
     
     // Rule: "a" => $cons + $vowel
     add_rule(&mut km2,
-        vec![RuleElement::String("a".to_string())],
+        vec![BinaryFormatElement::String("a".to_string())],
         vec![
-            RuleElement::Variable(cons_idx + 1),
-            RuleElement::Variable(vowel_idx + 1)
+            BinaryFormatElement::Variable(cons_idx + 1),
+            BinaryFormatElement::Variable(vowel_idx + 1)
         ]
     );
     
@@ -130,10 +139,10 @@ fn test_predefined_unicode_variables() {
     
     // Rule: "zws" => $ZWS + "test"
     add_rule(&mut km2,
-        vec![RuleElement::String("zws".to_string())],
+        vec![BinaryFormatElement::String("zws".to_string())],
         vec![
-            RuleElement::Variable(zws_idx + 1),
-            RuleElement::String("test".to_string())
+            BinaryFormatElement::Variable(zws_idx + 1),
+            BinaryFormatElement::String("test".to_string())
         ]
     );
     
@@ -160,9 +169,13 @@ fn test_variable_with_mixed_content() {
     let mixed_idx = add_string(&mut km2, "a\u{1000}b\u{1001}c");
     
     // Rule to match any character from the variable
+    // Pattern: Variable + Modifier(OP_ANYOF)
     add_rule(&mut km2,
-        vec![RuleElement::AnyOf(mixed_idx + 1)],
-        vec![RuleElement::String("matched".to_string())]
+        vec![
+            BinaryFormatElement::Variable(mixed_idx + 1),
+            BinaryFormatElement::Modifier(FLAG_ANYOF)
+        ],
+        vec![BinaryFormatElement::String("matched".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();

@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use keymagic_core::{RuleElement, km2::Km2Loader, KeyMagicEngine};
+use keymagic_core::{BinaryFormatElement, km2::Km2Loader, KeyMagicEngine};
 
 #[test]
 fn test_simple_string_mapping() {
@@ -9,8 +9,8 @@ fn test_simple_string_mapping() {
     let mut km2 = create_basic_km2();
     
     add_rule(&mut km2,
-        vec![RuleElement::String("ka".to_string())],
-        vec![RuleElement::String("က".to_string())]
+        vec![BinaryFormatElement::String("ka".to_string())],
+        vec![BinaryFormatElement::String("က".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -36,10 +36,10 @@ fn test_single_char_mapping() {
     let mut km2 = create_basic_km2();
     
     add_rule(&mut km2,
-        vec![RuleElement::String("a".to_string())],
+        vec![BinaryFormatElement::String("a".to_string())],
         vec![
-            RuleElement::String("\u{200B}".to_string()),
-            RuleElement::String("test".to_string())
+            BinaryFormatElement::String("\u{200B}".to_string()),
+            BinaryFormatElement::String("test".to_string())
         ]
     );
     
@@ -59,10 +59,10 @@ fn test_unicode_to_unicode_mapping() {
     
     add_rule(&mut km2,
         vec![
-            RuleElement::String("\u{0061}".to_string()), // 'a'
-            RuleElement::String("\u{0062}".to_string())  // 'b'
+            BinaryFormatElement::String("\u{0061}".to_string()), // 'a'
+            BinaryFormatElement::String("\u{0062}".to_string())  // 'b'
         ],
-        vec![RuleElement::String("\u{1000}".to_string())]
+        vec![BinaryFormatElement::String("\u{1000}".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -85,8 +85,8 @@ fn test_variable_substitution_in_rules() {
     let output_idx = add_string(&mut km2, "result");
     
     add_rule(&mut km2,
-        vec![RuleElement::Variable(input_idx + 1)],
-        vec![RuleElement::Variable(output_idx + 1)]
+        vec![BinaryFormatElement::Variable(input_idx + 1)],
+        vec![BinaryFormatElement::Variable(output_idx + 1)]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -111,20 +111,20 @@ fn test_multiple_rules() {
     
     // Rule 1: "ka" => "က"
     add_rule(&mut km2,
-        vec![RuleElement::String("ka".to_string())],
-        vec![RuleElement::String("က".to_string())]
+        vec![BinaryFormatElement::String("ka".to_string())],
+        vec![BinaryFormatElement::String("က".to_string())]
     );
     
     // Rule 2: "kha" => "ခ"
     add_rule(&mut km2,
-        vec![RuleElement::String("kha".to_string())],
-        vec![RuleElement::String("ခ".to_string())]
+        vec![BinaryFormatElement::String("kha".to_string())],
+        vec![BinaryFormatElement::String("ခ".to_string())]
     );
     
     // Rule 3: "ga" => "ဂ"
     add_rule(&mut km2,
-        vec![RuleElement::String("ga".to_string())],
-        vec![RuleElement::String("ဂ".to_string())]
+        vec![BinaryFormatElement::String("ga".to_string())],
+        vec![BinaryFormatElement::String("ဂ".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -159,7 +159,7 @@ fn test_null_output() {
     let mut km2 = create_basic_km2();
     
     add_rule(&mut km2,
-        vec![RuleElement::String("delete".to_string())],
+        vec![BinaryFormatElement::String("delete".to_string())],
         vec![] // Empty output represents NULL
     );
     
@@ -194,11 +194,11 @@ fn test_complex_pattern() {
     // Rule: $prefix + "test" + $suffix => "result"
     add_rule(&mut km2,
         vec![
-            RuleElement::Variable(prefix_idx + 1),
-            RuleElement::String("test".to_string()),
-            RuleElement::Variable(suffix_idx + 1)
+            BinaryFormatElement::Variable(prefix_idx + 1),
+            BinaryFormatElement::String("test".to_string()),
+            BinaryFormatElement::Variable(suffix_idx + 1)
         ],
-        vec![RuleElement::String("result".to_string())]
+        vec![BinaryFormatElement::String("result".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -223,20 +223,20 @@ fn test_overlapping_patterns() {
     
     // Rule 1: "ah" => "အ"
     add_rule(&mut km2,
-        vec![RuleElement::String("ah".to_string())],
-        vec![RuleElement::String("အ".to_string())]
+        vec![BinaryFormatElement::String("ah".to_string())],
+        vec![BinaryFormatElement::String("အ".to_string())]
     );
     
     // Rule 2: "aww" => "ဪ" (should take precedence when typing "aww")
     add_rule(&mut km2,
-        vec![RuleElement::String("aww".to_string())],
-        vec![RuleElement::String("ဪ".to_string())]
+        vec![BinaryFormatElement::String("aww".to_string())],
+        vec![BinaryFormatElement::String("ဪ".to_string())]
     );
 
     // Rule 3: "h" => "ဟ"
     add_rule(&mut km2,
-        vec![RuleElement::String("h".to_string())],
-        vec![RuleElement::String("ဟ".to_string())]
+        vec![BinaryFormatElement::String("h".to_string())],
+        vec![BinaryFormatElement::String("ဟ".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();

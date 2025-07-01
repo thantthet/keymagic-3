@@ -1,7 +1,7 @@
 use crate::{
     Error, Result,
     km2::Km2Loader,
-    types::{Km2File, RuleElement, VirtualKey},
+    types::{Km2File, BinaryFormatElement, VirtualKey, FLAG_ANYOF, FLAG_NANYOF},
 };
 use super::{EngineState, KeyInput, EngineOutput, matcher::RuleMatcher};
 
@@ -65,48 +65,58 @@ impl KeyMagicEngine {
     }
     
     /// Count state elements in a rule
-    fn count_states(elements: &[RuleElement]) -> usize {
-        elements.iter().filter(|e| matches!(e, RuleElement::Switch(_))).count()
+    fn count_states(elements: &[BinaryFormatElement]) -> usize {
+        elements.iter().filter(|e| matches!(e, BinaryFormatElement::Switch(_))).count()
     }
     
     /// Count virtual key elements in a rule
-    fn count_virtual_keys(elements: &[RuleElement]) -> usize {
-        elements.iter().filter(|e| matches!(e, RuleElement::Predefined(_))).count()
+    fn count_virtual_keys(elements: &[BinaryFormatElement]) -> usize {
+        elements.iter().filter(|e| matches!(e, BinaryFormatElement::Predefined(_))).count()
     }
     
     /// Calculate the total matching character length of a rule
-    fn calculate_rule_length(elements: &[RuleElement], strings: &[crate::types::StringEntry]) -> usize {
+    fn calculate_rule_length(elements: &[BinaryFormatElement], strings: &[crate::types::StringEntry]) -> usize {
         let mut length = 0;
         let mut i = 0;
         
         while i < elements.len() {
             match &elements[i] {
-                RuleElement::String(s) => {
+                BinaryFormatElement::String(s) => {
                     length += s.chars().count();
                 }
-                RuleElement::Variable(idx) => {
-                    // Get variable string length
+                BinaryFormatElement::Variable(idx) => {
+                    // Check if followed by ANYOF/NANYOF modifier
+                    if i + 1 < elements.len() {
+                        if let BinaryFormatElement::Modifier(flags) = &elements[i + 1] {
+                            if *flags == FLAG_ANYOF || *flags == FLAG_NANYOF {
+                                length += 1;
+                                i += 1; // Skip the modifier
+                                continue;
+                            }
+                        }
+                    }
+                    // Regular variable - count its content length
                     if *idx > 0 && *idx <= strings.len() {
                         length += strings[*idx - 1].value.chars().count();
                     }
                 }
-                RuleElement::AnyOf(_) | RuleElement::NotAnyOf(_) | RuleElement::Any => {
+                BinaryFormatElement::Any => {
                     length += 1;
                 }
-                RuleElement::Predefined(_) => {
+                BinaryFormatElement::Predefined(_) => {
                     // Count (AND + Predefined)+ as 1
                     length += 1;
                     // Skip any following AND + Predefined combinations
                     while i + 2 < elements.len() {
-                        if matches!(elements[i + 1], RuleElement::And) 
-                            && matches!(elements[i + 2], RuleElement::Predefined(_)) {
+                        if matches!(elements[i + 1], BinaryFormatElement::And) 
+                            && matches!(elements[i + 2], BinaryFormatElement::Predefined(_)) {
                             i += 2;
                         } else {
                             break;
                         }
                     }
                 }
-                RuleElement::Switch(_) => {
+                BinaryFormatElement::Switch(_) => {
                     // States don't contribute to length
                 }
                 _ => {}
@@ -203,7 +213,7 @@ impl KeyMagicEngine {
             
             // Collect all state switches from RHS
             for element in &match_result.rule.rhs {
-                if let RuleElement::Switch(state_idx) = element {
+                if let BinaryFormatElement::Switch(state_idx) = element {
                     self.state.add_state(*state_idx);
                 }
             }
@@ -211,7 +221,7 @@ impl KeyMagicEngine {
             // If RHS only contains state switches (and is not empty), don't produce output
             let has_only_state_switches = !match_result.rule.rhs.is_empty() && 
                 match_result.rule.rhs.iter()
-                    .all(|e| matches!(e, RuleElement::Switch(_)));
+                    .all(|e| matches!(e, BinaryFormatElement::Switch(_)));
             
             if has_only_state_switches {
                 return Ok(EngineOutput::pass_through());
@@ -282,7 +292,7 @@ impl KeyMagicEngine {
             
             // Collect all state switches from RHS
             for element in &match_result.rule.rhs {
-                if let RuleElement::Switch(state_idx) = element {
+                if let BinaryFormatElement::Switch(state_idx) = element {
                     self.state.add_state(*state_idx);
                 }
             }
@@ -290,7 +300,7 @@ impl KeyMagicEngine {
             // If RHS only contains state switches (and is not empty), don't produce output
             let has_only_state_switches = !match_result.rule.rhs.is_empty() && 
                 match_result.rule.rhs.iter()
-                    .all(|e| matches!(e, RuleElement::Switch(_)));
+                    .all(|e| matches!(e, BinaryFormatElement::Switch(_)));
             
             if has_only_state_switches {
                 return Ok(EngineOutput::pass_through());

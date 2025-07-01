@@ -169,18 +169,18 @@ impl Compiler {
         Ok(Rule { lhs, rhs })
     }
 
-    fn compile_pattern(&mut self, pattern: &[PatternElement]) -> std::result::Result<Vec<RuleElement>, KmsError> {
+    fn compile_pattern(&mut self, pattern: &[PatternElement]) -> std::result::Result<Vec<BinaryFormatElement>, KmsError> {
         let mut elements = Vec::new();
         
         for elem in pattern {
             match elem {
                 PatternElement::String(s) => {
                     let processed = self.process_string_escapes(s)?;
-                    elements.push(RuleElement::String(processed));
+                    elements.push(BinaryFormatElement::String(processed));
                 }
                 PatternElement::Unicode(code) => {
                     if let Some(ch) = char::from_u32(*code) {
-                        elements.push(RuleElement::String(ch.to_string()));
+                        elements.push(BinaryFormatElement::String(ch.to_string()));
                     } else {
                         return Err(KmsError::InvalidUnicode(format!("U{:04X}", code)));
                     }
@@ -188,7 +188,7 @@ impl Compiler {
                 PatternElement::Variable(var) => {
                     let var_name = var.trim_start_matches('$');
                     if let Some(&idx) = self.variables.get(var_name) {
-                        elements.push(RuleElement::Variable(idx + 1)); // 1-based
+                        elements.push(BinaryFormatElement::Variable(idx + 1)); // 1-based
                     } else {
                         return Err(KmsError::UndefinedVariable(var.clone()));
                     }
@@ -197,8 +197,8 @@ impl Compiler {
                     let var_name = var.trim_start_matches('$');
                     if let Some(&idx) = self.variables.get(var_name) {
                         // Reference parser uses: opVARIABLE + idx, then opMODIFIER + opANYOF
-                        elements.push(RuleElement::Variable(idx + 1)); // 1-based
-                        elements.push(RuleElement::Modifier(OP_ANYOF));
+                        elements.push(BinaryFormatElement::Variable(idx + 1)); // 1-based
+                        elements.push(BinaryFormatElement::Modifier(FLAG_ANYOF));
                     } else {
                         return Err(KmsError::UndefinedVariable(var.clone()));
                     }
@@ -207,38 +207,38 @@ impl Compiler {
                     let var_name = var.trim_start_matches('$');
                     if let Some(&idx) = self.variables.get(var_name) {
                         // Reference parser uses: opVARIABLE + idx, then opMODIFIER + opNANYOF
-                        elements.push(RuleElement::Variable(idx + 1)); // 1-based
-                        elements.push(RuleElement::Modifier(OP_NANYOF));
+                        elements.push(BinaryFormatElement::Variable(idx + 1)); // 1-based
+                        elements.push(BinaryFormatElement::Modifier(FLAG_NANYOF));
                     } else {
                         return Err(KmsError::UndefinedVariable(var.clone()));
                     }
                 }
                 PatternElement::VirtualKey(key) => {
                     // Reference parser always adds opAND for VK in angle brackets
-                    elements.push(RuleElement::And);
+                    elements.push(BinaryFormatElement::And);
                     if let Some(&vk) = self.vk_map.get(key.as_str()) {
-                        elements.push(RuleElement::Predefined(vk as u16));
+                        elements.push(BinaryFormatElement::Predefined(vk as u16));
                     } else {
                         return Err(KmsError::InvalidVirtualKey(key.clone()));
                     }
                 }
                 PatternElement::VirtualKeyCombo(keys) => {
                     // Reference parser puts opAND first, then all the keys
-                    elements.push(RuleElement::And);
+                    elements.push(BinaryFormatElement::And);
                     for key in keys {
                         if let Some(&vk) = self.vk_map.get(key.as_str()) {
-                            elements.push(RuleElement::Predefined(vk as u16));
+                            elements.push(BinaryFormatElement::Predefined(vk as u16));
                         } else {
                             return Err(KmsError::InvalidVirtualKey(key.clone()));
                         }
                     }
                 }
                 PatternElement::Any => {
-                    elements.push(RuleElement::Any);
+                    elements.push(BinaryFormatElement::Any);
                 }
                 PatternElement::State(state) => {
                     if let Some(&idx) = self.states.get(state) {
-                        elements.push(RuleElement::Switch(idx));
+                        elements.push(BinaryFormatElement::Switch(idx));
                     } else {
                         return Err(KmsError::InvalidRule(format!("Unknown state: {}", state)));
                     }
@@ -249,18 +249,18 @@ impl Compiler {
         Ok(elements)
     }
 
-    fn compile_output(&mut self, output: &[OutputElement]) -> std::result::Result<Vec<RuleElement>, KmsError> {
+    fn compile_output(&mut self, output: &[OutputElement]) -> std::result::Result<Vec<BinaryFormatElement>, KmsError> {
         let mut elements = Vec::new();
         
         for elem in output {
             match elem {
                 OutputElement::String(s) => {
                     let processed = self.process_string_escapes(s)?;
-                    elements.push(RuleElement::String(processed));
+                    elements.push(BinaryFormatElement::String(processed));
                 }
                 OutputElement::Unicode(code) => {
                     if let Some(ch) = char::from_u32(*code) {
-                        elements.push(RuleElement::String(ch.to_string()));
+                        elements.push(BinaryFormatElement::String(ch.to_string()));
                     } else {
                         return Err(KmsError::InvalidUnicode(format!("U{:04X}", code)));
                     }
@@ -268,7 +268,7 @@ impl Compiler {
                 OutputElement::Variable(var) => {
                     let var_name = var.trim_start_matches('$');
                     if let Some(&idx) = self.variables.get(var_name) {
-                        elements.push(RuleElement::Variable(idx + 1)); // 1-based
+                        elements.push(BinaryFormatElement::Variable(idx + 1)); // 1-based
                     } else {
                         return Err(KmsError::UndefinedVariable(var.clone()));
                     }
@@ -276,22 +276,22 @@ impl Compiler {
                 OutputElement::VariableIndexed(var, idx) => {
                     let var_name = var.trim_start_matches('$');
                     if let Some(&var_idx) = self.variables.get(var_name) {
-                        elements.push(RuleElement::Variable(var_idx + 1)); // 1-based
-                        elements.push(RuleElement::Modifier(*idx as u16)); // opMODIFIER + numeric index
+                        elements.push(BinaryFormatElement::Variable(var_idx + 1)); // 1-based
+                        elements.push(BinaryFormatElement::Modifier(*idx as u16)); // opMODIFIER + numeric index
                     } else {
                         return Err(KmsError::UndefinedVariable(var.clone()));
                     }
                 }
                 OutputElement::BackRef(idx) => {
-                    elements.push(RuleElement::Reference(*idx));
+                    elements.push(BinaryFormatElement::Reference(*idx));
                 }
                 OutputElement::Null => {
                     // NULL is represented as opPREDEFINED(1) = pdNULL
-                    elements.push(RuleElement::Predefined(1));
+                    elements.push(BinaryFormatElement::Predefined(1));
                 }
                 OutputElement::State(state) => {
                     if let Some(&idx) = self.states.get(state) {
-                        elements.push(RuleElement::Switch(idx));
+                        elements.push(BinaryFormatElement::Switch(idx));
                     } else {
                         return Err(KmsError::InvalidRule(format!("Unknown state: {}", state)));
                     }

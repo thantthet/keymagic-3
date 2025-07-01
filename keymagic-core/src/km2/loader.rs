@@ -1,4 +1,4 @@
-use crate::types::{FileHeader, Km2File, StringEntry, InfoEntry, Rule, RuleElement, LayoutOptions};
+use crate::types::{FileHeader, Km2File, StringEntry, InfoEntry, Rule, BinaryFormatElement, LayoutOptions};
 use crate::types::opcodes::*;
 use super::error::{Km2Error, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -141,7 +141,7 @@ impl Km2Loader {
     }
     
     /// Read rule elements
-    fn read_rule_elements(cursor: &mut Cursor<&[u8]>, byte_len: usize) -> Result<Vec<RuleElement>> {
+    fn read_rule_elements(cursor: &mut Cursor<&[u8]>, byte_len: usize) -> Result<Vec<BinaryFormatElement>> {
         let start_pos = cursor.position() as usize;
         let mut elements = Vec::new();
         
@@ -157,41 +157,43 @@ impl Km2Loader {
                     }
                     let value = String::from_utf16(&utf16_data)
                         .map_err(|_| Km2Error::InvalidUtf16(cursor.position() as usize))?;
-                    RuleElement::String(value)
+                    BinaryFormatElement::String(value)
                 }
                 OP_VARIABLE => {
                     let index = cursor.read_u16::<LittleEndian>()? as usize;
-                    RuleElement::Variable(index)
+                    BinaryFormatElement::Variable(index)
                 }
                 OP_REFERENCE => {
                     let index = cursor.read_u16::<LittleEndian>()? as usize;
-                    RuleElement::Reference(index)
+                    BinaryFormatElement::Reference(index)
                 }
                 OP_PREDEFINED => {
                     let vk_code = cursor.read_u16::<LittleEndian>()?;
-                    RuleElement::Predefined(vk_code)
+                    BinaryFormatElement::Predefined(vk_code)
                 }
                 OP_MODIFIER => {
                     let flags = cursor.read_u16::<LittleEndian>()?;
-                    RuleElement::Modifier(flags)
+                    BinaryFormatElement::Modifier(flags)
                 }
                 OP_ANYOF => {
-                    let var_index = cursor.read_u16::<LittleEndian>()? as usize;
-                    RuleElement::AnyOf(var_index)
+                    // OP_ANYOF and OP_NANYOF are used as modifier flags, not standalone opcodes
+                    // They should follow a Variable element
+                    BinaryFormatElement::Modifier(FLAG_ANYOF)
                 }
                 OP_AND => {
-                    RuleElement::And
+                    BinaryFormatElement::And
                 }
                 OP_NANYOF => {
-                    let var_index = cursor.read_u16::<LittleEndian>()? as usize;
-                    RuleElement::NotAnyOf(var_index)
+                    // OP_ANYOF and OP_NANYOF are used as modifier flags, not standalone opcodes
+                    // They should follow a Variable element
+                    BinaryFormatElement::Modifier(FLAG_NANYOF)
                 }
                 OP_ANY => {
-                    RuleElement::Any
+                    BinaryFormatElement::Any
                 }
                 OP_SWITCH => {
                     let string_index = cursor.read_u16::<LittleEndian>()? as usize;
-                    RuleElement::Switch(string_index)
+                    BinaryFormatElement::Switch(string_index)
                 }
                 _ => return Err(Km2Error::InvalidOpcode(opcode)),
             };

@@ -174,7 +174,7 @@ KMS: `$consonants[*] => $vowels[$1]`
 
 Binary encoding:
 ```
-LHS: opANYOF, variable_index_consonants
+LHS: opVARIABLE, variable_index_consonants, opMODIFIER(opANYOF)
 RHS: opVARIABLE, variable_index_vowels, opREFERENCE, 0x0001
 ```
 

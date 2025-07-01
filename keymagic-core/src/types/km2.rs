@@ -122,22 +122,22 @@ impl Metadata {
 
 #[derive(Debug, Clone)]
 pub struct Rule {
-    pub lhs: Vec<RuleElement>,
-    pub rhs: Vec<RuleElement>,
+    pub lhs: Vec<BinaryFormatElement>,
+    pub rhs: Vec<BinaryFormatElement>,
 }
 
+/// Binary format element from KM2 file
+/// These directly represent the opcodes and data from the compiled KM2 format
 #[derive(Debug, Clone)]
-pub enum RuleElement {
+pub enum BinaryFormatElement {
     String(String),
-    Variable(usize),            // 1-based index
+    Variable(usize),            // 1-based index into strings table
     Reference(usize),           // Back-reference ($1, $2, etc.)
     Predefined(u16),           // Virtual key code
-    Modifier(u16),             // Modifier flags (actually an opcode like opANYOF)
-    AnyOf(usize),              // Variable index for [*]
-    And,                       // Logical AND
-    NotAnyOf(usize),           // Variable index for [^]
-    Any,                       // ANY keyword
-    Switch(usize),             // State switch (index into strings)
+    Modifier(u16),             // Modifier flags (FLAG_ANYOF, FLAG_NANYOF, or numeric index)
+    And,                       // Logical AND for combining keys
+    Any,                       // ANY keyword - matches any character
+    Switch(usize),             // State switch (index into strings table)
 }
 
 #[derive(Debug)]

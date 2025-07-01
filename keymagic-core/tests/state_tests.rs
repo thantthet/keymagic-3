@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use keymagic_core::{RuleElement, KeyMagicEngine, VirtualKey};
+use keymagic_core::{BinaryFormatElement, KeyMagicEngine, VirtualKey};
 
 #[test]
 fn test_basic_state_toggle() {
@@ -13,23 +13,23 @@ fn test_basic_state_toggle() {
     
     // Rule to enter state
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::Oem3 as u16)],
-        vec![RuleElement::Switch(state_idx + 1)]
+        vec![BinaryFormatElement::Predefined(VirtualKey::Oem3 as u16)],
+        vec![BinaryFormatElement::Switch(state_idx + 1)]
     );
     
     // Rule that only works in state: ('zawgyi') + '1' => "၁"
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state_idx + 1),
-            RuleElement::String("1".to_string())
+            BinaryFormatElement::Switch(state_idx + 1),
+            BinaryFormatElement::String("1".to_string())
         ],
-        vec![RuleElement::String("၁".to_string())]
+        vec![BinaryFormatElement::String("၁".to_string())]
     );
     
     // Normal rule: '1' => "1"
     add_rule(&mut km2,
-        vec![RuleElement::String("1".to_string())],
-        vec![RuleElement::String("1".to_string())]
+        vec![BinaryFormatElement::String("1".to_string())],
+        vec![BinaryFormatElement::String("1".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -66,37 +66,37 @@ fn test_multiple_states() {
     
     // Rules to enter states
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::F1 as u16)],
-        vec![RuleElement::Switch(state1_idx + 1)]
+        vec![BinaryFormatElement::Predefined(VirtualKey::F1 as u16)],
+        vec![BinaryFormatElement::Switch(state1_idx + 1)]
     );
     
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::F2 as u16)],
-        vec![RuleElement::Switch(state2_idx + 1)]
+        vec![BinaryFormatElement::Predefined(VirtualKey::F2 as u16)],
+        vec![BinaryFormatElement::Switch(state2_idx + 1)]
     );
     
     // Rule that works in state1: ('state1') + 'a' => "A1"
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state1_idx + 1),
-            RuleElement::String("a".to_string())
+            BinaryFormatElement::Switch(state1_idx + 1),
+            BinaryFormatElement::String("a".to_string())
         ],
-        vec![RuleElement::String("A1".to_string())]
+        vec![BinaryFormatElement::String("A1".to_string())]
     );
     
     // Rule that works in state2: ('state2') + 'a' => "A2"
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state2_idx + 1),
-            RuleElement::String("a".to_string())
+            BinaryFormatElement::Switch(state2_idx + 1),
+            BinaryFormatElement::String("a".to_string())
         ],
-        vec![RuleElement::String("A2".to_string())]
+        vec![BinaryFormatElement::String("A2".to_string())]
     );
     
     // Default rule: 'a' => "a"
     add_rule(&mut km2,
-        vec![RuleElement::String("a".to_string())],
-        vec![RuleElement::String("a".to_string())]
+        vec![BinaryFormatElement::String("a".to_string())],
+        vec![BinaryFormatElement::String("a".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -137,19 +137,19 @@ fn test_state_with_any_wildcard() {
     
     // Rule to enter state
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::F3 as u16)],
-        vec![RuleElement::Switch(state_idx + 1)]
+        vec![BinaryFormatElement::Predefined(VirtualKey::F3 as u16)],
+        vec![BinaryFormatElement::Switch(state_idx + 1)]
     );
     
     // Rule in state that matches ANY and maintains state
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state_idx + 1),
-            RuleElement::Any
+            BinaryFormatElement::Switch(state_idx + 1),
+            BinaryFormatElement::Any
         ],
         vec![
-            RuleElement::Reference(1), // $1 - the matched character
-            RuleElement::Reference(1)  // $1 - the matched character
+            BinaryFormatElement::Reference(1), // $1 - the matched character
+            BinaryFormatElement::Reference(1)  // $1 - the matched character
         ]
     );
     
@@ -177,38 +177,38 @@ fn test_state_based_digit_conversion() {
     
     // Rule to enter Zawgyi mode
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::Oem3 as u16)],
-        vec![RuleElement::Switch(zg_state_idx + 1)]
+        vec![BinaryFormatElement::Predefined(VirtualKey::Oem3 as u16)],
+        vec![BinaryFormatElement::Switch(zg_state_idx + 1)]
     );
     
     // Zawgyi digit rules in state
     // ('zg_key') + '1' => U100D + U1039 + U100D
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(zg_state_idx + 1),
-            RuleElement::String("1".to_string())
+            BinaryFormatElement::Switch(zg_state_idx + 1),
+            BinaryFormatElement::String("1".to_string())
         ],
-        vec![RuleElement::String("\u{100D}\u{1039}\u{100D}".to_string())]
+        vec![BinaryFormatElement::String("\u{100D}\u{1039}\u{100D}".to_string())]
     );
     
     // ('zg_key') + '2' => U100E + U1039 + U100E
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(zg_state_idx + 1),
-            RuleElement::String("2".to_string())
+            BinaryFormatElement::Switch(zg_state_idx + 1),
+            BinaryFormatElement::String("2".to_string())
         ],
-        vec![RuleElement::String("\u{100E}\u{1039}\u{100E}".to_string())]
+        vec![BinaryFormatElement::String("\u{100E}\u{1039}\u{100E}".to_string())]
     );
     
     // Normal digit rules
     add_rule(&mut km2,
-        vec![RuleElement::String("1".to_string())],
-        vec![RuleElement::String("၁".to_string())]
+        vec![BinaryFormatElement::String("1".to_string())],
+        vec![BinaryFormatElement::String("၁".to_string())]
     );
     
     add_rule(&mut km2,
-        vec![RuleElement::String("2".to_string())],
-        vec![RuleElement::String("၂".to_string())]
+        vec![BinaryFormatElement::String("2".to_string())],
+        vec![BinaryFormatElement::String("၂".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -257,36 +257,36 @@ fn test_multiple_active_states() {
     
     // Rule to enter both states at once
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::F5 as u16)],
+        vec![BinaryFormatElement::Predefined(VirtualKey::F5 as u16)],
         vec![
-            RuleElement::Switch(state1_idx + 1),
-            RuleElement::Switch(state2_idx + 1)
+            BinaryFormatElement::Switch(state1_idx + 1),
+            BinaryFormatElement::Switch(state2_idx + 1)
         ]
     );
     
     // Rule that only works when both states are active
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state1_idx + 1),
-            RuleElement::Switch(state2_idx + 1),
-            RuleElement::String("x".to_string())
+            BinaryFormatElement::Switch(state1_idx + 1),
+            BinaryFormatElement::Switch(state2_idx + 1),
+            BinaryFormatElement::String("x".to_string())
         ],
-        vec![RuleElement::String("BOTH".to_string())]
+        vec![BinaryFormatElement::String("BOTH".to_string())]
     );
     
     // Rule for state1 only
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state1_idx + 1),
-            RuleElement::String("x".to_string())
+            BinaryFormatElement::Switch(state1_idx + 1),
+            BinaryFormatElement::String("x".to_string())
         ],
-        vec![RuleElement::String("S1".to_string())]
+        vec![BinaryFormatElement::String("S1".to_string())]
     );
     
     // Default rule
     add_rule(&mut km2,
-        vec![RuleElement::String("x".to_string())],
-        vec![RuleElement::String("x".to_string())]
+        vec![BinaryFormatElement::String("x".to_string())],
+        vec![BinaryFormatElement::String("x".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();
@@ -317,23 +317,23 @@ fn test_state_priority_in_rule_sorting() {
     
     // Rule to enter state
     add_rule(&mut km2,
-        vec![RuleElement::Predefined(VirtualKey::F4 as u16)],
-        vec![RuleElement::Switch(state_idx + 1)]
+        vec![BinaryFormatElement::Predefined(VirtualKey::F4 as u16)],
+        vec![BinaryFormatElement::Switch(state_idx + 1)]
     );
     
     // Long non-state rule: "test" => "normal"
     add_rule(&mut km2,
-        vec![RuleElement::String("test".to_string())],
-        vec![RuleElement::String("normal".to_string())]
+        vec![BinaryFormatElement::String("test".to_string())],
+        vec![BinaryFormatElement::String("normal".to_string())]
     );
     
     // Short state rule: ('priority_test') + 't' => "state"
     add_rule(&mut km2,
         vec![
-            RuleElement::Switch(state_idx + 1),
-            RuleElement::String("t".to_string())
+            BinaryFormatElement::Switch(state_idx + 1),
+            BinaryFormatElement::String("t".to_string())
         ],
-        vec![RuleElement::String("state".to_string())]
+        vec![BinaryFormatElement::String("state".to_string())]
     );
     
     let binary = create_km2_binary(&km2).unwrap();

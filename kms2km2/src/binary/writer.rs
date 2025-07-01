@@ -96,7 +96,7 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn write_rule_elements(&mut self, elements: &[RuleElement]) -> std::result::Result<(), KmsError> {
+    fn write_rule_elements(&mut self, elements: &[BinaryFormatElement]) -> std::result::Result<(), KmsError> {
         // Calculate total size in opcodes
         let mut size = 0u16;
         for elem in elements {
@@ -114,61 +114,51 @@ impl<W: Write> Km2Writer<W> {
         Ok(())
     }
 
-    fn element_size(&self, elem: &RuleElement) -> u16 {
+    fn element_size(&self, elem: &BinaryFormatElement) -> u16 {
         match elem {
-            RuleElement::String(s) => {
+            BinaryFormatElement::String(s) => {
                 let utf16_len = s.encode_utf16().count() as u16;
                 1 + 1 + utf16_len  // opcode + length + data
             }
-            RuleElement::Variable(_) |
-            RuleElement::Reference(_) |
-            RuleElement::Predefined(_) |
-            RuleElement::Modifier(_) |
-            RuleElement::AnyOf(_) |
-            RuleElement::NotAnyOf(_) => 2,  // opcode + parameter
-            RuleElement::And |
-            RuleElement::Any => 1,  // just opcode
-            RuleElement::Switch(_) => 2,  // opcode + index
+            BinaryFormatElement::Variable(_) |
+            BinaryFormatElement::Reference(_) |
+            BinaryFormatElement::Predefined(_) |
+            BinaryFormatElement::Modifier(_) => 2,  // opcode + parameter
+            BinaryFormatElement::And |
+            BinaryFormatElement::Any => 1,  // just opcode
+            BinaryFormatElement::Switch(_) => 2,  // opcode + index
         }
     }
 
-    fn write_rule_element(&mut self, elem: &RuleElement) -> std::result::Result<(), KmsError> {
+    fn write_rule_element(&mut self, elem: &BinaryFormatElement) -> std::result::Result<(), KmsError> {
         match elem {
-            RuleElement::String(s) => {
+            BinaryFormatElement::String(s) => {
                 self.writer.write_u16::<LittleEndian>(OP_STRING)?;
                 self.write_string(s)?;
             }
-            RuleElement::Variable(idx) => {
+            BinaryFormatElement::Variable(idx) => {
                 self.writer.write_u16::<LittleEndian>(OP_VARIABLE)?;
                 self.writer.write_u16::<LittleEndian>(*idx as u16)?;
             }
-            RuleElement::Reference(idx) => {
+            BinaryFormatElement::Reference(idx) => {
                 self.writer.write_u16::<LittleEndian>(OP_REFERENCE)?;
                 self.writer.write_u16::<LittleEndian>(*idx as u16)?;
             }
-            RuleElement::Predefined(vk) => {
+            BinaryFormatElement::Predefined(vk) => {
                 self.writer.write_u16::<LittleEndian>(OP_PREDEFINED)?;
                 self.writer.write_u16::<LittleEndian>(*vk)?;
             }
-            RuleElement::Modifier(mod_flags) => {
+            BinaryFormatElement::Modifier(mod_flags) => {
                 self.writer.write_u16::<LittleEndian>(OP_MODIFIER)?;
                 self.writer.write_u16::<LittleEndian>(*mod_flags)?;
             }
-            RuleElement::AnyOf(idx) => {
-                self.writer.write_u16::<LittleEndian>(OP_ANYOF)?;
-                self.writer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-            RuleElement::And => {
+            BinaryFormatElement::And => {
                 self.writer.write_u16::<LittleEndian>(OP_AND)?;
             }
-            RuleElement::NotAnyOf(idx) => {
-                self.writer.write_u16::<LittleEndian>(OP_NANYOF)?;
-                self.writer.write_u16::<LittleEndian>(*idx as u16)?;
-            }
-            RuleElement::Any => {
+            BinaryFormatElement::Any => {
                 self.writer.write_u16::<LittleEndian>(OP_ANY)?;
             }
-            RuleElement::Switch(idx) => {
+            BinaryFormatElement::Switch(idx) => {
                 self.writer.write_u16::<LittleEndian>(OP_SWITCH)?;
                 self.writer.write_u16::<LittleEndian>((*idx + 1) as u16)?; // 1-based
             }

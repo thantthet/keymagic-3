@@ -77,7 +77,7 @@ fn test_state_handling() {
     let mut state_indices = std::collections::HashSet::new();
     for rule in &km2.rules {
         for element in &rule.rhs {
-            if let RuleElement::Switch(idx) = element {
+            if let BinaryFormatElement::Switch(idx) = element {
                 state_indices.insert(*idx);
             }
         }
@@ -126,9 +126,9 @@ fn test_comprehensive_conversion() {
         // Check for ANYOF pattern (Variable + Modifier(OP_ANYOF))
         let lhs_vec: Vec<_> = rule.lhs.iter().collect();
         for i in 0..lhs_vec.len() {
-            if let RuleElement::Variable(_) = lhs_vec[i] {
+            if let BinaryFormatElement::Variable(_) = lhs_vec[i] {
                 if i + 1 < lhs_vec.len() {
-                    if let RuleElement::Modifier(op) = lhs_vec[i + 1] {
+                    if let BinaryFormatElement::Modifier(op) = lhs_vec[i + 1] {
                         if *op == OP_ANYOF {
                             has_anyof_pattern = true;
                         }
@@ -137,16 +137,16 @@ fn test_comprehensive_conversion() {
             }
             
             match lhs_vec[i] {
-                RuleElement::String(_) => has_string_rule = true,
-                RuleElement::Variable(_) => has_variable_rule = true,
-                RuleElement::Predefined(_) => has_vk_rule = true,
-                RuleElement::Switch(_) => has_state_rule = true,
+                BinaryFormatElement::String(_) => has_string_rule = true,
+                BinaryFormatElement::Variable(_) => has_variable_rule = true,
+                BinaryFormatElement::Predefined(_) => has_vk_rule = true,
+                BinaryFormatElement::Switch(_) => has_state_rule = true,
                 _ => {}
             }
         }
         
         for element in &rule.rhs {
-            if let RuleElement::Reference(_) = element {
+            if let BinaryFormatElement::Reference(_) = element {
                 has_reference_rule = true;
             }
         }
@@ -308,9 +308,9 @@ ANY + "test" => $1 + "_test"
         
         // Check LHS for patterns
         for i in 0..lhs_vec.len() {
-            if let RuleElement::Variable(_) = lhs_vec[i] {
+            if let BinaryFormatElement::Variable(_) = lhs_vec[i] {
                 if i + 1 < lhs_vec.len() {
-                    if let RuleElement::Modifier(op) = lhs_vec[i + 1] {
+                    if let BinaryFormatElement::Modifier(op) = lhs_vec[i + 1] {
                         match *op {
                             OP_ANYOF => has_anyof_pattern = true,
                             OP_NANYOF => has_nanyof_pattern = true,
@@ -321,16 +321,16 @@ ANY + "test" => $1 + "_test"
             }
             
             match lhs_vec[i] {
-                RuleElement::Any => has_any = true,
-                RuleElement::Predefined(_) => has_predefined = true,
-                RuleElement::Modifier(_) => has_modifier = true,
+                BinaryFormatElement::Any => has_any = true,
+                BinaryFormatElement::Predefined(_) => has_predefined = true,
+                BinaryFormatElement::Modifier(_) => has_modifier = true,
                 _ => {}
             }
         }
         
         // Check RHS for references
         for elem in &rule.rhs {
-            if matches!(elem, RuleElement::Reference(_)) {
+            if matches!(elem, BinaryFormatElement::Reference(_)) {
                 has_reference = true;
             }
         }
@@ -417,12 +417,12 @@ fn test_state_transitions() {
     
     for rule in &km2.rules {
         for element in &rule.lhs {
-            if matches!(element, RuleElement::Switch(_)) {
+            if matches!(element, BinaryFormatElement::Switch(_)) {
                 pattern_switches += 1;
             }
         }
         for element in &rule.rhs {
-            if matches!(element, RuleElement::Switch(_)) {
+            if matches!(element, BinaryFormatElement::Switch(_)) {
                 output_switches += 1;
             }
         }
@@ -510,15 +510,15 @@ fn test_modifier_combinations() {
     let mut rules_with_modifiers = 0;
     
     for rule in &km2.rules {
-        let has_and = rule.lhs.iter().any(|e| matches!(e, RuleElement::And));
+        let has_and = rule.lhs.iter().any(|e| matches!(e, BinaryFormatElement::And));
         if has_and {
             rules_with_modifiers += 1;
         }
         
         for element in &rule.lhs {
             match element {
-                RuleElement::And => and_count += 1,
-                RuleElement::Predefined(_) => predefined_count += 1,
+                BinaryFormatElement::And => and_count += 1,
+                BinaryFormatElement::Predefined(_) => predefined_count += 1,
                 _ => {}
             }
         }

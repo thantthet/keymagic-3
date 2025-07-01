@@ -1,4 +1,4 @@
-use keymagic_core::{Km2File, FileHeader, LayoutOptions, InfoEntry, StringEntry, Rule, RuleElement};
+use keymagic_core::{Km2File, FileHeader, LayoutOptions, InfoEntry, StringEntry, Rule, BinaryFormatElement};
 
 /// Creates a KM2 binary file from a Km2File struct
 pub fn create_km2_binary(km2: &Km2File) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -51,7 +51,7 @@ pub fn add_string(km2: &mut Km2File, value: &str) -> usize {
 
 /// Adds a rule to the Km2File
 #[allow(dead_code)]
-pub fn add_rule(km2: &mut Km2File, lhs: Vec<RuleElement>, rhs: Vec<RuleElement>) {
+pub fn add_rule(km2: &mut Km2File, lhs: Vec<BinaryFormatElement>, rhs: Vec<BinaryFormatElement>) {
     km2.rules.push(Rule { lhs, rhs });
     km2.header.rule_count = km2.rules.len() as u16;
 }
