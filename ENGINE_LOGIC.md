@@ -55,7 +55,30 @@ These capabilities are essential for:
     - Composing text changes to: "Title"
     - Action generated: backspace 4, insert "Title"
 
-4.  **Return Value**: The `process_key` method returns an `Output` object containing:
+4.  **Recursive Rule Matching**: KeyMagic supports recursive rule matching, allowing rule outputs to trigger additional rules. This enables complex transformations and rule chaining.
+
+    **Initial vs Subsequent Matching**:
+    - **Initial Rule Matching**: When a physical key is pressed, the matcher receives both the virtual key code (VK) and the character representation. This allows rules to match based on either the key itself (e.g., `<VK_KEY_A>`) or the character it produces (e.g., 'a').
+    - **Subsequent Rule Matching**: During recursive matching (when processing rule output), the matcher receives only the composing text - no VK or character input. This ensures that only text-based rules can match during recursion, not key-based rules.
+
+    **Rule Chaining Example**:
+    ```
+    <VK_KEY_A> => 'a'
+    <VK_KEY_B> => 'b'
+    <VK_KEY_C> => 'c'
+    'abc' => 'x'
+    ```
+
+    With these rules, pressing keys A, B, C in sequence:
+    1. Press A: Matches `<VK_KEY_A> => 'a'`, composing text becomes "a"
+    2. Press B: Matches `<VK_KEY_B> => 'b'`, composing text becomes "ab"
+    3. Press C: Matches `<VK_KEY_C> => 'c'`, composing text becomes "abc"
+    4. Recursive match: The composing text "abc" matches `'abc' => 'x'`
+    5. Final output: "x" (with action: backspace 2, insert "x")
+
+    This design allows virtual key rules to produce characters that can then be transformed by text-based rules, enabling sophisticated input method behaviors while preventing infinite loops from key-based rules.
+
+5.  **Return Value**: The `process_key` method returns an `Output` object containing:
     - **Composing Text**: The current accumulated text in the composing buffer
     - **Actions**: Specific instructions for modifying the text (insert, delete count, or combination)
     
