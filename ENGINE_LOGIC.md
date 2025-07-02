@@ -33,15 +33,24 @@ These capabilities are essential for:
 
 1.  **State Update**: The engine first updates its internal state based on the new input. This includes updating the context with the new character and resetting any flags.
 
-2.  **Rule Matching**: The `Matcher` is invoked to find a matching rule in the keyboard layout. The matching process is as follows:
-    - The `Matcher` iterates through the rules in the keyboard layout.
+2.  **Rule Matching**: The `Matcher` is invoked to find a matching rule in the keyboard layout. Before matching, rules are pre-sorted to ensure a deterministic and logical matching order.
+
+    **Rule Priority**:
+    Rules are sorted and matched based on the following precedence:
+    1.  **State-specific rules**: Rules that include a state condition `('state')` are checked first.
+    2.  **Virtual key combinations**: Rules with `<VK_...>` patterns have priority over text-based patterns.
+    3.  **Longer patterns**: For rules of the same type, the one with the longer text pattern is checked first (e.g., "abc" matches before "ab").
+    4.  **First match wins**: Once a rule matches, no further rules are tested for the current input event.
+
+    The matching process is as follows:
+    - The `Matcher` iterates through the pre-sorted rules.
     - For each rule, it compares the current input context with the rule's pattern.
     - A rule is considered a match if the context matches the rule's pattern and any associated conditions (e.g., modifier keys) are met.
 
-3.  **Composing Text Management and Output Generation**: The engine maintains a composing text buffer that stores the accumulated output from matched rules. When a rule matches:
-    - The output from the rule is appended to the composing text
-    - The engine checks if the new composing text can trigger another rule through recursive matching
-    - This allows for complex, multi-level transformations
+3.  **Composing Text Management and Output Generation**: The engine maintains a composing text buffer. When a rule matches, the engine updates the buffer by **replacing the matched portion of the text** with the rule's output. This is a key mechanism for transformations.
+
+    - The engine checks if the new composing text can trigger another rule through recursive matching.
+    - This allows for complex, multi-level transformations.
 
     The engine tracks how the composing text changes and generates appropriate actions:
     - **Text Insertion**: Insert new text at the cursor
@@ -98,17 +107,20 @@ The `KeyMagicEngine` struct holds the current keyboard layout and the engine's s
 ### State
 
 The `EngineState` struct maintains:
-- **Composing Text Buffer**: Stores the accumulated output from matched rules
-- **Input Context**: Tracks multi-key sequences for pattern matching
-- **Active States**: Manages state switches for context-sensitive rules
-- **Current Rule**: Keeps track of which rule is currently matched
+- **Composing Text Buffer**: Stores the current composing text.
+- **Active States**: A set of integer IDs representing the states that are active for the *next* key press.
+
+State behavior is transient:
+- When a rule's output activates a state (e.g., `=> ('my_state')`), that state becomes active for the next key event.
+- After a key event is processed, all previously active states are cleared.
+- A state only persists across multiple key presses if the rule that matches for each key press also reactivates the state in its output.
 
 ### Matcher and Pattern
 
 The `Matcher` and `Pattern` components work together to find the correct rule to apply. The `Pattern` defines what to look for, and the `Matcher` performs the search. This allows for complex rules, including those that depend on the preceding characters.
 
 Key matching behaviors:
-- **ANY keyword**: Matches only printable ASCII characters (0x20-0x7E), not Unicode or control characters
+- **ANY keyword**: Matches any single printable ASCII character from `!` to `~` (U+0021 to U+007E). It does **not** match the space character, Unicode characters, or control characters.
 - **Wildcards**: Support for [*] (any character in set) and [^] (any character NOT in set)
 - **State matching**: Rules can be state-specific, activated by state switches
 

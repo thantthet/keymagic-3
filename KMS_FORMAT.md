@@ -200,7 +200,7 @@ $set1[*] + $set2[*] + $set3[*] => $3 + $2 + $1
 
 #### ANY Keyword
 
-Matches any single printable ASCII character (space through tilde, 0x20-0x7E):
+Matches any single printable ASCII character from `!` to `~` (U+0021 to U+007E).
 
 ```kms
 ANY + "a" => $1 + "အ"              // Matches any printable ASCII char followed by "a"
@@ -208,9 +208,10 @@ ANY + "a" => $1 + "အ"              // Matches any printable ASCII char followe
 ```
 
 Note: ANY will NOT match:
+- The space character
 - Unicode characters (e.g., Myanmar characters)
 - Control characters (e.g., tab, newline)
-- Characters outside the ASCII printable range
+- Characters outside the ASCII printable range (`!` to `~`)
 
 #### NULL Keyword
 

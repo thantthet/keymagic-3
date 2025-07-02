@@ -118,6 +118,8 @@ Each info entry has this format:
 | 0x69636F6E | 'icon' | Keyboard icon | BMP image data |
 | 0x68746B79 | 'htky' | Hotkey combination | Binary hotkey data |
 
+Note: The 4-byte IDs are the little-endian representation of the ASCII characters (e.g., 'name' is stored as `b"eman"`).
+
 ### Icon Data Format
 
 Icon data is stored as a complete BMP file including headers. The icon should be 16x16 or 32x32 pixels for optimal display.
@@ -237,9 +239,11 @@ KMS: `<VK_SHIFT & VK_KEY_A> => "အ"`
 
 Binary encoding:
 ```
-LHS: opPREDEFINED, VK_SHIFT, opAND, opPREDEFINED, VK_KEY_A
+LHS: opAND, opPREDEFINED, VK_SHIFT, opPREDEFINED, VK_KEY_A
 RHS: opSTRING, 0x0001, 'အ'
 ```
+
+**Note**: For virtual key combinations, the `opAND` (0x00F6) opcode **must** appear first, followed by the sequence of `opPREDEFINED` opcodes for each key in the combination.
 
 #### State Switch
 KMS: `< VK_CFLEX > => ('zg_key')`
