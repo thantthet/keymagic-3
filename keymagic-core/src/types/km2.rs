@@ -137,7 +137,7 @@ pub enum BinaryFormatElement {
     Modifier(u16),             // Modifier flags (FLAG_ANYOF, FLAG_NANYOF, or numeric index)
     And,                       // Logical AND for combining keys
     Any,                       // ANY keyword - matches any character
-    Switch(usize),             // State switch (index into strings table)
+    Switch(usize),             // State switch (0-based integer ID)
 }
 
 #[derive(Debug)]

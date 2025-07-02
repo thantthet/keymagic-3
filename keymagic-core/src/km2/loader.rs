@@ -186,8 +186,8 @@ impl Km2Loader {
                     BinaryFormatElement::Any
                 }
                 OP_SWITCH => {
-                    let string_index = cursor.read_u16::<LittleEndian>()? as usize;
-                    BinaryFormatElement::Switch(string_index)
+                    let state_index = cursor.read_u16::<LittleEndian>()? as usize;
+                    BinaryFormatElement::Switch(state_index)
                 }
                 _ => return Err(Km2Error::InvalidOpcode(opcode))
             };
