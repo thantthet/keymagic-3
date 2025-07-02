@@ -79,6 +79,11 @@ Each string entry follows this format:
 
 Variables can contain references to other variables using the `opVARIABLE` opcode (0x00F1) followed by a 1-based index.
 
+**Important**: All variable indices in KM2 format are **1-based**, not 0-based. This means:
+- Variable index 1 refers to the first string in the strings table (index 0 in memory)
+- Variable index 2 refers to the second string (index 1 in memory)
+- And so on...
+
 ### Example
 
 ```
@@ -123,6 +128,28 @@ Hotkey data encodes key combinations:
 - **Modifier flags** (1 byte): Ctrl, Alt, Shift combinations
 - **Virtual key code** (1 byte): Target key code
 
+## Indexing Conventions
+
+**Important**: The KM2 format uses **1-based indexing** throughout:
+
+1. **Variable Indices**: When referencing strings in the strings table
+   - Index 1 = First string (array index 0)
+   - Index 2 = Second string (array index 1)
+   - Index 0 = Invalid/not used
+
+2. **Reference Indices**: When using back-references ($1, $2, etc.)
+   - $1 = First captured segment
+   - $2 = Second captured segment
+
+3. **State Indices**: When referencing states
+   - States are compiled to integer indices
+   - Each unique state name in KMS gets assigned a sequential integer
+   - State indices are 0-based integers
+
+4. **Character Position Indices**: When using ANYOF wildcards
+   - Position indices are 0-based (first character = position 0)
+   - These are captured as strings and parsed when needed
+
 ## Rules Section
 
 The rules section contains the compiled keyboard mapping rules encoded as binary opcodes.
@@ -151,12 +178,21 @@ All opcodes are 2-byte values (16-bit integers):
 | 0x00F1 | opVARIABLE | Variable reference | 1-based variable index |
 | 0x00F2 | opREFERENCE | Back-reference | Segment number (1-based) |
 | 0x00F3 | opPREDEFINED | Virtual key code | VK_* constant value |
-| 0x00F4 | opMODIFIER | Key modifier | Modifier flags |
-| 0x00F5 | opANYOF | Match any char in set | Variable index |
+| 0x00F4 | opMODIFIER | Modifier/Index | Context-dependent: modifier flags in LHS, or index reference in RHS |
 | 0x00F6 | opAND | Logical AND | Combines conditions |
-| 0x00F7 | opNANYOF | Match char NOT in set | Variable index |
 | 0x00F8 | opANY | Match any character | None |
-| 0x00F9 | opSWITCH | State switch | State index |
+| 0x00F9 | opSWITCH | State switch | State index (integer) |
+
+### Modifier Flags
+
+The `opMODIFIER` (0x00F4) opcode uses these flag values as parameters:
+
+| Flag | Value | Description | Usage |
+|------|-------|-------------|-------|
+| FLAG_ANYOF | 0x00F5 | Match any character in variable | Used in LHS pattern matching |
+| FLAG_NANYOF | 0x00F7 | Match character NOT in variable | Used in LHS pattern matching |
+
+Note: When `opMODIFIER` appears in RHS after `opVARIABLE`, its parameter represents a capture reference index for Variable[index] patterns.
 
 ### Rule Encoding Examples
 
@@ -174,9 +210,27 @@ KMS: `$consonants[*] => $vowels[$1]`
 
 Binary encoding:
 ```
-LHS: opVARIABLE, variable_index_consonants, opMODIFIER(opANYOF)
+LHS: opVARIABLE, variable_index_consonants, opMODIFIER(FLAG_ANYOF)
 RHS: opVARIABLE, variable_index_vowels, opREFERENCE, 0x0001
 ```
+
+#### Variable with Index (Variable[reference])
+KMS: `$baseK[*] => $baseU[$1]`
+
+This pattern matches any character from `$baseK` and outputs the corresponding character from `$baseU` at the same position.
+
+Binary encoding (assuming $baseK is variable 1 and $baseU is variable 2):
+```
+LHS: opVARIABLE, 0x0001, opMODIFIER(FLAG_ANYOF)  // $baseK[*]
+RHS: opVARIABLE, 0x0002, opMODIFIER(0x0001)      // $baseU[$1]
+```
+
+In the RHS, `opMODIFIER` following `opVARIABLE` represents an index operation:
+- The modifier value (0x0001) refers to capture reference 1 (the position matched by [*])
+- The engine should:
+  1. Get the capture value from reference 1 (e.g., "0" if first character matched)
+  2. Parse this as a numeric index
+  3. Extract the character at that position from the variable
 
 #### Virtual Key Combination
 KMS: `<VK_SHIFT & VK_KEY_A> => "အ"`
@@ -193,8 +247,10 @@ KMS: `< VK_CFLEX > => ('zg_key')`
 Binary encoding:
 ```
 LHS: opPREDEFINED, VK_CFLEX
-RHS: opSWITCH, INDEX OF "zg_key"
+RHS: opSWITCH, 0x0005  // Integer index assigned to 'zg_key' state during compilation
 ```
+
+Note: State names from KMS are converted to integer indices during compilation. The engine tracks active states using these integer values, not string names.
 
 ## File Loading Process
 

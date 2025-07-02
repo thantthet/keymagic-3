@@ -200,12 +200,17 @@ $set1[*] + $set2[*] + $set3[*] => $3 + $2 + $1
 
 #### ANY Keyword
 
-Matches any single keystroke:
+Matches any single printable ASCII character (space through tilde, 0x20-0x7E):
 
 ```kms
-ANY + "a" => $1 + "အ"
-('zg_gk') + ANY => $1 + ('zg_gk')
+ANY + "a" => $1 + "အ"              // Matches any printable ASCII char followed by "a"
+('zg_gk') + ANY => $1 + ('zg_gk')  // Maintains state while matching ASCII chars
 ```
+
+Note: ANY will NOT match:
+- Unicode characters (e.g., Myanmar characters)
+- Control characters (e.g., tab, newline)
+- Characters outside the ASCII printable range
 
 #### NULL Keyword
 
