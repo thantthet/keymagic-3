@@ -17,6 +17,20 @@ The key processing engine is composed of the following main components:
 
 The key processing begins when a key is pressed, triggering the `process_key` method in the `KeyMagicEngine`. The engine then performs the following steps:
 
+### External Control
+
+The engine provides methods for external control:
+- **Reset**: Clears both the composing buffer and active states, returning the engine to its initial state
+- **Set Composing Text**: Sets the composing buffer to a specific value and resets all active states. This ensures clean state when synchronizing with external text
+
+These capabilities are essential for:
+- Handling focus changes between input fields
+- Responding to user cancellation (e.g., ESC key)
+- Preventing state leakage between different text contexts
+- Recovering from error conditions
+- Synchronizing engine state with editor content (e.g., when user moves cursor or selects text)
+- Restoring composing state after external text modifications
+
 1.  **State Update**: The engine first updates its internal state based on the new input. This includes updating the context with the new character and resetting any flags.
 
 2.  **Rule Matching**: The `Matcher` is invoked to find a matching rule in the keyboard layout. The matching process is as follows:
@@ -24,24 +38,47 @@ The key processing begins when a key is pressed, triggering the `process_key` me
     - For each rule, it compares the current input context with the rule's pattern.
     - A rule is considered a match if the context matches the rule's pattern and any associated conditions (e.g., modifier keys) are met.
 
-3.  **Recursive Matching and Output Generation**: Once a matching rule is found, the engine checks if new composed text appened with the output of the current rule can trigger another rule. This is done by recursively calling the `process_key` method with the composing text as the new input. This allows for complex, multi-level transformations.
+3.  **Composing Text Management and Output Generation**: The engine maintains a composing text buffer that stores the accumulated output from matched rules. When a rule matches:
+    - The output from the rule is appended to the composing text
+    - The engine checks if the new composing text can trigger another rule through recursive matching
+    - This allows for complex, multi-level transformations
 
-    If no further matches are found, the `Output` component generates the final result. This can be one of the following:
-    - **Text Insertion**: If the rule specifies text to be output, this text is returned.
-    - **State Change**: The rule may specify a new state for the engine, which will be applied to subsequent key presses.
-    - **Action**: The rule can also trigger other actions, such as deleting a character (backspace).
+    The engine tracks how the composing text changes and generates appropriate actions:
+    - **Text Insertion**: Insert new text at the cursor
+    - **Backspace + Insert**: Delete previous characters and insert new text (e.g., when "title" becomes "Title", action is "delete 4 characters and insert 'Title'")
+    - **State Change**: Update the engine's state for subsequent key presses
+    - **Delete Only**: Remove characters without inserting new ones
 
-4.  **Return Value**: The `process_key` method returns an `Output` object containing the result of the key processing. The caller is then responsible for executing the actions specified in the `Output` object (e.g., inserting text into a text editor).
+    Example flow:
+    - Input keys: t, i, t, l → composing text: "titl"
+    - Input key: e → matches rule 'title' => 'Title'
+    - Composing text changes to: "Title"
+    - Action generated: backspace 4, insert "Title"
+
+4.  **Return Value**: The `process_key` method returns an `Output` object containing:
+    - **Composing Text**: The current accumulated text in the composing buffer
+    - **Actions**: Specific instructions for modifying the text (insert, delete count, or combination)
+    
+    The caller is responsible for executing these actions in the text editor or application.
 
 ## Detailed Component Descriptions
 
 ### Engine
 
-The `KeyMagicEngine` struct holds the current keyboard layout and the engine's state. Its primary responsibility is to manage the overall process and interact with the other components.
+The `KeyMagicEngine` struct holds the current keyboard layout and the engine's state. Its primary responsibilities include:
+- Managing the overall key processing workflow
+- Interacting with other components
+- Providing external control methods:
+  - `reset()`: Clears both composing buffer and active states simultaneously
+  - `set_composing_text(text)`: Sets the composing buffer and resets active states to ensure consistent state when synchronizing with external editor
 
 ### State
 
-The `EngineState` struct maintains the context of the input. This is crucial for multi-key sequences (e.g., typing "a" then "b" to get "c"). It also keeps track of which rule is currently matched.
+The `EngineState` struct maintains:
+- **Composing Text Buffer**: Stores the accumulated output from matched rules
+- **Input Context**: Tracks multi-key sequences for pattern matching
+- **Active States**: Manages state switches for context-sensitive rules
+- **Current Rule**: Keeps track of which rule is currently matched
 
 ### Matcher and Pattern
 
@@ -54,4 +91,19 @@ Key matching behaviors:
 
 ### Input and Output
 
-The `Input` and `Output` components serve as the data carriers for the engine. `Input` brings key events into the engine, and `Output` carries the results out. This design decouples the engine from the specifics of the operating system's input and output mechanisms.
+The `Input` and `Output` components serve as the data carriers for the engine:
+
+**Input**: Brings key events into the engine, including:
+- Key code
+- Modifier states (Shift, Ctrl, Alt)
+- Character representation
+
+**Output**: Carries the processing results, containing:
+- **Composing Text**: The current text in the composing buffer
+- **Action Type**: The specific modification to perform:
+  - `Insert(text)`: Add new text
+  - `BackspaceDelete(count)`: Remove specified number of characters
+  - `BackspaceDeleteAndInsert(count, text)`: Delete characters then insert new text
+  - `None`: No action needed (e.g., for state changes only)
+
+This design decouples the engine from the specifics of the operating system's input and output mechanisms.
