@@ -4,9 +4,7 @@ pub const OP_VARIABLE: u16 = 0x00F1;
 pub const OP_REFERENCE: u16 = 0x00F2;
 pub const OP_PREDEFINED: u16 = 0x00F3;
 pub const OP_MODIFIER: u16 = 0x00F4;
-pub const OP_ANYOF: u16 = 0x00F5;    // Legacy: treated as FLAG_ANYOF
 pub const OP_AND: u16 = 0x00F6;
-pub const OP_NANYOF: u16 = 0x00F7;   // Legacy: treated as FLAG_NANYOF
 pub const OP_ANY: u16 = 0x00F8;
 pub const OP_SWITCH: u16 = 0x00F9;
 

@@ -116,7 +116,8 @@ impl MatchRule {
                 }
                 
                 (State::Normal, BinaryFormatElement::And) => {
-                    // Start of virtual key combination
+                    // AND marks the start of a virtual key combination
+                    // Next elements should be Predefined (VK)
                     state = State::InVirtualKey {
                         shift: false,
                         ctrl: false,
@@ -168,7 +169,28 @@ impl MatchRule {
                 }
                 
                 (State::InVirtualKey { .. }, BinaryFormatElement::And) => {
-                    // Continue in virtual key state, expecting another Predefined
+                    // AND in the middle of VK sequence should not happen
+                    // End the current VK sequence and start a new one
+                    if let State::InVirtualKey { shift, ctrl, alt, alt_gr, target_vk } = &state {
+                        if let Some(key) = target_vk {
+                            result.push(RuleElement::VirtualKey {
+                                key: *key,
+                                shift: *shift,
+                                ctrl: *ctrl,
+                                alt: *alt,
+                                alt_gr: *alt_gr,
+                            });
+                        }
+                    }
+                    
+                    // Start new VK sequence
+                    state = State::InVirtualKey {
+                        shift: false,
+                        ctrl: false,
+                        alt: false,
+                        alt_gr: false,
+                        target_vk: None,
+                    };
                 }
                 
                 // End of virtual key combination

@@ -179,18 +179,8 @@ impl Km2Loader {
                     let flags = cursor.read_u16::<LittleEndian>()?;
                     BinaryFormatElement::Modifier(flags)
                 }
-                OP_ANYOF => {
-                    // OP_ANYOF and OP_NANYOF are used as modifier flags, not standalone opcodes
-                    // They should follow a Variable element
-                    BinaryFormatElement::Modifier(FLAG_ANYOF)
-                }
                 OP_AND => {
                     BinaryFormatElement::And
-                }
-                OP_NANYOF => {
-                    // OP_ANYOF and OP_NANYOF are used as modifier flags, not standalone opcodes
-                    // They should follow a Variable element
-                    BinaryFormatElement::Modifier(FLAG_NANYOF)
                 }
                 OP_ANY => {
                     BinaryFormatElement::Any
@@ -199,7 +189,7 @@ impl Km2Loader {
                     let string_index = cursor.read_u16::<LittleEndian>()? as usize;
                     BinaryFormatElement::Switch(string_index)
                 }
-                _ => return Err(Km2Error::InvalidOpcode(opcode)),
+                _ => return Err(Km2Error::InvalidOpcode(opcode))
             };
             
             elements.push(element);
@@ -209,28 +199,27 @@ impl Km2Loader {
     }
     
     /// Validate that standalone Predefined elements are not allowed in LHS
-    /// Only patterns with AND operators connecting Predefined elements are valid
+    /// Valid pattern: AND VK1 VK2 ... VKn
     fn validate_lhs_predefined(lhs: &[BinaryFormatElement]) -> Result<()> {
-        // Check if any Predefined exists without being part of a valid AND combination
         let mut i = 0;
+        let mut in_vk_sequence = false;
+        
         while i < lhs.len() {
-            if let BinaryFormatElement::Predefined(_) = lhs[i] {
-                // Check if this starts a valid combination (followed by AND)
-                if i + 1 < lhs.len() && matches!(lhs[i + 1], BinaryFormatElement::And) {
-                    // This is the start of a combination, skip to next element
-                    i += 1;
-                    continue;
+            match &lhs[i] {
+                BinaryFormatElement::And => {
+                    // AND marks the start of a VK sequence
+                    in_vk_sequence = true;
                 }
-                
-                // Check if this is preceded by AND (part of combination)
-                if i > 0 && matches!(lhs[i - 1], BinaryFormatElement::And) {
-                    // This is part of a combination, continue
-                    i += 1;
-                    continue;
+                BinaryFormatElement::Predefined(_) => {
+                    // Predefined must be part of a VK sequence
+                    if !in_vk_sequence {
+                        return Err(Km2Error::InvalidPredefinedUsage);
+                    }
                 }
-                
-                // This is a standalone Predefined - not allowed
-                return Err(Km2Error::InvalidPredefinedUsage);
+                _ => {
+                    // Any other element ends the VK sequence
+                    in_vk_sequence = false;
+                }
             }
             i += 1;
         }

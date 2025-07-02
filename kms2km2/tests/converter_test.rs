@@ -129,7 +129,7 @@ fn test_comprehensive_conversion() {
             if let BinaryFormatElement::Variable(_) = lhs_vec[i] {
                 if i + 1 < lhs_vec.len() {
                     if let BinaryFormatElement::Modifier(op) = lhs_vec[i + 1] {
-                        if *op == OP_ANYOF {
+                        if *op == FLAG_ANYOF {
                             has_anyof_pattern = true;
                         }
                     }
@@ -312,8 +312,8 @@ ANY + "test" => $1 + "_test"
                 if i + 1 < lhs_vec.len() {
                     if let BinaryFormatElement::Modifier(op) = lhs_vec[i + 1] {
                         match *op {
-                            OP_ANYOF => has_anyof_pattern = true,
-                            OP_NANYOF => has_nanyof_pattern = true,
+                            FLAG_ANYOF => has_anyof_pattern = true,
+                            FLAG_NANYOF => has_nanyof_pattern = true,
                             _ => {}
                         }
                     }

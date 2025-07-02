@@ -27,12 +27,11 @@ fn test_valid_predefined_with_and() {
     // Create a KM2 file with a valid virtual key combination
     let mut km2 = create_basic_km2();
     
-    // Rule with valid combination: Predefined + AND + Predefined
-    // LHS: Predefined(VK_SHIFT) + And + Predefined(VK_KEY_A)
+    // Rule with valid combination: AND + VK_SHIFT + VK_KEY_A
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
             BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
             BinaryFormatElement::Predefined(VirtualKey::KeyA as u16)
         ],
         vec![BinaryFormatElement::String("A".to_string())]
@@ -72,15 +71,13 @@ fn test_complex_valid_virtual_key_combination() {
     // Test a complex but valid virtual key combination
     let mut km2 = create_basic_km2();
     
-    // LHS: Ctrl + Alt + Shift + K
+    // LHS: AND + Ctrl + Alt + Shift + K
     add_rule(&mut km2,
         vec![
+            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::Control as u16),
-            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::Menu as u16), // Alt
-            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
-            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::KeyK as u16)
         ],
         vec![BinaryFormatElement::String("Special K".to_string())]

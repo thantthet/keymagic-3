@@ -8,11 +8,11 @@ fn test_virtual_key_with_modifiers() {
     // Test: <VK_SHIFT & VK_KEY_A> => "A"
     let mut km2 = create_basic_km2();
     
-    // Rule with modifier combination
+    // Rule with modifier combination: AND + VK_SHIFT + VK_KEY_A
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
             BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
             BinaryFormatElement::Predefined(VirtualKey::KeyA as u16)
         ],
         vec![BinaryFormatElement::String("A".to_string())]
@@ -43,8 +43,8 @@ fn test_modifier_only_virtual_key_ignored() {
     // Rule: <VK_SHIFT & VK_CONTROL> => "INVALID" (no actual key, only modifiers)
     add_rule(&mut km2,
         vec![
-            BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
             BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::Shift as u16),
             BinaryFormatElement::Predefined(VirtualKey::Control as u16)
         ],
         vec![BinaryFormatElement::String("INVALID".to_string())]
@@ -74,10 +74,9 @@ fn test_complex_modifier_combination() {
     
     add_rule(&mut km2,
         vec![
+            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::Control as u16),
-            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::Menu as u16), // Alt
-            BinaryFormatElement::And,
             BinaryFormatElement::Predefined(VirtualKey::KeyK as u16)
         ],
         vec![BinaryFormatElement::String("က".to_string())]
