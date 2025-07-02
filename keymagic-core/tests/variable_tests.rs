@@ -1,7 +1,9 @@
 mod common;
 
 use common::*;
-use keymagic_core::{BinaryFormatElement, km2::Km2Loader, KeyMagicEngine, FLAG_ANYOF};
+use keymagic_core::{BinaryFormatElement, km2::Km2Loader};
+use keymagic_core::engine::ActionType;
+use keymagic_core::types::opcodes::FLAG_ANYOF;
 
 #[test]
 fn test_variable_string_literals() {
@@ -28,10 +30,9 @@ fn test_variable_string_literals() {
     assert_eq!(loaded.strings[0].value, "ကခဂဃင");
     
     // Test the rule works
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
-    let result = engine.process_key_event(key_input_from_char('က')).unwrap();
-    assert_eq!(result.commit_text, Some("consonants".to_string()));
+    let mut engine = create_engine_from_binary(&binary).unwrap();
+    let result = process_char(&mut engine, 'က').unwrap();
+    assert_eq!(result.action, ActionType::Insert("consonants".to_string()));
 }
 
 #[test]
@@ -57,10 +58,9 @@ fn test_variable_unicode_concatenation() {
     assert_eq!(loaded.strings[0].value, "\u{1000}\u{1001}\u{1002}");
     
     // Test matching
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
-    let result = engine.process_key_event(key_input_from_char('\u{1000}')).unwrap();
-    assert_eq!(result.commit_text, Some("vowels".to_string()));
+    let mut engine = create_engine_from_binary(&binary).unwrap();
+    let result = process_char(&mut engine, '\u{1000}').unwrap();
+    assert_eq!(result.action, ActionType::Insert("vowels".to_string()));
 }
 
 #[test]
@@ -88,18 +88,16 @@ fn test_variable_concatenation() {
     let binary = create_km2_binary(&km2).unwrap();
     let loaded = Km2Loader::load(&binary).unwrap();
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Test matching a character from the combined variable
-    let result = engine.process_key_event(key_input_from_char('ခ')).unwrap();
-    assert_eq!(result.commit_text, Some("combined".to_string()));
+    let result = process_char(&mut engine, 'ခ').unwrap();
+    assert_eq!(result.action, ActionType::Insert("combined".to_string()));
     
     // Reset and test vowel
-    engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
-    let result = engine.process_key_event(key_input_from_char('ိ')).unwrap();
-    assert_eq!(result.commit_text, Some("combined".to_string()));
+    engine = create_engine_from_binary(&binary).unwrap();
+    let result = process_char(&mut engine, 'ိ').unwrap();
+    assert_eq!(result.action, ActionType::Insert("combined".to_string()));
 }
 
 #[test]
@@ -123,10 +121,9 @@ fn test_variable_in_rule_output() {
     let binary = create_km2_binary(&km2).unwrap();
     let loaded = Km2Loader::load(&binary).unwrap();
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
-    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    assert_eq!(result.commit_text, Some("ကာ".to_string()));
+    let mut engine = create_engine_from_binary(&binary).unwrap();
+    let result = process_char(&mut engine, 'a').unwrap();
+    assert_eq!(result.action, ActionType::Insert("ကာ".to_string()));
 }
 
 #[test]
@@ -149,15 +146,14 @@ fn test_predefined_unicode_variables() {
     let binary = create_km2_binary(&km2).unwrap();
     let loaded = Km2Loader::load(&binary).unwrap();
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Process each character
-    engine.process_key_event(key_input_from_char('z')).unwrap();
-    engine.process_key_event(key_input_from_char('w')).unwrap();
-    let result = engine.process_key_event(key_input_from_char('s')).unwrap();
+    process_char(&mut engine, 'z').unwrap();
+    process_char(&mut engine, 'w').unwrap();
+    let result = process_char(&mut engine, 's').unwrap();
     
-    assert_eq!(result.commit_text, Some("\u{200B}test".to_string()));
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(2, "\u{200B}test".to_string()));
 }
 
 #[test]
@@ -181,16 +177,14 @@ fn test_variable_with_mixed_content() {
     let binary = create_km2_binary(&km2).unwrap();
     let loaded = Km2Loader::load(&binary).unwrap();
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Test matching 'a'
-    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    assert_eq!(result.commit_text, Some("matched".to_string()));
+    let result = process_char(&mut engine, 'a').unwrap();
+    assert_eq!(result.action, ActionType::Insert("matched".to_string()));
     
     // Test matching Unicode character
-    engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
-    let result = engine.process_key_event(key_input_from_char('\u{1000}')).unwrap();
-    assert_eq!(result.commit_text, Some("matched".to_string()));
+    engine = create_engine_from_binary(&binary).unwrap();
+    let result = process_char(&mut engine, '\u{1000}').unwrap();
+    assert_eq!(result.action, ActionType::Insert("matched".to_string()));
 }

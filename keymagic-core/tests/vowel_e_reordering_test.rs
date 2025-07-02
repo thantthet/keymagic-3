@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use keymagic_core::KeyMagicEngine;
+use keymagic_core::engine::ActionType;
 use std::path::PathBuf;
 
 /// Get the path to the fixtures directory
@@ -25,13 +25,12 @@ fn test_vowel_e_reordering_basic() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
     // Test 1: Type 'a' - should produce filler + vowel_e
-    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    assert_eq!(result.commit_text, Some("\u{200A}\u{1031}".to_string()));
-    assert_eq!(result.composing_text, Some("\u{200A}\u{1031}".to_string()));
+    let result = process_char(&mut engine, 'a').unwrap();
+    assert_eq!(result.action, ActionType::Insert("\u{200A}\u{1031}".to_string()));
+    assert_eq!(result.composing_text, "\u{200A}\u{1031}");
 }
 
 #[test]
@@ -47,19 +46,17 @@ fn test_vowel_e_reordering_with_consonant() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
     // Type 'a' then 'u' (which maps to က - U1000)
     // Should reorder to က + vowel_e
-    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    assert_eq!(result.composing_text, Some("\u{200A}\u{1031}".to_string()));
+    let result = process_char(&mut engine, 'a').unwrap();
+    assert_eq!(result.composing_text, "\u{200A}\u{1031}");
     
-    let result = engine.process_key_event(key_input_from_char('u')).unwrap();
+    let result = process_char(&mut engine, 'u').unwrap();
 
-    assert_eq!(result.commit_text, Some("\u{1000}\u{1031}".to_string()));
-    assert_eq!(result.composing_text, Some("\u{1000}\u{1031}".to_string()));
-    assert_eq!(result.delete_count, 2); // Delete the filler and vowel_e
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(2, "\u{1000}\u{1031}".to_string()));
+    assert_eq!(result.composing_text, "\u{1000}\u{1031}");
 }
 
 #[test]
@@ -75,20 +72,20 @@ fn test_vowel_e_reordering_with_stacked_consonant() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
-    // First get vowel_e in the buffer
-    engine.process_key_event(key_input_from_char('a')).unwrap();
+    // First get vowel_e + consonant in the buffer
+    process_char(&mut engine, 'a').unwrap();
+    process_char(&mut engine, 'u').unwrap();
     
     // Type 'F' for stack (U1039)
-    let result = engine.process_key_event(key_input_from_char('F')).unwrap();
-    assert_eq!(result.composing_text, Some("\u{200A}\u{1031}\u{1039}".to_string()));
+    let result = process_char(&mut engine, 'F').unwrap();
+    assert_eq!(result.composing_text, "\u{1000}\u{1031}\u{1039}");
     
     // Type 'u' for က (U1000) - should reorder
-    let result = engine.process_key_event(key_input_from_char('u')).unwrap();
-    assert_eq!(result.commit_text, Some("\u{1039}\u{1000}\u{1031}".to_string()));
-    assert_eq!(result.delete_count, 3); // Delete all three characters before inserting reordered
+    let result = process_char(&mut engine, 'u').unwrap();
+    assert_eq!(result.composing_text, "\u{1000}\u{1039}\u{1000}\u{1031}");
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(2, "\u{1039}\u{1000}\u{1031}".to_string()));
 }
 
 #[test]
@@ -104,16 +101,14 @@ fn test_vowel_e_reordering_with_medial() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
     // Get filler + vowel_e first
-    engine.process_key_event(key_input_from_char('a')).unwrap();
+    process_char(&mut engine, 'a').unwrap();
     
     // Type 's' for ya-yit medial (U103B)
-    let result = engine.process_key_event(key_input_from_char('s')).unwrap();
-    assert_eq!(result.commit_text, Some("\u{200A}\u{103B}\u{1031}".to_string()));
-    assert_eq!(result.delete_count, 2); // Delete filler and vowel_e before inserting reordered
+    let result = process_char(&mut engine, 's').unwrap();
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(1, "\u{103B}\u{1031}".to_string()));
 }
 
 #[test]
@@ -128,17 +123,16 @@ fn test_vowel_e_complex_reordering() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
     // Type 'a' (vowel_e), 'u' (က), 's' (ya-yit)
     // Should produce က + ya-yit + vowel_e
-    engine.process_key_event(key_input_from_char('a')).unwrap();
-    engine.process_key_event(key_input_from_char('u')).unwrap();
-    let result = engine.process_key_event(key_input_from_char('s')).unwrap();
+    process_char(&mut engine, 'a').unwrap();
+    process_char(&mut engine, 'u').unwrap();
+    let result = process_char(&mut engine, 's').unwrap();
     
     // The final result should be consonant + medial + vowel_e
-    assert_eq!(result.commit_text, Some("\u{1000}\u{103B}\u{1031}".to_string()));
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(1, "\u{103B}\u{1031}".to_string()));
 }
 
 #[test]
@@ -152,16 +146,16 @@ fn test_vowel_e_with_multiple_consonants() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
     // Type 'au' - should produce က + vowel_e
-    engine.process_key_event(key_input_from_char('a')).unwrap();
-    engine.process_key_event(key_input_from_char('u')).unwrap();
+    process_char(&mut engine, 'a').unwrap();
+    process_char(&mut engine, 'u').unwrap();
+    assert_eq!(engine.composing_text(), "\u{1000}\u{1031}");
     
     // Type another 'i' (င - U1004) - should just append
-    let result = engine.process_key_event(key_input_from_char('i')).unwrap();
-    assert_eq!(result.commit_text, Some("\u{1000}\u{1031}\u{1004}".to_string()));
+    let result = process_char(&mut engine, 'i').unwrap();
+    assert_eq!(result.action, ActionType::Insert("\u{1004}".to_string()));
 }
 
 #[test]
@@ -176,15 +170,14 @@ fn test_filler_removal_at_end() {
     let km2_binary = create_km2_binary(&km2_file)
         .expect("Failed to create KM2 binary");
     
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&km2_binary).expect("Failed to load keyboard");
+    let mut engine = create_engine_from_binary(&km2_binary).expect("Failed to load keyboard");
     
     // Type 'a' for filler + vowel_e
-    engine.process_key_event(key_input_from_char('a')).unwrap();
+    process_char(&mut engine, 'a').unwrap();
+    assert_eq!(engine.composing_text(), "\u{200A}\u{1031}");
     
-    // Type '[' which maps to U103F
-    let result = engine.process_key_event(key_input_from_char('[')).unwrap();
+    // Type 'O' which maps to U103F
+    let result = process_char(&mut engine, 'O').unwrap();
     // Should remove filler and reorder
-    assert_eq!(result.commit_text, Some("\u{103F}\u{1031}".to_string()));
-    assert_eq!(result.delete_count, 2);
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(2, "\u{103F}\u{1031}".to_string()));
 }

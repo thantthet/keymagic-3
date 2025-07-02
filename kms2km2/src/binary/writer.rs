@@ -160,7 +160,7 @@ impl<W: Write> Km2Writer<W> {
             }
             BinaryFormatElement::Switch(idx) => {
                 self.writer.write_u16::<LittleEndian>(OP_SWITCH)?;
-                self.writer.write_u16::<LittleEndian>((*idx + 1) as u16)?; // 1-based
+                self.writer.write_u16::<LittleEndian>(*idx as u16)?;
             }
         }
         

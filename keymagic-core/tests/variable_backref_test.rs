@@ -1,9 +1,8 @@
-use keymagic_core::KeyMagicEngine;
-use keymagic_core::types::*;
-use kms2km2::binary::Km2Writer;
-
 mod common;
 use common::*;
+use keymagic_core::engine::ActionType;
+use keymagic_core::BinaryFormatElement;
+use keymagic_core::types::opcodes::FLAG_ANYOF;
 
 #[test]
 fn test_variable_positional_matching() {
@@ -30,24 +29,23 @@ fn test_variable_positional_matching() {
     let binary = create_km2_binary(&km2).unwrap();
     
     // Test the engine
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Test 'q' -> 'ဆ' (position 0)
-    let result = engine.process_key_event(key_input_from_char('q')).unwrap();
-    assert_eq!(result.commit_text, Some("ဆ".to_string()));
+    let result = process_char(&mut engine, 'q').unwrap();
+    assert_eq!(result.action, ActionType::Insert("ဆ".to_string()));
     
     // Test 'w' -> 'တ' (position 1)
-    let result = engine.process_key_event(key_input_from_char('w')).unwrap();
-    assert_eq!(result.commit_text, Some("တ".to_string()));
+    let result = process_char(&mut engine, 'w').unwrap();
+    assert_eq!(result.action, ActionType::Insert("တ".to_string()));
     
     // Test 'e' -> 'န' (position 2)
-    let result = engine.process_key_event(key_input_from_char('e')).unwrap();
-    assert_eq!(result.commit_text, Some("န".to_string()));
+    let result = process_char(&mut engine, 'e').unwrap();
+    assert_eq!(result.action, ActionType::Insert("န".to_string()));
     
     // Test 'y' -> 'ပ' (position 5)
-    let result = engine.process_key_event(key_input_from_char('y')).unwrap();
-    assert_eq!(result.commit_text, Some("ပ".to_string()));
+    let result = process_char(&mut engine, 'y').unwrap();
+    assert_eq!(result.action, ActionType::Insert("ပ".to_string()));
 }
 
 #[test]
@@ -80,18 +78,17 @@ fn test_multiple_variable_references() {
     let binary = create_km2_binary(&km2).unwrap();
     
     // Test the engine
-    let mut engine = KeyMagicEngine::new();
-    engine.load_keyboard(&binary).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Test 'ka' -> 'ကာ' (positions 0,0)
-    let result = engine.process_key_event(key_input_from_char('k')).unwrap();
-    assert_eq!(result.commit_text, None); // Composing
-    let result = engine.process_key_event(key_input_from_char('a')).unwrap();
-    assert_eq!(result.commit_text, Some("ကာ".to_string()));
+    let result = process_char(&mut engine, 'k').unwrap();
+    assert_eq!(result.action, ActionType::Insert("k".to_string())); // Composing
+    let result = process_char(&mut engine, 'a').unwrap();
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(1, "ကာ".to_string()));
     
     // Test 'gi' -> 'ဂိ' (positions 1,1)
-    let result = engine.process_key_event(key_input_from_char('g')).unwrap();
-    assert_eq!(result.commit_text, None); // Composing
-    let result = engine.process_key_event(key_input_from_char('i')).unwrap();
-    assert_eq!(result.commit_text, Some("ဂိ".to_string()));
+    let result = process_char(&mut engine, 'g').unwrap();
+    assert_eq!(result.action, ActionType::Insert("g".to_string())); // Composing
+    let result = process_char(&mut engine, 'i').unwrap();
+    assert_eq!(result.action, ActionType::BackspaceDeleteAndInsert(1, "ဂိ".to_string()));
 }

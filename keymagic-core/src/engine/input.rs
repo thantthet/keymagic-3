@@ -1,73 +1,74 @@
-use crate::types::VirtualKey;
+//! Input representation for the KeyMagic engine
 
-/// Represents a key input event
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use crate::engine::types::Predefined;
+
+/// Represents a keyboard input event
+#[derive(Debug, Clone, PartialEq)]
 pub struct KeyInput {
     /// Virtual key code
-    pub vk_code: VirtualKey,
-    /// Modifier state
+    pub key_code: Predefined,
+    /// Modifier keys state
     pub modifiers: ModifierState,
-    /// Character value (if available)
-    pub char_value: Option<char>,
+    /// Character representation (if any)
+    pub character: Option<char>,
 }
 
-/// Modifier key state
+impl KeyInput {
+    /// Creates a new keyboard input
+    pub fn new(key_code: Predefined, modifiers: ModifierState, character: Option<char>) -> Self {
+        Self {
+            key_code,
+            modifiers,
+            character,
+        }
+    }
+
+    /// Creates a simple character input without modifiers
+    pub fn from_char(ch: char) -> Self {
+        Self {
+            key_code: Predefined::NONE,
+            modifiers: ModifierState::default(),
+            character: Some(ch),
+        }
+    }
+
+    /// Creates a virtual key input
+    pub fn from_vk(key_code: Predefined, modifiers: ModifierState) -> Self {
+        Self {
+            key_code,
+            modifiers,
+            character: None,
+        }
+    }
+}
+
+/// State of modifier keys
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ModifierState {
     pub shift: bool,
     pub ctrl: bool,
     pub alt: bool,
-    pub alt_gr: bool,
     pub caps_lock: bool,
 }
 
 impl ModifierState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_shift(mut self) -> Self {
-        self.shift = true;
-        self
-    }
-
-    pub fn with_ctrl(mut self) -> Self {
-        self.ctrl = true;
-        self
-    }
-
-    pub fn with_alt(mut self) -> Self {
-        self.alt = true;
-        self
-    }
-
-    pub fn with_alt_gr(mut self) -> Self {
-        self.alt_gr = true;
-        self
-    }
-
-    pub fn with_caps_lock(mut self) -> Self {
-        self.caps_lock = true;
-        self
-    }
-
-    /// Check if Ctrl+Alt should be treated as AltGr
-    pub fn is_alt_gr(&self, treat_ctrl_alt_as_ralt: bool) -> bool {
-        self.alt_gr || (treat_ctrl_alt_as_ralt && self.ctrl && self.alt)
-    }
-}
-
-impl KeyInput {
-    pub fn new(vk_code: VirtualKey, modifiers: ModifierState) -> Self {
+    /// Creates a new modifier state
+    pub fn new(shift: bool, ctrl: bool, alt: bool, caps_lock: bool) -> Self {
         Self {
-            vk_code,
-            modifiers,
-            char_value: None,
+            shift,
+            ctrl,
+            alt,
+            caps_lock,
         }
     }
 
-    pub fn with_char(mut self, ch: char) -> Self {
-        self.char_value = Some(ch);
-        self
+    /// Checks if any modifier is active
+    pub fn any(&self) -> bool {
+        self.shift || self.ctrl || self.alt
+    }
+
+    /// Checks if no modifiers are active
+    pub fn none(&self) -> bool {
+        !self.any()
     }
 }

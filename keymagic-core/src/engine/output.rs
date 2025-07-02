@@ -1,90 +1,65 @@
-/// Output from the KeyMagic engine after processing a key input
-#[derive(Debug, Clone, PartialEq, Eq)]
+//! Output representation for the KeyMagic engine
+
+/// Result of processing a key input
+#[derive(Debug, Clone, PartialEq)]
 pub struct EngineOutput {
-    /// Text to be committed to the application
-    pub commit_text: Option<String>,
-    /// Updated composing text to display
-    pub composing_text: Option<String>,
-    /// Number of characters to delete before inserting
-    pub delete_count: usize,
-    /// Whether the key event was consumed
-    pub consumed: bool,
+    /// Current composing text buffer
+    pub composing_text: String,
+    /// Action to perform
+    pub action: ActionType,
 }
 
-impl Default for EngineOutput {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Types of actions the engine can output
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActionType {
+    /// No action needed (e.g., state change only)
+    None,
+    /// Insert text at cursor
+    Insert(String),
+    /// Delete characters before cursor
+    BackspaceDelete(usize),
+    /// Delete characters then insert text
+    BackspaceDeleteAndInsert(usize, String),
 }
 
 impl EngineOutput {
-    pub fn new() -> Self {
+    /// Creates a new engine output
+    pub fn new(composing_text: String, action: ActionType) -> Self {
         Self {
-            commit_text: None,
-            composing_text: None,
-            delete_count: 0,
-            consumed: false,
-        }
-    }
-    
-    /// Create an output that consumes the key but produces no visible output
-    pub fn consume() -> Self {
-        Self {
-            commit_text: None,
-            composing_text: None,
-            delete_count: 0,
-            consumed: true,
+            composing_text,
+            action,
         }
     }
 
-    /// Create an output that commits text
-    pub fn commit(text: String) -> Self {
+    /// Creates a no-action output
+    pub fn none(composing_text: String) -> Self {
         Self {
-            commit_text: Some(text.clone()),
-            composing_text: Some(text),
-            delete_count: 0,
-            consumed: true,
-        }
-    }
-    
-    /// Create an output that commits text with custom composing text
-    pub fn commit_with_composing(commit: String, composing: Option<String>) -> Self {
-        Self {
-            commit_text: Some(commit),
-            composing_text: composing,
-            delete_count: 0,
-            consumed: true,
+            composing_text,
+            action: ActionType::None,
         }
     }
 
-    /// Create an output that updates composing text
-    pub fn composing(text: String) -> Self {
+    /// Creates an insert action output
+    pub fn insert(composing_text: String, text: String) -> Self {
         Self {
-            commit_text: None,
-            composing_text: Some(text),
-            delete_count: 0,
-            consumed: true,
+            composing_text,
+            action: ActionType::Insert(text),
         }
     }
 
-    /// Create an output that does nothing (key not consumed)
-    pub fn pass_through() -> Self {
+    /// Creates a delete action output
+    pub fn delete(composing_text: String, count: usize) -> Self {
         Self {
-            commit_text: None,
-            composing_text: None,
-            delete_count: 0,
-            consumed: false,
+            composing_text,
+            action: ActionType::BackspaceDelete(count),
         }
     }
 
-    /// Set the number of characters to delete
-    pub fn with_delete(mut self, count: usize) -> Self {
-        self.delete_count = count;
-        self
-    }
-
-    /// Check if this output has any effect
-    pub fn has_effect(&self) -> bool {
-        self.commit_text.is_some() || self.composing_text.is_some() || self.delete_count > 0
+    /// Creates a delete-and-insert action output
+    pub fn delete_and_insert(composing_text: String, delete_count: usize, insert_text: String) -> Self {
+        Self {
+            composing_text,
+            action: ActionType::BackspaceDeleteAndInsert(delete_count, insert_text),
+        }
     }
 }
