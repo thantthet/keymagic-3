@@ -101,78 +101,81 @@ impl MatchRule {
                 }
                 
                 BinaryFormatElement::Predefined(vk) => {
-                    // Skip if this was already processed as part of a combination
-                    let mut skip = false;
+                    // Check if this is preceded by AND (part of a virtual key combination)
+                    let preceded_by_and = i > 0 && matches!(elements[i - 1], BinaryFormatElement::And);
                     
-                    // Check if preceded by AND (part of combination already processed)
-                    if i > 0 {
-                        let mut j = i - 1;
-                        while j > 0 && matches!(elements[j], BinaryFormatElement::And) {
-                            j -= 1;
-                            if matches!(elements[j], BinaryFormatElement::Predefined(_)) {
-                                skip = true;
-                                break;
+                    if preceded_by_and {
+                        // This is part of a combination already being processed, skip it
+                    } else {
+                        // Check if this starts a virtual key combination (followed by AND)
+                        let starts_combination = i + 1 < elements.len() && matches!(elements[i + 1], BinaryFormatElement::And);
+                        
+                        if starts_combination {
+                            // Process the entire virtual key combination
+                            let mut shift = false;
+                            let mut ctrl = false;
+                            let mut alt = false;
+                            let mut alt_gr = false;
+                            let mut target_vk = None;
+                            
+                            // Process first key
+                            use crate::types::VirtualKey;
+                            match *vk {
+                                x if x == VirtualKey::Shift as u16 => shift = true,
+                                x if x == VirtualKey::Control as u16 => ctrl = true,
+                                x if x == VirtualKey::Menu as u16 => alt = true,
+                                x if x == VirtualKey::LShift as u16 => shift = true,
+                                x if x == VirtualKey::RShift as u16 => shift = true,
+                                x if x == VirtualKey::LControl as u16 => ctrl = true,
+                                x if x == VirtualKey::RControl as u16 => ctrl = true,
+                                x if x == VirtualKey::LMenu as u16 => alt = true,
+                                x if x == VirtualKey::RMenu as u16 => alt_gr = true,
+                                _ => target_vk = Some(*vk),
                             }
-                        }
-                    }
-                    
-                    if !skip {
-                        // This is either standalone or the start of a combination
-                        let mut shift = false;
-                        let mut ctrl = false;
-                        let mut alt = false;
-                        let mut alt_gr = false;
-                        let mut target_vk = *vk;
-                        
-                        // Check if this key is a modifier
-                        use crate::types::VirtualKey;
-                        match *vk {
-                            x if x == VirtualKey::Shift as u16 => shift = true,
-                            x if x == VirtualKey::Control as u16 => ctrl = true,
-                            x if x == VirtualKey::Menu as u16 => alt = true,
-                            x if x == VirtualKey::LShift as u16 => shift = true,
-                            x if x == VirtualKey::RShift as u16 => shift = true,
-                            x if x == VirtualKey::LControl as u16 => ctrl = true,
-                            x if x == VirtualKey::RControl as u16 => ctrl = true,
-                            x if x == VirtualKey::LMenu as u16 => alt = true,
-                            x if x == VirtualKey::RMenu as u16 => alt_gr = true,
-                            _ => {}
-                        }
-                        
-                        // Look ahead for AND + more keys
-                        let mut j = i + 1;
-                        while j < elements.len() && matches!(elements[j], BinaryFormatElement::And) {
-                            if j + 1 < elements.len() {
-                                if let BinaryFormatElement::Predefined(key) = &elements[j + 1] {
-                                    match *key {
-                                        x if x == VirtualKey::Shift as u16 => shift = true,
-                                        x if x == VirtualKey::Control as u16 => ctrl = true,
-                                        x if x == VirtualKey::Menu as u16 => alt = true,
-                                        x if x == VirtualKey::LShift as u16 => shift = true,
-                                        x if x == VirtualKey::RShift as u16 => shift = true,
-                                        x if x == VirtualKey::LControl as u16 => ctrl = true,
-                                        x if x == VirtualKey::RControl as u16 => ctrl = true,
-                                        x if x == VirtualKey::LMenu as u16 => alt = true,
-                                        x if x == VirtualKey::RMenu as u16 => alt_gr = true,
-                                        _ => target_vk = *key,
+                            
+                            // Look ahead for AND + more keys
+                            let mut j = i + 1;
+                            while j < elements.len() && matches!(elements[j], BinaryFormatElement::And) {
+                                if j + 1 < elements.len() {
+                                    if let BinaryFormatElement::Predefined(key) = &elements[j + 1] {
+                                        match *key {
+                                            x if x == VirtualKey::Shift as u16 => shift = true,
+                                            x if x == VirtualKey::Control as u16 => ctrl = true,
+                                            x if x == VirtualKey::Menu as u16 => alt = true,
+                                            x if x == VirtualKey::LShift as u16 => shift = true,
+                                            x if x == VirtualKey::RShift as u16 => shift = true,
+                                            x if x == VirtualKey::LControl as u16 => ctrl = true,
+                                            x if x == VirtualKey::RControl as u16 => ctrl = true,
+                                            x if x == VirtualKey::LMenu as u16 => alt = true,
+                                            x if x == VirtualKey::RMenu as u16 => alt_gr = true,
+                                            _ => target_vk = Some(*key),
+                                        }
+                                        j += 2;
+                                        i = j - 1; // Skip processed elements
+                                    } else {
+                                        break;
                                     }
-                                    j += 2;
-                                    i = j - 1; // Skip processed elements
                                 } else {
                                     break;
                                 }
-                            } else {
-                                break;
                             }
+                            
+                            // Only create VirtualKey if we have a non-modifier key
+                            if let Some(key) = target_vk {
+                                result.push(RuleElement::VirtualKey {
+                                    key,
+                                    shift,
+                                    ctrl,
+                                    alt,
+                                    alt_gr,
+                                });
+                            }
+                            // If no target key (only modifiers), skip creating VirtualKey
+                        } else {
+                            // Standalone Predefined - treat as string
+                            // Convert the virtual key code to a string
+                            result.push(RuleElement::String((*vk as u8 as char).to_string()));
                         }
-                        
-                        result.push(RuleElement::VirtualKey {
-                            key: target_vk,
-                            shift,
-                            ctrl,
-                            alt,
-                            alt_gr,
-                        });
                     }
                 }
                 
@@ -185,7 +188,62 @@ impl MatchRule {
                 }
                 
                 BinaryFormatElement::And => {
-                    // Skip - handled in VirtualKey processing
+                    // Check if this is the start of a virtual key combination
+                    if i + 1 < elements.len() {
+                        if let BinaryFormatElement::Predefined(_vk) = &elements[i + 1] {
+                            // This And starts a virtual key combination
+                            // Process the entire combination starting from here
+                            let mut shift = false;
+                            let mut ctrl = false;
+                            let mut alt = false;
+                            let mut alt_gr = false;
+                            let mut target_vk = None;
+                            
+                            // Skip the And we're currently at
+                            i += 1;
+                            
+                            // Process all And + Predefined pairs
+                            while i < elements.len() {
+                                if let BinaryFormatElement::Predefined(key) = &elements[i] {
+                                    use crate::types::VirtualKey;
+                                    match *key {
+                                        x if x == VirtualKey::Shift as u16 => shift = true,
+                                        x if x == VirtualKey::Control as u16 => ctrl = true,
+                                        x if x == VirtualKey::Menu as u16 => alt = true,
+                                        x if x == VirtualKey::LShift as u16 => shift = true,
+                                        x if x == VirtualKey::RShift as u16 => shift = true,
+                                        x if x == VirtualKey::LControl as u16 => ctrl = true,
+                                        x if x == VirtualKey::RControl as u16 => ctrl = true,
+                                        x if x == VirtualKey::LMenu as u16 => alt = true,
+                                        x if x == VirtualKey::RMenu as u16 => alt_gr = true,
+                                        _ => target_vk = Some(*key),
+                                    }
+                                    
+                                    // Check if there's another And following
+                                    if i + 1 < elements.len() && matches!(elements[i + 1], BinaryFormatElement::And) {
+                                        i += 2; // Skip both Predefined and And
+                                        continue;
+                                    } else {
+                                        break; // End of combination
+                                    }
+                                } else {
+                                    break; // Not a Predefined, end of combination
+                                }
+                            }
+                            
+                            // Only create VirtualKey if we have a non-modifier key
+                            if let Some(key) = target_vk {
+                                result.push(RuleElement::VirtualKey {
+                                    key,
+                                    shift,
+                                    ctrl,
+                                    alt,
+                                    alt_gr,
+                                });
+                            }
+                        }
+                    }
+                    // If not followed by Predefined, just skip the And
                 }
                 
                 _ => {

@@ -26,6 +26,9 @@ pub enum Km2Error {
     #[error("Invalid rule structure at index {0}")]
     InvalidRule(usize),
     
+    #[error("Invalid Predefined usage: VK keys must be preceded by AND operator")]
+    InvalidPredefinedUsage,
+    
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

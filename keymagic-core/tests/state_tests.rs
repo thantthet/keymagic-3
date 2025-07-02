@@ -11,9 +11,12 @@ fn test_basic_state_toggle() {
     // Add state name to strings
     let state_idx = add_string(&mut km2, "zawgyi");
     
-    // Rule to enter state
+    // Rule to enter state - add And to make it valid
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::Oem3 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::Oem3 as u16)
+        ],
         vec![BinaryFormatElement::Switch(state_idx)]
     );
     
@@ -69,14 +72,20 @@ fn test_multiple_states() {
     let state1_idx = add_string(&mut km2, "state1");
     let state2_idx = add_string(&mut km2, "state2");
     
-    // Rules to enter states
+    // Rules to enter states - add And to make valid
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::F1 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::F1 as u16)
+        ],
         vec![BinaryFormatElement::Switch(state1_idx)]
     );
     
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::F2 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::F2 as u16)
+        ],
         vec![BinaryFormatElement::Switch(state2_idx)]
     );
     
@@ -143,9 +152,12 @@ fn test_state_with_any_wildcard() {
     
     let state_idx = add_string(&mut km2, "special");
     
-    // Rule to enter state
+    // Rule to enter state - add And to make valid
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::F3 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::F3 as u16)
+        ],
         vec![BinaryFormatElement::Switch(state_idx)]
     );
     
@@ -183,9 +195,12 @@ fn test_state_based_digit_conversion() {
     
     let zg_state_idx = add_string(&mut km2, "zg_key");
     
-    // Rule to enter Zawgyi mode
+    // Rule to enter Zawgyi mode - add And to make valid
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::Oem3 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::Oem3 as u16)
+        ],
         vec![BinaryFormatElement::Switch(zg_state_idx)]
     );
     
@@ -267,9 +282,12 @@ fn test_multiple_active_states() {
     let state1_idx = add_string(&mut km2, "state1");
     let state2_idx = add_string(&mut km2, "state2");
     
-    // Rule to enter both states at once
+    // Rule to enter both states at once - add And to make valid
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::F5 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::F5 as u16)
+        ],
         vec![
             BinaryFormatElement::Switch(state1_idx),
             BinaryFormatElement::Switch(state2_idx)
@@ -328,9 +346,12 @@ fn test_state_priority_in_rule_sorting() {
     
     let state_idx = add_string(&mut km2, "priority_test");
     
-    // Rule to enter state
+    // Rule to enter state - add And to make valid
     add_rule(&mut km2,
-        vec![BinaryFormatElement::Predefined(VirtualKey::F4 as u16)],
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::F4 as u16)
+        ],
         vec![BinaryFormatElement::Switch(state_idx)]
     );
     

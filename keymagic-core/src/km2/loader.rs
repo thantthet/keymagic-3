@@ -129,6 +129,10 @@ impl Km2Loader {
             let lhs = Self::read_rule_elements(cursor, lhs_len * 2)
                 .map_err(|_| Km2Error::InvalidRule(i))?;
             
+            // Validate LHS: Predefined elements must be preceded by AND
+            Self::validate_lhs_predefined(&lhs)
+                .map_err(|_| Km2Error::InvalidRule(i))?;
+            
             // Read RHS (size is in 16-bit units, convert to bytes)
             let rhs_len = cursor.read_u16::<LittleEndian>()? as usize;
             let rhs = Self::read_rule_elements(cursor, rhs_len * 2)
@@ -203,6 +207,35 @@ impl Km2Loader {
         
         Ok(elements)
     }
+    
+    /// Validate that standalone Predefined elements are not allowed in LHS
+    /// Only patterns with AND operators connecting Predefined elements are valid
+    fn validate_lhs_predefined(lhs: &[BinaryFormatElement]) -> Result<()> {
+        // Check if any Predefined exists without being part of a valid AND combination
+        let mut i = 0;
+        while i < lhs.len() {
+            if let BinaryFormatElement::Predefined(_) = lhs[i] {
+                // Check if this starts a valid combination (followed by AND)
+                if i + 1 < lhs.len() && matches!(lhs[i + 1], BinaryFormatElement::And) {
+                    // This is the start of a combination, skip to next element
+                    i += 1;
+                    continue;
+                }
+                
+                // Check if this is preceded by AND (part of combination)
+                if i > 0 && matches!(lhs[i - 1], BinaryFormatElement::And) {
+                    // This is part of a combination, continue
+                    i += 1;
+                    continue;
+                }
+                
+                // This is a standalone Predefined - not allowed
+                return Err(Km2Error::InvalidPredefinedUsage);
+            }
+            i += 1;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -242,4 +275,5 @@ mod tests {
         let result = Km2Loader::load(&data);
         assert!(matches!(result, Err(Km2Error::InvalidMagicCode(_))));
     }
+    
 }
