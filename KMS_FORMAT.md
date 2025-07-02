@@ -59,11 +59,11 @@ Options must be declared within a comment block using the format `@OPTION_NAME =
 ### Default Behavior
 
 When no options are specified, KeyMagic uses these defaults:
-- `@TRACK_CAPSLOCK = "FALSE"`
+- `@TRACK_CAPSLOCK = "TRUE"`
 - `@EAT_ALL_UNUSED_KEYS = "FALSE"`
 - `@US_LAYOUT_BASED = "FALSE"`
 - `@SMART_BACKSPACE = "FALSE"`
-- `@TREAT_CTRL_ALT_AS_RALT = "FALSE"`
+- `@TREAT_CTRL_ALT_AS_RALT = "TRUE"`
 
 ## Variables
 
@@ -184,16 +184,7 @@ $wDiaU[*] + $hDiaU[*] + u1031 + $yDiaK[*] => $yDiaU[$4] + $1 + $2 + $3
 
 ### Advanced Pattern Matching
 
-#### String Indexing
 
-Access specific characters in a variable by index (0-based):
-
-```kms
-$myvar = "abc"
-$myvar[0] => "a"    // First character
-$myvar[1] => "b"    // Second character
-$myvar[2] => "c"    // Third character
-```
 
 #### Combining Operators
 
@@ -247,11 +238,12 @@ KMS supports state-based input using parentheses with quoted strings:
 
 ### State Behavior
 
-- States are boolean toggles - entering the same state again exits it
-- State names are case-sensitive
-- States persist across input until explicitly changed
-- Multiple states can be active simultaneously
-- State names should be unique within a keyboard layout
+- **Single-Event Lifecycle**: States are transient and exist only for the duration of a single key event processing cycle.
+- **Activation**: A state is made active for the *next* key event when it appears in the output (right-hand side) of a matched rule.
+- **Matching**: An active state can be used as a matching condition in the pattern (left-hand side) of a rule during the current key event.
+- **Deactivation**: At the end of processing a key event, all states that were active at the start of the event are cleared. A state will only remain active for the subsequent event if the rule that just matched explicitly re-activates it in its output.
+- **State Maintenance**: To keep a state active across multiple key presses, the rule that matches must also include the state in its output. For example, `('my_state') + ANY => $1 + ('my_state')` uses the active state for matching and then re-activates it for the next input.
+- State names are case-sensitive and should be unique within a keyboard layout.
 
 ## Virtual Keys
 
@@ -326,6 +318,18 @@ Use angle brackets `< >` to define key combinations:
 - `VK_DOWN`
 - `VK_INSERT`
 
+### Virtual Key Aliases
+
+Several virtual keys have aliases for convenience. For example:
+- `VK_CTRL` is an alias for `VK_CONTROL`
+- `VK_ALT` is an alias for `VK_MENU`
+- `VK_ENTER` is an alias for `VK_RETURN`
+- `VK_CAPSLOCK` is an alias for `VK_CAPITAL`
+- `VK_ESC` is an alias for `VK_ESCAPE`
+- `VK_ALT_GR` is an alias for `VK_RMENU` (Right Alt)
+
+Many OEM keys also have aliases (e.g., `VK_COLON` for `VK_OEM_1`). Refer to the implementation for a complete list.
+
 ### Modifier Key Behavior
 
 - Multiple modifiers can be combined with `&`
@@ -336,11 +340,11 @@ Use angle brackets `< >` to define key combinations:
 
 ### Rule Priority
 
-Rules are matched in the following order:
-1. **Longer patterns first**: "abc" matches before "ab"
-2. **Virtual key combinations before string patterns**
-3. **State-specific rules before global rules**
-4. **First match wins**: Once a rule matches, no further rules are tested
+Rules are matched in the following order of precedence:
+1. **State-specific rules before global rules**: Rules that include a state condition `('state')` are checked first.
+2. **Virtual key combinations before string patterns**: Rules with `<VK_...>` patterns have priority over text-based patterns.
+3. **Longer patterns first**: For rules of the same type, the one with the longer pattern is checked first (e.g., "abc" matches before "ab").
+4. **First match wins**: Once a rule matches, no further rules are tested for the current input event.
 
 ### Greedy Matching
 
@@ -394,6 +398,8 @@ This means:
 ```
 
 ## Include Directive
+
+**Note:** This feature is planned but **not yet implemented** in the compiler.
 
 Scripts can include other KMS files:
 
