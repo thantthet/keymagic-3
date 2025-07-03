@@ -7,6 +7,8 @@ pub struct EngineOutput {
     pub composing_text: String,
     /// Action to perform
     pub action: ActionType,
+    /// Whether the input was processed by the engine (matched a rule)
+    pub is_processed: bool,
 }
 
 /// Types of actions the engine can output
@@ -24,10 +26,11 @@ pub enum ActionType {
 
 impl EngineOutput {
     /// Creates a new engine output
-    pub fn new(composing_text: String, action: ActionType) -> Self {
+    pub fn new(composing_text: String, action: ActionType, is_processed: bool) -> Self {
         Self {
             composing_text,
             action,
+            is_processed,
         }
     }
 
@@ -36,6 +39,7 @@ impl EngineOutput {
         Self {
             composing_text,
             action: ActionType::None,
+            is_processed: false,
         }
     }
 
@@ -44,6 +48,7 @@ impl EngineOutput {
         Self {
             composing_text,
             action: ActionType::Insert(text),
+            is_processed: true,
         }
     }
 
@@ -52,6 +57,7 @@ impl EngineOutput {
         Self {
             composing_text,
             action: ActionType::BackspaceDelete(count),
+            is_processed: true,
         }
     }
 
@@ -60,6 +66,7 @@ impl EngineOutput {
         Self {
             composing_text,
             action: ActionType::BackspaceDeleteAndInsert(delete_count, insert_text),
+            is_processed: true,
         }
     }
 }

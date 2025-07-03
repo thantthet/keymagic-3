@@ -75,6 +75,20 @@ impl ComposingBuffer {
                 .collect::<String>() + replacement;
         }
     }
+    
+    /// Removes one character from the end of the buffer (backspace)
+    pub fn backspace(&mut self) {
+        if !self.content.is_empty() {
+            // Remove the last character, handling Unicode properly
+            let chars: Vec<char> = self.content.chars().collect();
+            let char_count = chars.len();
+            if char_count > 0 {
+                self.content = chars.into_iter()
+                    .take(char_count - 1)
+                    .collect();
+            }
+        }
+    }
 }
 
 impl Default for ComposingBuffer {

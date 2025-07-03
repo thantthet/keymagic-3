@@ -4,6 +4,7 @@ use crate::types::{Km2File, Rule};
 use crate::engine::types::Element;
 use crate::engine::{
     input::KeyInput,
+    types::Predefined,
     output::EngineOutput,
     state::EngineState,
     matching::{RuleMatcher, Pattern, MatchContext},
@@ -55,8 +56,14 @@ impl KeyMagicEngine {
             self.state.active_states(),
         );
 
+        // Track whether a rule was matched (input was processed)
+        let mut is_processed = false;
+
         // Try to find a matching rule
         if let Some((rule, pattern, captures)) = RuleMatcher::find_match(&self.rules, &context, &self.strings) {
+            // A rule matched, so the input was processed
+            is_processed = true;
+
             // Calculate the matched length from the pattern
             let matched_len = pattern.calculate_match_length(&self.strings).unwrap_or(0);
 
@@ -92,12 +99,28 @@ impl KeyMagicEngine {
             }
         } else {
             // No rule matched
+            
+            // Check if this is a backspace key with auto_bksp enabled
+            if input.key_code == Predefined::from_raw(0x08) // VK_BACK
+                && self.keyboard.header.layout_options.auto_bksp == 1 
+                && !self.state.composing_text().is_empty() {
+                // Auto backspace is enabled, backspace key pressed, and composing buffer is not empty
+                // Delete one character backward
+                self.state.composing_buffer_mut().backspace();
+                is_processed = true;
+            } else if let Some(ch) = input.character {
+                // if character is available, set is_processed to true
+                is_processed = true;
 
-            // append character if available & not eat_all_unused_keys
-            if self.keyboard.header.layout_options.eat == 0 {
-                if let Some(ch) = input.character {
+                // append character if available & not eat_all_unused_keys
+                if self.keyboard.header.layout_options.eat == 0 {
                     self.state.composing_buffer_mut().append(&ch.to_string());
+                } else {
+                    // key is processed and eaten
                 }
+            } else {
+                // if no character, set is_processed to false
+                is_processed = false;
             }
 
             // Clear active states
@@ -108,7 +131,7 @@ impl KeyMagicEngine {
         let after_text = self.state.composing_text().to_string();
         let action = ActionGenerator::generate_action(&before_text, &after_text, true);
 
-        Ok(EngineOutput::new(after_text, action))
+        Ok(EngineOutput::new(after_text, action, is_processed))
     }
 
     /// Resets the engine state
