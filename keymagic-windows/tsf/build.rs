@@ -12,13 +12,20 @@ fn main() {
     let src_dir = PathBuf::from(&manifest_dir).join("src");
 
     // Compile C++ sources
-    cc::Build::new()
-        .cpp(true)
+    let mut build = cc::Build::new();
+    build.cpp(true)
+        .file(src_dir.join("Globals.cpp"))
         .file(src_dir.join("KeyMagicTextService.cpp"))
         .file(src_dir.join("DllMain.cpp"))
         .include(PathBuf::from(&manifest_dir).join("include"))
-        .flag("/std:c++17")
-        .compile("keymagic_tsf");
+        .flag("/std:c++17");
+    
+    // Add debug flag in debug builds
+    if env::var("PROFILE").unwrap_or_default() == "debug" {
+        build.define("_DEBUG", None);
+    }
+    
+    build.compile("keymagic_tsf");
 
     // Link Windows libraries
     println!("cargo:rustc-link-lib=user32");

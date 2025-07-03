@@ -1,0 +1,17 @@
+[package]
+name = "keymagic-windows"
+version = "0.1.0"
+edition = "2021"
+authors = ["KeyMagic Contributors"]
+license = "GPL-3.0"
+repository = "https://github.com/keymagic/keymagic-v3"
+description = "Windows Text Services Framework integration for KeyMagic"
+
+[dependencies]
+keymagic-core = { path = "../../keymagic-core" }
+
+[build-dependencies]
+cc = "1.0"
+
+[lib]
+crate-type = ["cdylib"]

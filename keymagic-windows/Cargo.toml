@@ -1,17 +1,3 @@
-[package]
-name = "keymagic-windows"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-repository.workspace = true
-description = "Windows Text Services Framework integration for KeyMagic"
-
-[dependencies]
-keymagic-core = { path = "../keymagic-core" }
-
-[build-dependencies]
-cc = "1.0"
-
-[lib]
-crate-type = ["cdylib"]
+[workspace]
+members = ["tsf"]
+resolver = "2"

@@ -1,10 +1,15 @@
+#define UNICODE
+#define _UNICODE
+
 #include "KeyMagicTextService.h"
+#include "Debug.h"
 #include <string>
 #include <vector>
+#include <windows.h>
+#include <shlwapi.h>
 
-// Global variables
-HINSTANCE g_hInst = NULL;
-LONG g_cRefDll = 0;
+#pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "advapi32.lib")
 
 // Helper function to convert UTF-8 to UTF-16
 std::wstring CKeyMagicTextService::_Utf8ToUtf16(const char* utf8) {
@@ -89,15 +94,24 @@ CKeyMagicTextService::CKeyMagicTextService()
     
     InterlockedIncrement(&g_cRefDll);
     
+    // Initialize debug logging
+    DEBUG_OUTPUT("KeyMagicTextService constructor called");
+    
     // Create KeyMagic engine instance
     m_pEngine = keymagic_engine_new();
+    DEBUG_OUTPUT("Engine created: %p", m_pEngine);
+    
+    // Load active keyboard from registry
+    LoadActiveKeyboard();
 }
 
 CKeyMagicTextService::~CKeyMagicTextService() {
+    DEBUG_OUTPUT("KeyMagicTextService destructor");
     if (m_pEngine) {
         keymagic_engine_free(m_pEngine);
     }
     InterlockedDecrement(&g_cRefDll);
+    DEBUG_OUTPUT("KeyMagicTextService shutdown");
 }
 
 STDAPI CKeyMagicTextService::QueryInterface(REFIID riid, void** ppvObj) {
@@ -137,6 +151,9 @@ STDAPI_(ULONG) CKeyMagicTextService::Release() {
 
 // ITfTextInputProcessor implementation
 STDAPI CKeyMagicTextService::Activate(ITfThreadMgr* ptim, TfClientId tid) {
+    DEBUG_FUNCTION_ENTER();
+    DEBUG_OUTPUT("Activating with ClientId: %d", tid);
+    
     m_pThreadMgr = ptim;
     m_pThreadMgr->AddRef();
     m_tfClientId = tid;
@@ -145,6 +162,7 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr* ptim, TfClientId tid) {
     _InitThreadMgrEventSink();
     _InitKeyEventSink();
     
+    DEBUG_FUNCTION_EXIT();
     return S_OK;
 }
 
@@ -179,9 +197,12 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext* pic, WPARAM wParam, LPARA
 }
 
 STDAPI CKeyMagicTextService::OnKeyDown(ITfContext* pic, WPARAM wParam, LPARAM lParam, BOOL* pfEaten) {
+    DEBUG_FUNCTION_ENTER();
     *pfEaten = FALSE;
     
     if (!m_pEngine) {
+        DEBUG_OUTPUT("No engine available");
+        DEBUG_FUNCTION_EXIT();
         return S_OK;
     }
     
@@ -191,11 +212,23 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext* pic, WPARAM wParam, LPARAM lP
     int alt = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
     int caps = (GetKeyState(VK_CAPITAL) & 0x0001) ? 1 : 0;
     
+    DEBUG_OUTPUT("Modifiers: Shift=%d, Ctrl=%d, Alt=%d, Caps=%d", shift, ctrl, alt, caps);
+    
+    // Convert virtual key to character
+    BYTE keyState[256];
+    GetKeyboardState(keyState);
+    WCHAR buffer[2] = {0};
+    int charCount = ToUnicode((UINT)wParam, (lParam >> 16) & 0xFF, keyState, buffer, 2, 0);
+    char character = (charCount == 1) ? (char)buffer[0] : '\0';
+    
+    DEBUG_KEY_EVENT((int)wParam, character, shift, ctrl, alt);
+    
     // Process key through engine
     ProcessKeyOutput output = {0};
     KeyMagicResult result = keymagic_engine_process_key(
         m_pEngine,
         (int)wParam,
+        character,
         shift,
         ctrl,
         alt,
@@ -204,14 +237,18 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext* pic, WPARAM wParam, LPARAM lP
     );
     
     if (result != KEYMAGIC_SUCCESS) {
+        DEBUG_OUTPUT("Engine returned error: %d", result);
+        DEBUG_FUNCTION_EXIT();
         return S_OK;
     }
     
     *pfEaten = output.consumed ? TRUE : FALSE;
+    DEBUG_OUTPUT("Key consumed: %s", *pfEaten ? "YES" : "NO");
     
     // Handle output based on action type
     if (output.action_type != 0 && output.text) {
         std::wstring text = _Utf8ToUtf16(output.text);
+        DEBUG_OUTPUT("Engine action: type=%d, text='%S'", output.action_type, text.c_str());
         
         switch (output.action_type) {
             case 1: // CommitText
@@ -231,6 +268,7 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext* pic, WPARAM wParam, LPARAM lP
         keymagic_free_string(output.text);
     }
     
+    DEBUG_FUNCTION_EXIT();
     return S_OK;
 }
 
@@ -333,4 +371,65 @@ HRESULT CKeyMagicTextService::_CommitText(ITfContext* pContext, const std::wstri
     // TODO: Implement text commit
     _EndComposition(pContext);
     return S_OK;
+}
+
+// Load active keyboard from registry
+void CKeyMagicTextService::LoadActiveKeyboard() {
+    DEBUG_OUTPUT("Loading active keyboard from registry");
+    
+    HKEY hKey;
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Keyboards", 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+        DEBUG_OUTPUT("No keyboards found in registry");
+        return;
+    }
+    
+    // Get active keyboard index
+    DWORD activeIndex = 0;
+    DWORD size = sizeof(DWORD);
+    if (RegQueryValueEx(hKey, L"ActiveKeyboard", NULL, NULL, (BYTE*)&activeIndex, &size) != ERROR_SUCCESS) {
+        DEBUG_OUTPUT("No active keyboard set");
+        RegCloseKey(hKey);
+        return;
+    }
+    
+    // Enumerate keyboards to find the active one
+    DWORD index = 0;
+    wchar_t valueName[256];
+    DWORD valueNameSize;
+    wchar_t filePath[MAX_PATH];
+    DWORD filePathSize;
+    DWORD type;
+    
+    while (index <= activeIndex) {
+        valueNameSize = 256;
+        filePathSize = MAX_PATH * sizeof(wchar_t);
+        
+        if (RegEnumValue(hKey, index, valueName, &valueNameSize, NULL, &type, 
+                         (BYTE*)filePath, &filePathSize) != ERROR_SUCCESS) {
+            break;
+        }
+        
+        if (index == activeIndex && type == REG_SZ) {
+            // Found the active keyboard
+            DEBUG_OUTPUT("Found active keyboard: %S", valueName);
+            DEBUG_OUTPUT("Loading from: %S", filePath);
+            
+            // Convert to UTF-8 for the engine
+            char utf8Path[MAX_PATH * 3];
+            WideCharToMultiByte(CP_UTF8, 0, filePath, -1, utf8Path, sizeof(utf8Path), NULL, NULL);
+            
+            // Load the keyboard file
+            KeyMagicResult result = keymagic_engine_load_keyboard(m_pEngine, utf8Path);
+            if (result == KEYMAGIC_SUCCESS) {
+                DEBUG_OUTPUT("Keyboard loaded successfully");
+            } else {
+                DEBUG_OUTPUT("Failed to load keyboard: error %d", result);
+            }
+            break;
+        }
+        
+        index++;
+    }
+    
+    RegCloseKey(hKey);
 }

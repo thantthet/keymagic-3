@@ -1,19 +1,17 @@
+#define UNICODE
+#define _UNICODE
+
 #include <windows.h>
 #include <olectl.h>
 #include <msctf.h>
 #include "KeyMagicTextService.h"
+#include "KeyMagicGuids.h"
 
-// DLL entry point
-BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID pvReserved) {
-    switch (dwReason) {
-        case DLL_PROCESS_ATTACH:
-            g_hInst = hInstance;
-            DisableThreadLibraryCalls(hInstance);
-            break;
-            
-        case DLL_PROCESS_DETACH:
-            break;
-    }
+
+// Called from Rust's DllMain
+extern "C" BOOL InitializeDll(HINSTANCE hInstance) {
+    g_hInst = hInstance;
+    DisableThreadLibraryCalls(hInstance);
     return TRUE;
 }
 
@@ -87,9 +85,10 @@ STDAPI DllRegisterServer() {
                 0x0409,  // Language ID
                 GUID_KeyMagicProfile,
                 L"KeyMagic",
-                L"KeyMagic Input Method",
+                (ULONG)wcslen(L"KeyMagic"),  // Display name length
                 szModule,
-                (ULONG)-1
+                (ULONG)-1,  // Module file index
+                0  // Icon index
             );
         }
         

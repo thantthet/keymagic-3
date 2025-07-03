@@ -6,6 +6,7 @@
 #include <olectl.h>
 #include <string>
 #include "keymagic_ffi.h"
+#include "KeyMagicGuids.h"
 
 // Forward declarations
 class CKeyMagicTextService;
@@ -75,6 +76,9 @@ private:
 
     // Convert UTF-8 to UTF-16
     std::wstring _Utf8ToUtf16(const char* utf8);
+    
+    // Load active keyboard from registry
+    void LoadActiveKeyboard();
     
     // Member variables
     LONG m_cRef;
