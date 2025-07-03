@@ -7,7 +7,7 @@ A modern rewrite of the KeyMagic input method editor in Rust, focusing on perfor
 This is a monorepo organized as a Cargo workspace:
 
 ```
-keymagic-afterlife/
+keymagic-v3/
 ├── Cargo.toml                 # Workspace configuration
 ├── keymagic-core/            # Core engine library
 │   ├── Cargo.toml
@@ -81,10 +81,10 @@ cargo run -p kms2km2 --bin km2_dump -- file.km2
 ## Development Status
 
 - ✅ Phase 1: KMS to KM2 Converter (Complete)
-- 🚧 Phase 2: Core Engine Development (In Progress)
+- ✅ Phase 2: Core Engine Development (Complete)
 - ⏳ Phase 3: Linux Integration (Planned)
 - ⏳ Phase 4: macOS Integration (Planned)
-- ⏳ Phase 5: Windows Integration (Planned)
+- 🚧 Phase 5: Windows Integration (In Progress)
 - ⏳ Phase 6: Advanced Features & Optimization (Planned)
 
 ## Features
