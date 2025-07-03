@@ -11,7 +11,7 @@ description = "Windows Text Services Framework integration for KeyMagic"
 keymagic-core = { path = "../keymagic-core" }
 
 [build-dependencies]
-# Add Windows-specific build dependencies here
+cc = "1.0"
 
 [lib]
 crate-type = ["cdylib"]
