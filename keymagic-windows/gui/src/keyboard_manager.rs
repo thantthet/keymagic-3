@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow};
 
 // Import FFI types from keymagic-core
 use keymagic_core::ffi::*;
+use keymagic_core::km2::Km2Loader;
 
 pub struct KeyboardInfo {
     pub id: String,
@@ -40,39 +41,53 @@ impl KeyboardManager {
         // Read the .km2 file
         let km2_data = std::fs::read(path)?;
         
-        // Use keymagic-core to parse the file and extract metadata
-        // For now, we'll create a temporary engine to load and validate the keyboard
-        let engine = unsafe { keymagic_engine_new() };
+        // Parse the KM2 file to extract metadata
+        let km2 = Km2Loader::load(&km2_data)?;
+        let metadata = km2.metadata();
+        
+        // Also validate that it can be loaded by the engine
+        let engine = keymagic_engine_new();
         if engine.is_null() {
             return Err(anyhow!("Failed to create engine"));
         }
         
         let c_path = CString::new(path.to_str().unwrap())?;
-        let result = unsafe {
-            keymagic_engine_load_keyboard(engine, c_path.as_ptr())
-        };
+        let result = keymagic_engine_load_keyboard(engine, c_path.as_ptr());
         
         // Clean up engine
-        unsafe { keymagic_engine_free(engine) };
+        keymagic_engine_free(engine);
         
         if result != KeyMagicResult::Success {
             return Err(anyhow!("Failed to load keyboard"));
         }
         
         // Extract metadata from km2 file
-        // For now, use simple parsing to get the name
         let keyboard_id = path.file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
             
+        let name = metadata.name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| keyboard_id.clone());
+            
+        let description = metadata.description()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| String::new());
+            
+        let hotkey = metadata.hotkey()
+            .map(|s| s.to_string());
+            
+        let icon_data = metadata.icon()
+            .map(|data| data.to_vec());
+            
         let info = KeyboardInfo {
             id: keyboard_id.clone(),
             path: path.to_path_buf(),
-            name: keyboard_id.clone(), // TODO: Extract from km2
-            description: String::new(), // TODO: Extract from km2
-            icon_data: None, // TODO: Extract from km2
-            hotkey: None,
+            name,
+            description,
+            icon_data,
+            hotkey,
             enabled: true,
         };
         
@@ -254,24 +269,27 @@ impl KeyboardManager {
     
     // Registry helper methods
     unsafe fn read_registry_string(&self, hkey: HKEY, value_name: PCWSTR) -> Option<String> {
+        let mut buffer = vec![0u16; 256];
+        let mut size = buffer.len() as u32 * 2;
         let mut data_type = REG_VALUE_TYPE::default();
-        let mut data_size = 0u32;
         
-        if RegQueryValueExW(hkey, value_name, None, Some(&mut data_type), None, Some(&mut data_size)) .is_ok() {
-            let mut buffer = vec![0u8; data_size as usize];
-            
-            if RegQueryValueExW(hkey, value_name, None, None, Some(buffer.as_mut_ptr()), Some(&mut data_size)) .is_ok() {
-                // Convert from UTF-16
-                let u16_buffer: Vec<u16> = buffer.chunks_exact(2)
-                    .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-                    .take_while(|&c| c != 0)
-                    .collect();
-                    
-                return Some(String::from_utf16_lossy(&u16_buffer));
-            }
+        let result = RegQueryValueExW(
+            hkey,
+            value_name,
+            None,
+            Some(&mut data_type),
+            Some(buffer.as_mut_ptr() as *mut u8),
+            Some(&mut size),
+        );
+        
+        if result.is_ok() {
+            // Find null terminator and truncate
+            let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+            buffer.truncate(len);
+            Some(String::from_utf16_lossy(&buffer))
+        } else {
+            None
         }
-        
-        None
     }
     
     unsafe fn read_registry_dword(&self, hkey: HKEY, value_name: PCWSTR) -> Option<u32> {
@@ -279,14 +297,16 @@ impl KeyboardManager {
         let mut data = 0u32;
         let mut data_size = std::mem::size_of::<u32>() as u32;
         
-        if RegQueryValueExW(
+        let result = RegQueryValueExW(
             hkey,
             value_name,
             None,
             Some(&mut data_type),
-            Some(std::slice::from_raw_parts_mut(&mut data as *mut u32 as *mut u8, std::mem::size_of::<u32>())),
-            Some(&mut data_size)
-        ) .is_ok() {
+            Some(&mut data as *mut u32 as *mut u8),
+            Some(&mut data_size),
+        );
+        
+        if result.is_ok() {
             Some(data)
         } else {
             None
@@ -295,14 +315,18 @@ impl KeyboardManager {
     
     unsafe fn write_registry_string(&self, hkey: HKEY, value_name: PCWSTR, value: &str) -> Result<()> {
         let value_w: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+        let value_bytes = std::slice::from_raw_parts(
+            value_w.as_ptr() as *const u8,
+            value_w.len() * 2
+        );
         
         if RegSetValueExW(
             hkey,
             value_name,
             0,
             REG_SZ,
-            Some(std::slice::from_raw_parts(value_w.as_ptr() as *const u8, value_w.len() * 2))
-        ) .is_err() {
+            Some(value_bytes),
+        ).is_err() {
             return Err(anyhow!("Failed to write registry value"));
         }
         
@@ -310,13 +334,18 @@ impl KeyboardManager {
     }
     
     unsafe fn write_registry_dword(&self, hkey: HKEY, value_name: PCWSTR, value: u32) -> Result<()> {
+        let value_bytes = std::slice::from_raw_parts(
+            &value as *const u32 as *const u8,
+            std::mem::size_of::<u32>()
+        );
+        
         if RegSetValueExW(
             hkey,
             value_name,
             0,
             REG_DWORD,
-            Some(std::slice::from_raw_parts(&value as *const u32 as *const u8, std::mem::size_of::<u32>()))
-        ) .is_err() {
+            Some(value_bytes),
+        ).is_err() {
             return Err(anyhow!("Failed to write registry value"));
         }
         

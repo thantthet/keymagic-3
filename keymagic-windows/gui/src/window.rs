@@ -13,8 +13,9 @@ use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
 use std::ffi::c_void;
 use crate::app::App;
-use crate::keyboard_manager_simple::KeyboardManager;
+use crate::keyboard_manager::KeyboardManager;
 use crate::keyboard_list::KeyboardListView;
+use crate::keyboard_preview::KeyboardPreview;
 
 const WINDOW_CLASS_NAME: PCWSTR = w!("KeyMagicConfigWindow");
 const WINDOW_TITLE: PCWSTR = w!("KeyMagic Configuration Manager");
@@ -27,11 +28,15 @@ const ID_KEYBOARD_ACTIVATE: u16 = 201;
 const ID_KEYBOARD_CONFIGURE: u16 = 202;
 const ID_HELP_ABOUT: u16 = 301;
 
+// Custom window messages
+const WM_UPDATE_OUTPUT: u32 = WM_USER + 1;
+
 pub struct MainWindow {
     hwnd: HWND,
     app: Arc<App>,
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
     list_view: RefCell<Option<KeyboardListView>>,
+    preview: RefCell<Option<Arc<KeyboardPreview>>>,
 }
 
 impl MainWindow {
@@ -69,6 +74,7 @@ impl MainWindow {
                 app: app.clone(),
                 keyboard_manager,
                 list_view: RefCell::new(None),
+                preview: RefCell::new(None),
             });
             
             // Store window pointer for WM_CREATE
@@ -83,7 +89,7 @@ impl MainWindow {
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
                 900,
-                600,
+                700,
                 None,
                 Self::create_menu()?,
                 instance,
@@ -152,6 +158,12 @@ impl MainWindow {
                     if let Ok(lv) = list_view {
                         *window.list_view.borrow_mut() = Some(lv);
                     }
+                    
+                    // Create the preview area
+                    let preview = KeyboardPreview::new(hwnd);
+                    if let Ok(pv) = preview {
+                        *window.preview.borrow_mut() = Some(pv);
+                    }
                 }
                 
                 LRESULT(0)
@@ -179,7 +191,12 @@ impl MainWindow {
                         ID_KEYBOARD_ACTIVATE => {
                             window.activate_keyboard();
                         }
-                        _ => {}
+                        _ => {
+                            // Check if it's from the preview area
+                            if let Some(preview) = window.preview.borrow().as_ref() {
+                                let _ = preview.handle_command(cmd_id);
+                            }
+                        }
                     }
                 }
                 LRESULT(0)
@@ -200,7 +217,7 @@ impl MainWindow {
             WM_SIZE => {
                 // Resize ListView to fill client area
                 let width = (lparam.0 & 0xFFFF) as i32;
-                let height = ((lparam.0 >> 16) & 0xFFFF) as i32;
+                let _height = ((lparam.0 >> 16) & 0xFFFF) as i32;
                 
                 let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
                 if !window_ptr.is_null() {
@@ -212,9 +229,19 @@ impl MainWindow {
                             10,
                             10,
                             width - 20,
-                            height - 20,
+                            200,  // Fixed height for ListView
                             SWP_NOZORDER,
                         );
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_UPDATE_OUTPUT => {
+                let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
+                if !window_ptr.is_null() {
+                    let window = &*window_ptr;
+                    if let Some(preview) = window.preview.borrow().as_ref() {
+                        preview.update_output();
                     }
                 }
                 LRESULT(0)
@@ -293,6 +320,12 @@ impl MainWindow {
             if let Some(id) = list_view.get_selected_keyboard_id() {
                 let mut manager = self.keyboard_manager.lock().unwrap();
                 if manager.set_active_keyboard(&id).is_ok() {
+                    // Load keyboard in preview if available
+                    if let Some(keyboard_info) = manager.get_keyboard(&id) {
+                        if let Some(preview) = self.preview.borrow().as_ref() {
+                            let _ = preview.load_keyboard(keyboard_info.path.to_str().unwrap_or(""));
+                        }
+                    }
                     drop(manager);
                     let _ = list_view.refresh();
                 }

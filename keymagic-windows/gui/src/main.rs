@@ -7,8 +7,9 @@ use windows::{
 
 mod window;
 mod app;
-mod keyboard_manager_simple;
+mod keyboard_manager;
 mod keyboard_list;
+mod keyboard_preview;
 
 use window::MainWindow;
 use app::App;

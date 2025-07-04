@@ -8,7 +8,7 @@ use windows::{
     },
 };
 use std::sync::{Arc, Mutex};
-use crate::keyboard_manager_simple::{KeyboardManager, KeyboardInfo};
+use crate::keyboard_manager::{KeyboardManager, KeyboardInfo};
 
 const IDC_KEYBOARD_LIST: i32 = 1001;
 
@@ -36,7 +36,7 @@ impl KeyboardListView {
                 10,
                 10,
                 760,
-                400,
+                200,
                 parent,
                 HMENU(IDC_KEYBOARD_LIST as _),
                 GetModuleHandleW(None)?,

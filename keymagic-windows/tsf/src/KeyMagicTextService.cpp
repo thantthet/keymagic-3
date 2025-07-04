@@ -369,8 +369,8 @@ void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARA
     int alt = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
     int capsLock = (GetKeyState(VK_CAPITAL) & 0x0001) ? 1 : 0;
     
-    // Process key through engine
-    KeyMagicResult result = keymagic_engine_process_key(
+    // Process key through engine using Windows VK code variant
+    KeyMagicResult result = keymagic_engine_process_key_win(
         m_pEngine, keyCode, character, 
         shift, ctrl, alt, capsLock, &output
     );
