@@ -479,7 +479,7 @@ impl KeyboardPreview {
                             println!("Composing Text: null");
                         }
                         
-                        preview.handle_engine_output(&output, vk_code);
+                        preview.handle_engine_output(&output, vk_code, engine);
                         
                         // Clean up
                         if !output.text.is_null() {
@@ -512,7 +512,7 @@ impl KeyboardPreview {
         )
     }
     
-    fn handle_engine_output(&self, output: &ProcessKeyOutput, vk_code: u32) {
+    fn handle_engine_output(&self, output: &ProcessKeyOutput, vk_code: u32, engine: *mut EngineHandle) {
         unsafe {
             println!("\n--- Handle Engine Output ---");
             
@@ -565,10 +565,7 @@ impl KeyboardPreview {
                     // Clear composing and reset engine
                     println!("Clearing composing display and resetting engine");
                     let _ = SetWindowTextW(self.composing_hwnd, w!(""));
-                    let engine_guard = self.engine.lock().unwrap();
-                    if let Some(engine) = *engine_guard {
-                        keymagic_engine_reset(engine);
-                    }
+                    keymagic_engine_reset(engine);
                 } else if should_commit && composing.is_empty() {
                     println!("Should commit but composing is empty - skipping");
                 }
