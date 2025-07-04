@@ -47,18 +47,36 @@ These capabilities are essential for:
     - For each rule, it compares the current input context with the rule's pattern.
     - A rule is considered a match if the context matches the rule's pattern and any associated conditions (e.g., modifier keys) are met.
 
-3.  **Composing Text Management and Output Generation**: The engine maintains a composing text buffer. When a rule matches, the engine updates the buffer by **replacing the matched portion of the text** with the rule's output. This is a key mechanism for transformations.
+3.  **Composing Text Management and Output Generation**: The engine maintains a persistent composing text buffer that accumulates ALL input across key events. This is fundamental to KeyMagic's operation:
 
-    - The engine checks if the new composing text can trigger another rule through recursive matching.
-    - This allows for complex, multi-level transformations.
+    **Composing Text Persistence**:
+    - The composing buffer is **never automatically cleared** by normal key processing
+    - Every key press either adds to or modifies the existing composing text
+    - Even when text is committed (action=Insert), the committed text remains in the composing buffer
+    - The composing buffer only clears when:
+      - The engine is explicitly reset (via `reset()` method)
+      - The composing text is explicitly set (via `set_composing_text()`)
+      - A rule produces empty output (effectively clearing the buffer)
 
+    **How Composing Text Updates**:
+    - When no rule matches: The new character is appended to the composing buffer
+    - When a rule matches: The matched portion is replaced with the rule's output
+    - The engine then checks if the new composing text can trigger another rule through recursive matching
+
+    **Action Generation**:
     The engine tracks how the composing text changes and generates appropriate actions:
     - **Text Insertion**: Insert new text at the cursor
-    - **Backspace + Insert**: Delete previous characters and insert new text (e.g., when "title" becomes "Title", action is "delete 4 characters and insert 'Title'")
+    - **Backspace + Insert**: Delete previous characters and insert new text
     - **State Change**: Update the engine's state for subsequent key presses
     - **Delete Only**: Remove characters without inserting new ones
 
-    Example flow:
+    **Example flows**:
+    
+    Simple example - typing "ka":
+    - Press 'k': No rule matches, composing text = "k", action = Insert("k")
+    - Press 'a': Rule matches 'ka' => 'က', composing text = "က", action = BackspaceDeleteAndInsert(1, "က")
+    
+    Complex example - typing "title":
     - Input keys: t, i, t, l → composing text: "titl"
     - Input key: e → matches rule 'title' => 'Title'
     - Composing text changes to: "Title"
@@ -88,8 +106,14 @@ These capabilities are essential for:
     This design allows virtual key rules to produce characters that can then be transformed by text-based rules, enabling sophisticated input method behaviors while preventing infinite loops from key-based rules.
 
 5.  **Return Value**: The `process_key` method returns an `Output` object containing:
-    - **Composing Text**: The current accumulated text in the composing buffer
+    - **Composing Text**: The current accumulated text in the composing buffer (ALWAYS returned, never empty unless explicitly cleared)
     - **Actions**: Specific instructions for modifying the text (insert, delete count, or combination)
+    - **Is Processed**: Whether the key was handled by the engine (used to determine if the key should be consumed)
+    
+    **Important**: The composing text represents the engine's complete internal state and should be used for:
+    - Displaying composition indicators (underlines) in the UI
+    - Synchronizing engine state after external changes
+    - Debugging and logging
     
     The caller is responsible for executing these actions in the text editor or application.
 
@@ -107,10 +131,16 @@ The `KeyMagicEngine` struct holds the current keyboard layout and the engine's s
 ### State
 
 The `EngineState` struct maintains:
-- **Composing Text Buffer**: Stores the current composing text.
+- **Composing Text Buffer**: Stores the current composing text persistently across all key events.
 - **Active States**: A set of integer IDs representing the states that are active for the *next* key press.
 
-State behavior is transient:
+**Composing Text Buffer Behavior**:
+- **Persistent**: Never cleared automatically during normal key processing
+- **Accumulative**: Each key press modifies or appends to existing content
+- **Always Present**: Every `process_key` response includes the current composing text
+- **Manual Control**: Only cleared via `reset()` or `set_composing_text()`
+
+**State Behavior** (transient):
 - When a rule's output activates a state (e.g., `=> ('my_state')`), that state becomes active for the next key event.
 - After a key event is processed, all previously active states are cleared.
 - A state only persists across multiple key presses if the rule that matches for each key press also reactivates the state in its output.

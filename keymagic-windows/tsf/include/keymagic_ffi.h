@@ -6,40 +6,41 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
 
-// Opaque handle to the KeyMagic engine
+// Opaque handle to the engine
 typedef struct EngineHandle EngineHandle;
 
 // Result codes
 typedef enum {
-    KEYMAGIC_SUCCESS = 0,
-    KEYMAGIC_ERROR_INVALID_HANDLE = -1,
-    KEYMAGIC_ERROR_INVALID_PARAMETER = -2,
-    KEYMAGIC_ERROR_ENGINE_FAILURE = -3,
-    KEYMAGIC_ERROR_UTF8_CONVERSION = -4,
-    KEYMAGIC_ERROR_NO_KEYBOARD = -5,
+    KeyMagicResult_Success = 0,
+    KeyMagicResult_ErrorInvalidHandle = -1,
+    KeyMagicResult_ErrorInvalidParameter = -2,
+    KeyMagicResult_ErrorEngineFailure = -3,
+    KeyMagicResult_ErrorUtf8Conversion = -4,
+    KeyMagicResult_ErrorNoKeyboard = -5,
 } KeyMagicResult;
 
-// Output from key processing
+// Output structure from key processing
 typedef struct {
-    // Action type: 0=None, 1=Insert, 2=BackspaceDelete, 3=BackspaceDeleteAndInsert
-    int action_type;
-    // UTF-8 encoded text to insert (null-terminated)
-    char* text;
-    // Number of characters to delete
-    int delete_count;
-    // Current composing text (UTF-8, null-terminated)
-    char* composing_text;
-    // Whether the key was consumed (0=false, 1=true)
-    int consumed;
+    int action_type;      // 0=None, 1=Insert, 2=BackspaceDelete, 3=BackspaceDeleteAndInsert
+    char* text;           // UTF-8 encoded, null-terminated (needs to be freed)
+    int delete_count;     // Number of characters to delete
+    char* composing_text; // UTF-8 encoded, null-terminated (needs to be freed)
+    int is_processed;     // 0=false, 1=true
 } ProcessKeyOutput;
 
-// Engine lifecycle functions
+// Engine management
 EngineHandle* keymagic_engine_new(void);
 void keymagic_engine_free(EngineHandle* handle);
 
 // Keyboard loading
 KeyMagicResult keymagic_engine_load_keyboard(EngineHandle* handle, const char* km2_path);
+KeyMagicResult keymagic_engine_load_keyboard_from_memory(
+    EngineHandle* handle, 
+    const uint8_t* km2_data, 
+    size_t data_len
+);
 
 // Key processing
 KeyMagicResult keymagic_engine_process_key(
@@ -53,15 +54,15 @@ KeyMagicResult keymagic_engine_process_key(
     ProcessKeyOutput* output
 );
 
-// State management
-KeyMagicResult keymagic_engine_reset(EngineHandle* handle);
-char* keymagic_engine_get_composition(EngineHandle* handle);
-
 // Memory management
 void keymagic_free_string(char* s);
 
-// Version information
-const char* keymagic_windows_version(void);
+// Engine control
+KeyMagicResult keymagic_engine_reset(EngineHandle* handle);
+char* keymagic_engine_get_composition(EngineHandle* handle);
+
+// Version info
+const char* keymagic_get_version(void);
 
 #ifdef __cplusplus
 }

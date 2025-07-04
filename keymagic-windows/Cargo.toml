@@ -1,3 +1,7 @@
 [workspace]
-members = ["tsf"]
+members = ["gui"]
 resolver = "2"
+
+[workspace.dependencies]
+keymagic-core = { path = "../keymagic-core" }
+anyhow = "1.0"

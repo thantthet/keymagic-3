@@ -1,73 +1,59 @@
-# KeyMagic TSF (Text Services Framework)
+# KeyMagic TSF Text Service
 
-Windows Text Services Framework integration for KeyMagic IME.
-
-## Overview
-
-This component provides the core IME functionality for Windows by integrating with the Text Services Framework (TSF). It's built using Rust with C++ TSF integration.
+This directory contains the Windows Text Services Framework (TSF) implementation for KeyMagic.
 
 ## Building
 
-From this directory:
-```cmd
-cargo build --release
-```
+### Prerequisites
+- Visual Studio 2022 or later
+- CMake 3.20 or later
+- Windows SDK
+- Rust toolchain (for building keymagic-core)
 
-Or use the build script:
-```cmd
-build_windows.bat
-```
+### Build Steps
+
+1. First build keymagic-core:
+   ```cmd
+   cd ../..
+   cargo build --release
+   ```
+
+2. Generate the Visual Studio project:
+   ```cmd
+   cd keymagic-windows/tsf
+   mkdir build
+   cd build
+   cmake -G "Visual Studio 17 2022" -A x64 ..
+   ```
+
+3. Build the TSF DLL:
+   ```cmd
+   cmake --build . --config Release
+   ```
 
 ## Installation
 
-Run as Administrator:
+1. Register the DLL:
+   ```cmd
+   regsvr32 KeyMagicTSF.dll
+   ```
+
+2. The text service will appear in Windows language settings.
+
+## Uninstallation
+
 ```cmd
-install.bat
-```
-
-## Features
-
-- Full TSF integration for Windows IME support
-- Rust-based engine with C++ TSF wrapper
-- Debug logging via OutputDebugString
-- Automatic keyboard loading from registry
-- Support for all Windows applications
-
-## Project Structure
-
-```
-tsf/
-├── src/                    # Source files
-│   ├── ffi.rs             # Rust FFI implementation
-│   ├── lib.rs             # Rust library entry
-│   ├── KeyMagicTextService.cpp/h  # TSF implementation
-│   ├── DllMain.cpp        # DLL entry point
-│   └── ...
-├── include/               # Public headers
-│   └── keymagic_ffi.h
-├── build.rs              # Rust build script
-├── Cargo.toml           # Rust project config
-└── *.bat                # Build/install scripts
+regsvr32 /u KeyMagicTSF.dll
 ```
 
 ## Development
 
-### Debug Build
-```cmd
-cargo build
-```
+The TSF implementation follows the simplified text handling strategy:
+- Always displays the engine's composing text as the composition string
+- Commits text on space, enter, tab, or focus loss
+- Resets the engine after each commit
 
-### View Debug Output
-Use DebugView.exe to see real-time debug messages with filter "[KeyMagic]"
-
-### Uninstall
-```cmd
-force_uninstall.bat
-```
-
-## Registry Integration
-
-The TSF reads keyboard configuration from:
-`HKEY_CURRENT_USER\Software\KeyMagic\Keyboards`
-
-Use the KeyMagic Manager GUI to configure keyboards.
+Key files:
+- `KeyMagicTextService.cpp/h` - Main TSF implementation
+- `keymagic_ffi.h` - FFI interface to keymagic-core
+- `DllMain.cpp` - DLL entry points and COM registration

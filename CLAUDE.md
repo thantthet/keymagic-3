@@ -8,3 +8,7 @@
 - Software Design Document @SDD.md
 - KeyMagic Script @KMS_FORMAT.md
 - KeyMagic Keyboard @KM2_FORMAT.md
+
+## Engine Logic
+
+- How keymagic engine works @ENGINE_LOGIC.md

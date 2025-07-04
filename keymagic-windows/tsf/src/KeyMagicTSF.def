@@ -1,4 +1,5 @@
-LIBRARY keymagic_windows
+LIBRARY KeyMagicTSF
+
 EXPORTS
     DllGetClassObject   PRIVATE
     DllCanUnloadNow     PRIVATE

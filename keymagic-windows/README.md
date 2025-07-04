@@ -1,127 +1,115 @@
-# KeyMagic Windows
+# KeyMagic Windows Implementation
 
-Windows implementation of KeyMagic IME using Text Services Framework (TSF) and Rust.
+This directory contains the Windows-specific implementation of KeyMagic, including:
 
-## Overview
-
-This project provides a complete KeyMagic input method solution for Windows, consisting of:
-
-1. **TSF Integration** - A Windows Text Services Framework DLL that provides the actual IME functionality
-2. **Manager GUI** - A Windows application for managing keyboard layouts
-
-## Components
-
-### TSF Integration (`keymagic_windows.dll`)
-
-The core IME implementation that:
-- Integrates with Windows Text Services Framework
-- Processes keyboard input using the KeyMagic engine
-- Loads keyboard layouts from .km2 files
-- Provides debug output for troubleshooting
-
-**Key Features:**
-- Written in Rust with C++ TSF integration
-- Supports all Windows applications
-- Debug logging via OutputDebugString
-- Automatic keyboard loading from registry
-
-### Manager GUI (`KeyMagicManager.exe`)
-
-A user-friendly Windows application that:
-- Manages KeyMagic keyboard layouts
-- Allows adding/removing .km2 keyboard files
-- Activates keyboards for use with the TSF
-- Stores configuration in Windows registry
-
-**Key Features:**
-- Simple ListView interface
-- File browser for .km2 files
-- One-click keyboard activation
-- Persistent keyboard storage
-
-## Quick Start
-
-### Prerequisites
-
-- Windows 10/11 (ARM64 or x64)
-- Visual Studio 2022 or Build Tools for Visual Studio
-- Rust toolchain (install from https://rustup.rs)
-- Administrator privileges (for TSF installation)
-
-### Building
-
-1. **Build the TSF DLL:**
-   ```cmd
-   cd tsf
-   build_windows.bat
-   ```
-
-2. **Build the Manager GUI:**
-   ```cmd
-   cd manager
-   build_with_vs.bat
-   ```
-
-### Installation
-
-1. **Install the TSF (Run as Administrator):**
-   ```cmd
-   cd tsf
-   install.bat
-   ```
-
-2. **Configure keyboards:**
-   - Run `manager\KeyMagicManager.exe`
-   - Click "Add..." to add .km2 keyboard files
-   - Select a keyboard and click "Activate"
-
-3. **Enable in Windows:**
-   - Go to Settings → Time & Language → Language
-   - Click on your language and select Options
-   - Add KeyMagic as a keyboard
-   - Use Win+Space to switch between keyboards
+- **TSF Text Service** - Windows Text Services Framework IME implementation
+- **Configuration Manager** - Native Win32 GUI for managing keyboards and settings
 
 ## Project Structure
 
 ```
 keymagic-windows/
-├── tsf/                    # Text Services Framework component
-│   ├── src/               # TSF source files
-│   ├── include/           # Public headers
-│   ├── build_windows.bat  # TSF build script
-│   ├── install.bat        # TSF install script
-│   └── Cargo.toml         # Rust project config
-├── manager/                # GUI Manager application
-│   ├── KeyMagicManager.exe
-│   └── source/build files
-└── docs/                   # Documentation
+├── tsf/                    # TSF Text Service (C++)
+│   ├── CMakeLists.txt     # CMake build configuration
+│   ├── include/           # Header files
+│   │   └── keymagic_ffi.h # FFI interface to keymagic-core
+│   └── src/              # C++ source files
+│       ├── DllMain.cpp   # DLL entry points
+│       ├── ClassFactory.* # COM class factory
+│       ├── KeyMagicTextService.* # Main TSF implementation
+│       ├── Registry.*    # Registration helpers
+│       └── Globals.*     # Global state
+│
+├── gui/                   # Configuration Manager (Rust)
+│   ├── Cargo.toml        # Rust package configuration
+│   ├── build.rs          # Build script for resources
+│   ├── src/              # Rust source files
+│   │   ├── main.rs       # Application entry point
+│   │   ├── app.rs        # Application state
+│   │   └── window.rs     # Main window implementation
+│   └── resources/        # Application resources
+│       └── app.manifest  # Windows manifest
+│
+└── installer/            # Installation package (future)
+
 ```
 
-## Documentation
+## Building
 
-- [Build & Installation Guide](docs/BUILD_INSTALL.md)
-- [Usage Guide](docs/USAGE_GUIDE.md)
-- [TSF Debugging Guide](docs/TSF_DEBUGGING.md)
-- [Uninstall Help](docs/UNINSTALL_HELP.md)
+### Prerequisites
+- Visual Studio 2022 or later
+- CMake 3.20+
+- Rust toolchain (stable-msvc)
+- Windows SDK
 
-## Development
+### Build All Components
 
-### Debugging
+1. Build keymagic-core (from repository root):
+   ```cmd
+   cargo build --release
+   ```
 
-1. Use DebugView to see real-time debug output
-2. Check `%TEMP%\KeyMagicTSF_*.log` for log files
-3. See [TSF Debugging Guide](docs/TSF_DEBUGGING.md) for details
+2. Build TSF Text Service:
+   ```cmd
+   cd keymagic-windows/tsf
+   mkdir build && cd build
+   cmake -G "Visual Studio 17 2022" -A x64 ..
+   cmake --build . --config Release
+   ```
 
-### Testing
+3. Build Configuration Manager:
+   ```cmd
+   cd keymagic-windows/gui
+   cargo build --release
+   ```
 
-1. Build debug version with `cargo build`
-2. Use included test programs in `examples/`
-3. Test with various Windows applications
+## Installation
 
-## License
+1. Register the TSF DLL:
+   ```cmd
+   regsvr32 KeyMagicTSF.dll
+   ```
 
-[License information here]
+2. Run the Configuration Manager:
+   ```cmd
+   keymagic-config.exe
+   ```
 
-## Contributing
+## Development Status
 
-[Contributing guidelines here]
+### Phase 5.1: Foundation Setup ✅
+- [x] Create project structure
+- [x] Set up build systems
+- [x] Implement basic COM server
+- [x] Create basic Win32 window
+
+### Phase 5.2: Core Functionality (Next)
+- [ ] Implement key processing pipeline
+- [ ] Basic keyboard management
+- [ ] Initial TSF-GUI integration
+
+### Phase 5.3: Advanced Features
+- [ ] Smart backspace support
+- [ ] Language bar integration
+- [ ] System tray functionality
+- [ ] Hotkey configuration
+
+### Phase 5.4: Testing and Polish
+- [ ] Unit tests
+- [ ] Integration testing
+- [ ] Performance optimization
+
+### Phase 5.5: Deployment
+- [ ] Installer creation
+- [ ] Documentation
+- [ ] Release preparation
+
+## Architecture Notes
+
+The implementation follows a simplified text handling strategy:
+- The TSF always displays the engine's composing text as the composition string
+- Text is committed on space, enter, tab, or focus loss
+- The engine is reset after each commit
+- Action types from the engine are ignored in favor of this simpler model
+
+This approach significantly reduces TSF complexity while maintaining full compatibility with KeyMagic's rule-based engine.

@@ -4,7 +4,6 @@ members = [
     "kms2km2",
     "keymagic-ibus",
     "keymagic-macos",
-    "keymagic-windows",
 ]
 resolver = "2"
 
