@@ -13,6 +13,12 @@ import struct
 from pathlib import Path
 from typing import Optional
 
+# Set UTF-8 encoding for Windows console
+if platform.system() == "Windows":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 # Determine library name based on platform
 def get_library_name():
     system = platform.system()
@@ -29,16 +35,43 @@ def find_library():
     script_dir = Path(__file__).parent
     project_root = script_dir.parent.parent
     
-    search_paths = [
-        # Release builds
-        project_root / "target" / "release",
-        project_root / "target" / "x86_64-pc-windows-msvc" / "release",
-        project_root / "target" / "aarch64-pc-windows-msvc" / "release",
-        # Debug builds
-        project_root / "target" / "debug",
-        project_root / "target" / "x86_64-pc-windows-msvc" / "debug",
-        project_root / "target" / "aarch64-pc-windows-msvc" / "debug",
-    ]
+    # Prioritize architecture-specific paths on Windows
+    if platform.system() == "Windows":
+        import struct
+        is_64bit = struct.calcsize('P') * 8 == 64
+        arch = platform.machine().lower()
+        
+        # Check if Python is x64 running on ARM64 (common scenario)
+        # Python compiled as AMD64 will report machine as ARM64 on ARM64 Windows
+        if sys.version.find("AMD64") != -1:
+            # This is x64 Python, use x64 DLL
+            arch_specific = "x86_64-pc-windows-msvc"
+        elif arch == "arm64" or arch == "aarch64":
+            arch_specific = "aarch64-pc-windows-msvc"
+        elif is_64bit:
+            arch_specific = "x86_64-pc-windows-msvc"
+        else:
+            arch_specific = "i686-pc-windows-msvc"
+            
+        search_paths = [
+            # Architecture-specific paths first
+            project_root / "target" / arch_specific / "release",
+            project_root / "target" / arch_specific / "debug",
+            # Generic paths as fallback
+            project_root / "target" / "release",
+            project_root / "target" / "debug",
+        ]
+    else:
+        search_paths = [
+            # Release builds
+            project_root / "target" / "release",
+            project_root / "target" / "x86_64-pc-windows-msvc" / "release",
+            project_root / "target" / "aarch64-pc-windows-msvc" / "release",
+            # Debug builds
+            project_root / "target" / "debug",
+            project_root / "target" / "x86_64-pc-windows-msvc" / "debug",
+            project_root / "target" / "aarch64-pc-windows-msvc" / "debug",
+        ]
     
     lib_name = get_library_name()
     for path in search_paths:
