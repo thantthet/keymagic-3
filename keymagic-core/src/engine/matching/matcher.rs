@@ -1,6 +1,7 @@
 //! Core rule matching logic
 
 use crate::types::Rule;
+use crate::VirtualKey;
 use super::{Pattern, PatternElement, MatchContext, CaptureManager};
 use super::pattern::VariableMatch;
 
@@ -75,31 +76,83 @@ impl RuleMatcher {
                         break;
                     }
                 }
-                PatternElement::VirtualKey(vk) => {
+                PatternElement::VirtualKey(vks) => {
                     // Virtual keys only match in non-recursive context
                     if context.is_recursive {
                         match_success = false;
                         break;
                     }
-                    // Convert VK code to Predefined for comparison
-                    if let Some(vk_code) = context.vk_code() {
-                        if vk_code != vk.raw() {
-                            match_success = false;
-                            break;
+                    
+                    // First, validate that there's exactly one primary key
+                    let mut primary_key_count = 0;
+                    let mut primary_vk = None;
+                    
+                    for vk in vks {
+                        match vk {
+                            VirtualKey::Shift | VirtualKey::Control | VirtualKey::Menu => {
+                                // Modifier keys don't count as primary
+                            }
+                            _ => {
+                                primary_key_count += 1;
+                                primary_vk = Some(vk);
+                            }
+                        }
+                    }
+                    
+                    // Skip this rule if it has 0 or more than 1 primary key
+                    if primary_key_count != 1 {
+                        match_success = false;
+                        break;
+                    }
+                    
+                    // Check if all VKs in the combination match
+                    // For a combination like Shift+A, both VK_SHIFT and VK_KEY_A must be present
+                    if let Some(key_input) = context.key_input {
+                        let vk_code = key_input.key_code;
+                        
+                        // Check if the primary key matches
+                        if let Some(primary) = primary_vk {
+                            // Convert key_input's vk_code to VirtualKey for comparison
+                            if let Some(input_vk) = VirtualKey::from_raw(vk_code) {
+                                if input_vk != *primary {
+                                    match_success = false;
+                                    break;
+                                }
+                            } else {
+                                // Unknown key code
+                                match_success = false;
+                                break;
+                            }
+                        }
+                        
+                        // For combinations with modifiers, also check modifier state
+                        for vk in vks {
+                            match vk {
+                                VirtualKey::Shift => {
+                                    if !key_input.modifiers.shift {
+                                        match_success = false;
+                                        break;
+                                    }
+                                }
+                                VirtualKey::Control => {
+                                    if !key_input.modifiers.ctrl {
+                                        match_success = false;
+                                        break;
+                                    }
+                                }
+                                VirtualKey::Menu => {
+                                    if !key_input.modifiers.alt {
+                                        match_success = false;
+                                        break;
+                                    }
+                                }
+                                _ => {
+                                    // Non-modifier keys are already checked above
+                                }
+                            }
                         }
                     } else {
                         // No VK code in context
-                        match_success = false;
-                        break;
-                    }
-                }
-                PatternElement::Modifier { shift, ctrl, alt } => {
-                    // Modifiers only match in non-recursive context
-                    if context.is_recursive {
-                        match_success = false;
-                        break;
-                    }
-                    if !context.modifiers_match(*shift, *ctrl, *alt) {
                         match_success = false;
                         break;
                     }

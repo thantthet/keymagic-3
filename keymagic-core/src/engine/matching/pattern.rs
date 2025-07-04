@@ -2,6 +2,7 @@
 
 use crate::engine::types::{Element, Predefined};
 use crate::types::opcodes::{FLAG_ANYOF, FLAG_NANYOF};
+use crate::VirtualKey;
 
 /// Preprocessed pattern for efficient matching
 #[derive(Debug, Clone)]
@@ -23,10 +24,8 @@ pub enum PatternElement {
     String(String),
     /// Variable content
     Variable(usize, VariableMatch),
-    /// Virtual key
-    VirtualKey(Predefined),
-    /// Modifier key
-    Modifier { shift: bool, ctrl: bool, alt: bool },
+    /// Virtual key(s) - can be a combination like Shift+A
+    VirtualKey(Vec<VirtualKey>),
     /// State condition
     State(usize),
     /// Match any printable ASCII character
@@ -88,7 +87,7 @@ impl Pattern {
                     
                     pattern_elements.push(PatternElement::Variable(*idx, var_match));
                 }
-                Element::Predefined(vk) => {
+                Element::Predefined(_) => {
                     // Validate that Predefined only appears after And
                     if !expecting_vk_after_and {
                         // Invalid: Predefined without preceding And
@@ -96,17 +95,9 @@ impl Pattern {
                         i += 1;
                         continue;
                     }
-                    expecting_vk_after_and = false;
-                    vk_count += 1;
-                    pattern_elements.push(PatternElement::VirtualKey(*vk));
-                }
-                Element::Modifier(flags) => {
-                    expecting_vk_after_and = false;
-                    // Parse modifier flags
-                    let shift = (*flags & 0x01) != 0;
-                    let ctrl = (*flags & 0x02) != 0;
-                    let alt = (*flags & 0x04) != 0;
-                    pattern_elements.push(PatternElement::Modifier { shift, ctrl, alt });
+                    // Don't process here - will be handled by AND case
+                    i += 1;
+                    continue;
                 }
                 Element::Any => {
                     expecting_vk_after_and = false;
@@ -120,8 +111,41 @@ impl Pattern {
                 }
                 Element::And => {
                     // AND is used to combine VK elements
-                    // Set flag to expect Predefined elements next
+                    // Collect all subsequent Predefined elements
+                    let mut vks = Vec::new();
+                    let mut j = i + 1;
+                    
+                    while j < elements.len() {
+                        if let Element::Predefined(vk) = &elements[j] {
+                            vks.push(*vk);
+                            j += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    if !vks.is_empty() {
+                        // Convert Predefined to VirtualKey and validate
+                        let mut virtual_keys = Vec::new();
+                        
+                        for vk in &vks {
+                            if let Some(virtual_key) = VirtualKey::from_raw(vk.raw()) {
+                                virtual_keys.push(virtual_key);
+                            }
+                        }
+                        
+                        vk_count += 1;
+                        pattern_elements.push(PatternElement::VirtualKey(virtual_keys));
+                        
+                        i = j - 1; // Skip all processed VK elements
+                    }
+                    
                     expecting_vk_after_and = true;
+                }
+                Element::Modifier(_) => {
+                    // invalid: modifier should be preceded by a variable
+                    i += 1;
+                    continue;
                 }
                 _ => {
                     expecting_vk_after_and = false;
@@ -187,7 +211,7 @@ impl Pattern {
                     // Matches exactly one character
                     length += 1;
                 }
-                PatternElement::State(_) | PatternElement::VirtualKey(_) | PatternElement::Modifier { .. } => {
+                PatternElement::State(_) | PatternElement::VirtualKey(_) => {
                     // These don't contribute to text length
                 }
             }
