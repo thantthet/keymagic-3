@@ -35,7 +35,6 @@ pub enum PatternElement {
     Variable(String),
     VariableAnyOf(String),      // $var[*]
     VariableNotAnyOf(String),   // $var[^]
-    VirtualKey(String),
     VirtualKeyCombo(Vec<String>), // <VK_SHIFT & VK_A>
     Any,
     State(String),              // ('state_name')

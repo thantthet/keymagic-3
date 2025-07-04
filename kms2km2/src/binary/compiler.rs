@@ -213,15 +213,6 @@ impl Compiler {
                         return Err(KmsError::UndefinedVariable(var.clone()));
                     }
                 }
-                PatternElement::VirtualKey(key) => {
-                    // Reference parser always adds opAND for VK in angle brackets
-                    elements.push(BinaryFormatElement::And);
-                    if let Some(&vk) = self.vk_map.get(key.as_str()) {
-                        elements.push(BinaryFormatElement::Predefined(vk as u16));
-                    } else {
-                        return Err(KmsError::InvalidVirtualKey(key.clone()));
-                    }
-                }
                 PatternElement::VirtualKeyCombo(keys) => {
                     // Reference parser puts opAND first, then all the keys
                     elements.push(BinaryFormatElement::And);

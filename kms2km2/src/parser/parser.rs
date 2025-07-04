@@ -281,11 +281,7 @@ impl<'a> Parser<'a> {
         
         self.expect(Token::RAngle)?;
         
-        if keys.len() == 1 {
-            Ok(PatternElement::VirtualKey(keys[0].clone()))
-        } else {
-            Ok(PatternElement::VirtualKeyCombo(keys))
-        }
+        Ok(PatternElement::VirtualKeyCombo(keys))
     }
 
     fn parse_state_pattern(&mut self) -> Result<PatternElement, KmsError> {
