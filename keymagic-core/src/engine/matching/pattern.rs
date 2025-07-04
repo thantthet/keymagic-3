@@ -46,20 +46,24 @@ pub enum VariableMatch {
 
 impl Pattern {
     /// Creates a pattern from rule elements
+    /// Validates that Element::Predefined only appears after Element::And
     pub fn from_elements(elements: &[Element]) -> Self {
         let mut pattern_elements = Vec::new();
         let mut char_length = 0;
         let mut state_count = 0;
         let mut vk_count = 0;
         let mut i = 0;
+        let mut expecting_vk_after_and = false;
 
         while i < elements.len() {
             match &elements[i] {
                 Element::String(s) => {
+                    expecting_vk_after_and = false;
                     char_length += s.chars().count();
                     pattern_elements.push(PatternElement::String(s.clone()));
                 }
                 Element::Variable(idx) => {
+                    expecting_vk_after_and = false;
                     // Check for modifiers after variable
                     let var_match = if i + 1 < elements.len() {
                         match &elements[i + 1] {
@@ -85,10 +89,19 @@ impl Pattern {
                     pattern_elements.push(PatternElement::Variable(*idx, var_match));
                 }
                 Element::Predefined(vk) => {
+                    // Validate that Predefined only appears after And
+                    if !expecting_vk_after_and {
+                        // Invalid: Predefined without preceding And
+                        // Skip this element as it's invalid in LHS
+                        i += 1;
+                        continue;
+                    }
+                    expecting_vk_after_and = false;
                     vk_count += 1;
                     pattern_elements.push(PatternElement::VirtualKey(*vk));
                 }
                 Element::Modifier(flags) => {
+                    expecting_vk_after_and = false;
                     // Parse modifier flags
                     let shift = (*flags & 0x01) != 0;
                     let ctrl = (*flags & 0x02) != 0;
@@ -96,18 +109,24 @@ impl Pattern {
                     pattern_elements.push(PatternElement::Modifier { shift, ctrl, alt });
                 }
                 Element::Any => {
+                    expecting_vk_after_and = false;
                     char_length += 1;
                     pattern_elements.push(PatternElement::Any);
                 }
                 Element::Switch(state_idx) => {
+                    expecting_vk_after_and = false;
                     state_count += 1;
                     pattern_elements.push(PatternElement::State(*state_idx));
                 }
                 Element::And => {
-                    // AND is used to combine VK elements - skip it
-                    // The actual VK element will follow
+                    // AND is used to combine VK elements
+                    // Set flag to expect Predefined elements next
+                    expecting_vk_after_and = true;
                 }
-                _ => {} // Skip other elements in LHS
+                _ => {
+                    expecting_vk_after_and = false;
+                    // Skip other elements in LHS
+                }
             }
             i += 1;
         }
