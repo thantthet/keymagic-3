@@ -3,7 +3,7 @@
 //! This module provides a C-compatible API that can be used from any language
 //! that supports C FFI (Python, C, C++, etc.) across all platforms.
 
-use crate::{KeyMagicEngine, KeyInput};
+use crate::{KeyInput, KeyMagicEngine, VirtualKey};
 use crate::engine::{ModifierState, ActionType};
 use crate::km2::Km2Loader;
 use std::ffi::{CStr, CString};
@@ -292,9 +292,6 @@ pub extern "C" fn keymagic_get_version() -> *const c_char {
 }
 
 /// Process a key event with Windows VK code
-/// 
-/// This is now just an alias for keymagic_engine_process_key since it accepts VK codes directly.
-/// Kept for backward compatibility.
 #[no_mangle]
 pub extern "C" fn keymagic_engine_process_key_win(
     handle: *mut EngineHandle,
@@ -309,7 +306,7 @@ pub extern "C" fn keymagic_engine_process_key_win(
     // Now that process_key accepts VK codes directly, just forward the call
     keymagic_engine_process_key(
         handle,
-        vk_code,
+        VirtualKey::from_win_vk(vk_code as u16).unwrap() as i32,
         character,
         shift,
         ctrl,
