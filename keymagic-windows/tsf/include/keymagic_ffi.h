@@ -64,6 +64,18 @@ char* keymagic_engine_get_composition(EngineHandle* handle);
 // Version info
 const char* keymagic_get_version(void);
 
+// Windows-specific key processing with VK codes
+KeyMagicResult keymagic_engine_process_key_win(
+    EngineHandle* handle,
+    int vk_code,          // Windows VK code (e.g., 0x41 for VK_A)
+    char character,
+    int shift,
+    int ctrl,
+    int alt,
+    int caps_lock,
+    ProcessKeyOutput* output
+);
+
 #ifdef __cplusplus
 }
 #endif

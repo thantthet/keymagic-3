@@ -21,9 +21,12 @@ windows = { version = "0.52", features = [
     "Win32_Graphics_Dwm",
     "Win32_Globalization",
     "Win32_UI_HiDpi",
+    "Win32_System_Diagnostics_ToolHelp",
 ]}
 keymagic-core = { workspace = true }
 anyhow = { workspace = true }
+lazy_static = "1.4"
+chrono = "0.4"
 
 [build-dependencies]
 winres = "0.1"

@@ -15,6 +15,7 @@ set(SOURCES
     src/KeyMagicTextService.cpp
     src/Globals.cpp
     src/Registry.cpp
+    src/KeyMagicTSF.rc
 )
 
 # Create the DLL
@@ -36,8 +37,13 @@ target_link_libraries(KeyMagicTSF PRIVATE
     ws2_32      # Windows Sockets
     userenv     # User environment
     ntdll       # NT functions
-    # Link to Rust keymagic-core static library
-    "C:/Users/thantthet/keymagic-v3/target/release/keymagic_core.lib"
+)
+
+# Link to Rust keymagic-core static library based on configuration
+# Using relative paths from the CMake source directory
+target_link_libraries(KeyMagicTSF PRIVATE
+    debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug/keymagic_core.lib"
+    optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/release/keymagic_core.lib"
 )
 
 # Module definition file
@@ -45,9 +51,12 @@ set_target_properties(KeyMagicTSF PROPERTIES
     LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/KeyMagicTSF.def"
 )
 
-# Copy DLL to output directory
+# Copy DLL to output directory based on configuration
+# Using generator expressions for multi-config generators
 add_custom_command(TARGET KeyMagicTSF POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory 
+        "$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_BINARY_DIR}/../../target/debug/,${CMAKE_CURRENT_BINARY_DIR}/../../target/release/>"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:KeyMagicTSF>
-        ${CMAKE_CURRENT_BINARY_DIR}/../../target/release/
+        "$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_BINARY_DIR}/../../target/debug/,${CMAKE_CURRENT_BINARY_DIR}/../../target/release/>"
 )

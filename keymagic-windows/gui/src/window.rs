@@ -17,6 +17,9 @@ use crate::app::App;
 use crate::keyboard_manager::KeyboardManager;
 use crate::keyboard_list::KeyboardListView;
 use crate::keyboard_preview::KeyboardPreview;
+use crate::tray::{TrayIcon, tray_message};
+use crate::tsf_status::TsfStatus;
+use crate::{log_info, log_error, log_debug};
 
 const WINDOW_CLASS_NAME: PCWSTR = w!("KeyMagicConfigWindow");
 const WINDOW_TITLE: PCWSTR = w!("KeyMagic Configuration Manager");
@@ -32,12 +35,21 @@ const ID_HELP_ABOUT: u16 = 301;
 // Custom window messages
 const WM_UPDATE_OUTPUT: u32 = WM_USER + 1;
 
+// Control IDs
+const ID_STATUSBAR: u16 = 1100;
+
+// Status bar constants
+const SB_SETTEXT: u32 = WM_USER + 1;
+const SBARS_SIZEGRIP: u32 = 0x0100;
+
 pub struct MainWindow {
     hwnd: HWND,
     app: Arc<App>,
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
     list_view: RefCell<Option<KeyboardListView>>,
     preview: RefCell<Option<Arc<KeyboardPreview>>>,
+    tray_icon: RefCell<Option<TrayIcon>>,
+    status_bar: RefCell<Option<HWND>>,
     dpi: RefCell<u32>,
 }
 
@@ -52,13 +64,23 @@ impl MainWindow {
     
     pub fn new(app: &Arc<App>) -> Result<Arc<Self>> {
         unsafe {
+            log_info!("MainWindow::new() started");
+            
             // Get system DPI
             let system_dpi = Self::get_dpi_for_system();
+            log_info!("System DPI: {}", system_dpi);
             
             // Create keyboard manager
-            let keyboard_manager = Arc::new(Mutex::new(KeyboardManager::new().map_err(|e| Error::new(HRESULT(-1), HSTRING::from(e.to_string())))?));
+            log_info!("Creating keyboard manager");
+            let keyboard_manager = Arc::new(Mutex::new(
+                KeyboardManager::new().map_err(|e| {
+                    log_error!("Failed to create keyboard manager: {}", e);
+                    Error::new(HRESULT(-1), HSTRING::from(e.to_string()))
+                })?
+            ));
             
             // Register window class
+            log_info!("Getting module handle");
             let instance = GetModuleHandleW(None)?;
             
             let wc = WNDCLASSEXW {
@@ -68,7 +90,16 @@ impl MainWindow {
                 cbClsExtra: 0,
                 cbWndExtra: std::mem::size_of::<*const MainWindow>() as i32,
                 hInstance: instance.into(),
-                hIcon: LoadIconW(None, IDI_APPLICATION)?,
+                hIcon: {
+                    log_info!("Loading window icon");
+                    match LoadIconW(instance, PCWSTR(1 as *const u16)) {
+                        Ok(icon) => icon,
+                        Err(e) => {
+                            log_error!("Failed to load icon, using default: {}", e);
+                            LoadIconW(None, IDI_APPLICATION)?
+                        }
+                    }
+                },
                 hCursor: LoadCursorW(None, IDC_ARROW)?,
                 hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as _),
                 lpszMenuName: PCWSTR::null(),
@@ -88,6 +119,8 @@ impl MainWindow {
                 keyboard_manager,
                 list_view: RefCell::new(None),
                 preview: RefCell::new(None),
+                tray_icon: RefCell::new(None),
+                status_bar: RefCell::new(None),
                 dpi: RefCell::new(system_dpi),
             });
             
@@ -181,6 +214,33 @@ impl MainWindow {
                     if let Ok(pv) = preview {
                         *window.preview.borrow_mut() = Some(pv);
                     }
+                    
+                    // Create tray icon
+                    if let Ok(tray) = TrayIcon::new(hwnd, window.keyboard_manager.clone()) {
+                        *window.tray_icon.borrow_mut() = Some(tray);
+                    }
+                    
+                    // Create status bar
+                    let status_bar = CreateWindowExW(
+                        WINDOW_EX_STYLE::default(),
+                        w!("msctls_statusbar32"),
+                        PCWSTR::null(),
+                        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SBARS_SIZEGRIP),
+                        0, 0, 0, 0,
+                        hwnd,
+                        HMENU(ID_STATUSBAR as isize),
+                        GetModuleHandleW(None).unwrap(),
+                        None,
+                    );
+                    
+                    if status_bar != HWND::default() {
+                        *window.status_bar.borrow_mut() = Some(status_bar);
+                        
+                        // Set initial status
+                        let status_msg = TsfStatus::get_status_message();
+                        let status_w: Vec<u16> = status_msg.encode_utf16().chain(std::iter::once(0)).collect();
+                        SendMessageW(status_bar, SB_SETTEXT, WPARAM(0), LPARAM(status_w.as_ptr() as isize));
+                    }
                 }
                 
                 LRESULT(0)
@@ -209,8 +269,12 @@ impl MainWindow {
                             window.activate_keyboard();
                         }
                         _ => {
+                            // Check if it's from the tray icon
+                            if let Some(tray) = window.tray_icon.borrow().as_ref() {
+                                let _ = tray.handle_menu_command(cmd_id);
+                            }
                             // Check if it's from the preview area
-                            if let Some(preview) = window.preview.borrow().as_ref() {
+                            else if let Some(preview) = window.preview.borrow().as_ref() {
                                 let _ = preview.handle_command(cmd_id);
                             }
                         }
@@ -253,6 +317,11 @@ impl MainWindow {
                             SWP_NOZORDER,
                         );
                     }
+                    
+                    // Resize status bar
+                    if let Some(status_bar) = window.status_bar.borrow().as_ref() {
+                        SendMessageW(*status_bar, WM_SIZE, wparam, lparam);
+                    }
                 }
                 LRESULT(0)
             }
@@ -290,6 +359,41 @@ impl MainWindow {
                 }
                 LRESULT(0)
             }
+            WM_SYSCOMMAND => {
+                // Handle minimize to tray
+                if wparam.0 as u32 == SC_MINIMIZE {
+                    ShowWindow(hwnd, SW_HIDE);
+                    LRESULT(0)
+                } else {
+                    DefWindowProcW(hwnd, msg, wparam, lparam)
+                }
+            }
+            msg if msg == tray_message() => {
+                let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
+                if !window_ptr.is_null() {
+                    let window = &*window_ptr;
+                    let icon_msg = lparam.0 as u32;
+                    
+                    match icon_msg {
+                        WM_LBUTTONDBLCLK => {
+                            // Double-click - show window
+                            ShowWindow(hwnd, SW_SHOW);
+                            SetForegroundWindow(hwnd);
+                        }
+                        WM_RBUTTONUP => {
+                            // Right-click - show context menu
+                            let mut pt = POINT::default();
+                            GetCursorPos(&mut pt);
+                            
+                            if let Some(tray) = window.tray_icon.borrow().as_ref() {
+                                let _ = tray.show_context_menu(pt.x, pt.y);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                LRESULT(0)
+            }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }
@@ -320,6 +424,7 @@ impl MainWindow {
                         if let Some(list_view) = self.list_view.borrow().as_ref() {
                             let _ = list_view.refresh();
                         }
+                        self.update_tray_tooltip();
                     }
                     Err(e) => {
                         let msg = format!("Failed to load keyboard: {}", e);
@@ -352,6 +457,7 @@ impl MainWindow {
                         if manager.remove_keyboard(&id).is_ok() {
                             drop(manager);
                             let _ = list_view.refresh();
+                            self.update_tray_tooltip();
                         }
                     }
                 }
@@ -372,8 +478,28 @@ impl MainWindow {
                     }
                     drop(manager);
                     let _ = list_view.refresh();
+                    self.update_tray_tooltip();
                 }
             }
+        }
+    }
+    
+    fn update_tray_tooltip(&self) {
+        let manager = self.keyboard_manager.lock().unwrap();
+        let tooltip = if let Some(active_id) = manager.get_active_keyboard() {
+            if let Some(keyboard) = manager.get_keyboard(&active_id) {
+                format!("KeyMagic - {}", keyboard.name)
+            } else {
+                "KeyMagic - No active keyboard".to_string()
+            }
+        } else {
+            "KeyMagic - No active keyboard".to_string()
+        };
+        
+        drop(manager);
+        
+        if let Some(tray) = self.tray_icon.borrow().as_ref() {
+            let _ = tray.update_tooltip(&tooltip);
         }
     }
 }
