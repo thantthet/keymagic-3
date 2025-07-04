@@ -17,10 +17,6 @@ impl ActionGenerator {
             return ActionType::None;
         }
 
-        // log before and after
-        println!("Before: {}", before);
-        println!("After: {}", after);
-
         let before_chars: Vec<char> = before.chars().collect();
         let after_chars: Vec<char> = after.chars().collect();
 

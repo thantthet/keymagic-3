@@ -1,0 +1,18 @@
+/*
+@NAME = "Test Keyboard"
+@DESCRIPTION = "Simple test keyboard for FFI testing"
+@TRACK_CAPSLOCK = "FALSE"
+@SMART_BACKSPACE = "TRUE"
+@US_LAYOUT_BASED = "TRUE"
+*/
+
+// Simple rules for testing
+"a" => "အ"
+"ka" => "က"
+"kha" => "ခ"
+
+// Test with modifier
+<VK_SHIFT & VK_KEY_A> => "အ"
+
+// Test backspace
+"က" + <VK_BACK> => NULL

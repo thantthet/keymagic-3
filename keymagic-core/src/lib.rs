@@ -2,6 +2,7 @@ pub mod types;
 pub mod error;
 pub mod km2;
 pub mod engine;
+pub mod ffi;
 
 pub use types::*;
 

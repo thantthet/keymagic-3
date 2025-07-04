@@ -11,6 +11,10 @@ description = "Core engine for KeyMagic input method editor"
 byteorder = { workspace = true }
 thiserror = { workspace = true }
 
+[lib]
+name = "keymagic_core"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
 [dev-dependencies]
 kms2km2 = { path = "../kms2km2" }
 hex = "0.4"
