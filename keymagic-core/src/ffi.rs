@@ -6,6 +6,7 @@
 use crate::{KeyMagicEngine, KeyInput};
 use crate::engine::{ModifierState, ActionType, Predefined};
 use crate::km2::Km2Loader;
+use crate::types::VirtualKey;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::ptr;
@@ -289,6 +290,74 @@ pub extern "C" fn keymagic_engine_get_composition(
 #[no_mangle]
 pub extern "C" fn keymagic_get_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
+}
+
+/// Process a key event with Windows VK code
+/// 
+/// This is a Windows-specific variant that accepts Windows Virtual Key codes
+/// and converts them to KeyMagic predefined values before processing.
+#[no_mangle]
+pub extern "C" fn keymagic_engine_process_key_win(
+    handle: *mut EngineHandle,
+    vk_code: c_int,        // Windows VK code (e.g., 0x41 for VK_A)
+    character: c_char,
+    shift: c_int,
+    ctrl: c_int,
+    alt: c_int,
+    caps_lock: c_int,
+    output: *mut ProcessKeyOutput,
+) -> KeyMagicResult {
+    if handle.is_null() || output.is_null() {
+        return KeyMagicResult::ErrorInvalidParameter;
+    }
+
+    // Convert Windows VK code to KeyMagic predefined value
+    let predefined_code = if let Some(vk) = VirtualKey::from_win_vk(vk_code as u16) {
+        vk as u16
+    } else {
+        // If we don't recognize the VK code, pass it through as-is
+        // This allows for potential custom handling
+        vk_code as u16
+    };
+
+    // Call the standard process_key function with the converted code
+    keymagic_engine_process_key(
+        handle,
+        predefined_code as c_int,
+        character,
+        shift,
+        ctrl,
+        alt,
+        caps_lock,
+        output,
+    )
+}
+
+/// Get the current composing text from the engine
+/// Returns a newly allocated C string that must be freed with keymagic_engine_free_string
+#[no_mangle]
+pub extern "C" fn keymagic_engine_get_composing_text(engine: *mut KeyMagicEngine) -> *mut c_char {
+    if engine.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    unsafe {
+        let engine_ref = &*engine;
+        match CString::new(engine_ref.composing_text()) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// Free a string allocated by the engine
+#[no_mangle]
+pub extern "C" fn keymagic_engine_free_string(str: *mut c_char) {
+    if !str.is_null() {
+        unsafe {
+            let _ = CString::from_raw(str);
+        }
+    }
 }
 
 #[cfg(test)]

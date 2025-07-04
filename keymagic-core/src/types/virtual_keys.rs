@@ -123,6 +123,258 @@ pub enum VirtualKey {
     Ico00 = 101,           // pdVK_ICO_00
 }
 
+impl VirtualKey {
+    /// Convert this VirtualKey to Windows Virtual Key code
+    pub fn to_win_vk(&self) -> u16 {
+        match self {
+            // Special values
+            VirtualKey::Null => 0x00,
+            
+            // Control keys
+            VirtualKey::Back => 0x08,
+            VirtualKey::Tab => 0x09,
+            VirtualKey::Return => 0x0D,
+            VirtualKey::Shift => 0x10,
+            VirtualKey::Control => 0x11,
+            VirtualKey::Menu => 0x12,
+            VirtualKey::Pause => 0x13,
+            VirtualKey::Capital => 0x14,
+            VirtualKey::Kanji => 0x19,
+            VirtualKey::Escape => 0x1B,
+            VirtualKey::Space => 0x20,
+            VirtualKey::Prior => 0x21,
+            VirtualKey::Next => 0x22,
+            VirtualKey::Delete => 0x2E,
+            
+            // Number keys
+            VirtualKey::Key0 => 0x30,
+            VirtualKey::Key1 => 0x31,
+            VirtualKey::Key2 => 0x32,
+            VirtualKey::Key3 => 0x33,
+            VirtualKey::Key4 => 0x34,
+            VirtualKey::Key5 => 0x35,
+            VirtualKey::Key6 => 0x36,
+            VirtualKey::Key7 => 0x37,
+            VirtualKey::Key8 => 0x38,
+            VirtualKey::Key9 => 0x39,
+            
+            // Letter keys
+            VirtualKey::KeyA => 0x41,
+            VirtualKey::KeyB => 0x42,
+            VirtualKey::KeyC => 0x43,
+            VirtualKey::KeyD => 0x44,
+            VirtualKey::KeyE => 0x45,
+            VirtualKey::KeyF => 0x46,
+            VirtualKey::KeyG => 0x47,
+            VirtualKey::KeyH => 0x48,
+            VirtualKey::KeyI => 0x49,
+            VirtualKey::KeyJ => 0x4A,
+            VirtualKey::KeyK => 0x4B,
+            VirtualKey::KeyL => 0x4C,
+            VirtualKey::KeyM => 0x4D,
+            VirtualKey::KeyN => 0x4E,
+            VirtualKey::KeyO => 0x4F,
+            VirtualKey::KeyP => 0x50,
+            VirtualKey::KeyQ => 0x51,
+            VirtualKey::KeyR => 0x52,
+            VirtualKey::KeyS => 0x53,
+            VirtualKey::KeyT => 0x54,
+            VirtualKey::KeyU => 0x55,
+            VirtualKey::KeyV => 0x56,
+            VirtualKey::KeyW => 0x57,
+            VirtualKey::KeyX => 0x58,
+            VirtualKey::KeyY => 0x59,
+            VirtualKey::KeyZ => 0x5A,
+            
+            // Numpad keys
+            VirtualKey::Numpad0 => 0x60,
+            VirtualKey::Numpad1 => 0x61,
+            VirtualKey::Numpad2 => 0x62,
+            VirtualKey::Numpad3 => 0x63,
+            VirtualKey::Numpad4 => 0x64,
+            VirtualKey::Numpad5 => 0x65,
+            VirtualKey::Numpad6 => 0x66,
+            VirtualKey::Numpad7 => 0x67,
+            VirtualKey::Numpad8 => 0x68,
+            VirtualKey::Numpad9 => 0x69,
+            
+            // Numpad operators
+            VirtualKey::Multiply => 0x6A,
+            VirtualKey::Add => 0x6B,
+            VirtualKey::Separator => 0x6C,
+            VirtualKey::Subtract => 0x6D,
+            VirtualKey::Decimal => 0x6E,
+            VirtualKey::Divide => 0x6F,
+            
+            // Function keys
+            VirtualKey::F1 => 0x70,
+            VirtualKey::F2 => 0x71,
+            VirtualKey::F3 => 0x72,
+            VirtualKey::F4 => 0x73,
+            VirtualKey::F5 => 0x74,
+            VirtualKey::F6 => 0x75,
+            VirtualKey::F7 => 0x76,
+            VirtualKey::F8 => 0x77,
+            VirtualKey::F9 => 0x78,
+            VirtualKey::F10 => 0x79,
+            VirtualKey::F11 => 0x7A,
+            VirtualKey::F12 => 0x7B,
+            
+            // Modifier keys (left/right variants)
+            VirtualKey::LShift => 0xA0,
+            VirtualKey::RShift => 0xA1,
+            VirtualKey::LControl => 0xA2,
+            VirtualKey::RControl => 0xA3,
+            VirtualKey::LMenu => 0xA4,
+            VirtualKey::RMenu => 0xA5,
+            
+            // OEM keys
+            VirtualKey::Oem1 => 0xBA,
+            VirtualKey::OemPlus => 0xBB,
+            VirtualKey::OemComma => 0xBC,
+            VirtualKey::OemMinus => 0xBD,
+            VirtualKey::OemPeriod => 0xBE,
+            VirtualKey::Oem2 => 0xBF,
+            VirtualKey::Oem3 => 0xC0,
+            VirtualKey::Oem4 => 0xDB,
+            VirtualKey::Oem5 => 0xDC,
+            VirtualKey::Oem6 => 0xDD,
+            VirtualKey::Oem7 => 0xDE,
+            VirtualKey::Oem8 => 0xDF,
+            VirtualKey::OemAx => 0xE1,
+            VirtualKey::Oem102 => 0xE2,
+            VirtualKey::IcoHelp => 0xE3,
+            VirtualKey::Ico00 => 0xE4,
+        }
+    }
+    
+    /// Convert Windows Virtual Key code to VirtualKey
+    pub fn from_win_vk(vk_code: u16) -> Option<Self> {
+        match vk_code {
+            // Special values
+            0x00 => Some(VirtualKey::Null),
+            
+            // Control keys
+            0x08 => Some(VirtualKey::Back),
+            0x09 => Some(VirtualKey::Tab),
+            0x0D => Some(VirtualKey::Return),
+            0x10 => Some(VirtualKey::Shift),
+            0x11 => Some(VirtualKey::Control),
+            0x12 => Some(VirtualKey::Menu),
+            0x13 => Some(VirtualKey::Pause),
+            0x14 => Some(VirtualKey::Capital),
+            0x19 => Some(VirtualKey::Kanji),
+            0x1B => Some(VirtualKey::Escape),
+            0x20 => Some(VirtualKey::Space),
+            0x21 => Some(VirtualKey::Prior),
+            0x22 => Some(VirtualKey::Next),
+            0x2E => Some(VirtualKey::Delete),
+            
+            // Number keys
+            0x30 => Some(VirtualKey::Key0),
+            0x31 => Some(VirtualKey::Key1),
+            0x32 => Some(VirtualKey::Key2),
+            0x33 => Some(VirtualKey::Key3),
+            0x34 => Some(VirtualKey::Key4),
+            0x35 => Some(VirtualKey::Key5),
+            0x36 => Some(VirtualKey::Key6),
+            0x37 => Some(VirtualKey::Key7),
+            0x38 => Some(VirtualKey::Key8),
+            0x39 => Some(VirtualKey::Key9),
+            
+            // Letter keys
+            0x41 => Some(VirtualKey::KeyA),
+            0x42 => Some(VirtualKey::KeyB),
+            0x43 => Some(VirtualKey::KeyC),
+            0x44 => Some(VirtualKey::KeyD),
+            0x45 => Some(VirtualKey::KeyE),
+            0x46 => Some(VirtualKey::KeyF),
+            0x47 => Some(VirtualKey::KeyG),
+            0x48 => Some(VirtualKey::KeyH),
+            0x49 => Some(VirtualKey::KeyI),
+            0x4A => Some(VirtualKey::KeyJ),
+            0x4B => Some(VirtualKey::KeyK),
+            0x4C => Some(VirtualKey::KeyL),
+            0x4D => Some(VirtualKey::KeyM),
+            0x4E => Some(VirtualKey::KeyN),
+            0x4F => Some(VirtualKey::KeyO),
+            0x50 => Some(VirtualKey::KeyP),
+            0x51 => Some(VirtualKey::KeyQ),
+            0x52 => Some(VirtualKey::KeyR),
+            0x53 => Some(VirtualKey::KeyS),
+            0x54 => Some(VirtualKey::KeyT),
+            0x55 => Some(VirtualKey::KeyU),
+            0x56 => Some(VirtualKey::KeyV),
+            0x57 => Some(VirtualKey::KeyW),
+            0x58 => Some(VirtualKey::KeyX),
+            0x59 => Some(VirtualKey::KeyY),
+            0x5A => Some(VirtualKey::KeyZ),
+            
+            // Numpad keys
+            0x60 => Some(VirtualKey::Numpad0),
+            0x61 => Some(VirtualKey::Numpad1),
+            0x62 => Some(VirtualKey::Numpad2),
+            0x63 => Some(VirtualKey::Numpad3),
+            0x64 => Some(VirtualKey::Numpad4),
+            0x65 => Some(VirtualKey::Numpad5),
+            0x66 => Some(VirtualKey::Numpad6),
+            0x67 => Some(VirtualKey::Numpad7),
+            0x68 => Some(VirtualKey::Numpad8),
+            0x69 => Some(VirtualKey::Numpad9),
+            
+            // Numpad operators
+            0x6A => Some(VirtualKey::Multiply),
+            0x6B => Some(VirtualKey::Add),
+            0x6C => Some(VirtualKey::Separator),
+            0x6D => Some(VirtualKey::Subtract),
+            0x6E => Some(VirtualKey::Decimal),
+            0x6F => Some(VirtualKey::Divide),
+            
+            // Function keys
+            0x70 => Some(VirtualKey::F1),
+            0x71 => Some(VirtualKey::F2),
+            0x72 => Some(VirtualKey::F3),
+            0x73 => Some(VirtualKey::F4),
+            0x74 => Some(VirtualKey::F5),
+            0x75 => Some(VirtualKey::F6),
+            0x76 => Some(VirtualKey::F7),
+            0x77 => Some(VirtualKey::F8),
+            0x78 => Some(VirtualKey::F9),
+            0x79 => Some(VirtualKey::F10),
+            0x7A => Some(VirtualKey::F11),
+            0x7B => Some(VirtualKey::F12),
+            
+            // Modifier keys (left/right variants)
+            0xA0 => Some(VirtualKey::LShift),
+            0xA1 => Some(VirtualKey::RShift),
+            0xA2 => Some(VirtualKey::LControl),
+            0xA3 => Some(VirtualKey::RControl),
+            0xA4 => Some(VirtualKey::LMenu),
+            0xA5 => Some(VirtualKey::RMenu),
+            
+            // OEM keys
+            0xBA => Some(VirtualKey::Oem1),
+            0xBB => Some(VirtualKey::OemPlus),
+            0xBC => Some(VirtualKey::OemComma),
+            0xBD => Some(VirtualKey::OemMinus),
+            0xBE => Some(VirtualKey::OemPeriod),
+            0xBF => Some(VirtualKey::Oem2),
+            0xC0 => Some(VirtualKey::Oem3),
+            0xDB => Some(VirtualKey::Oem4),
+            0xDC => Some(VirtualKey::Oem5),
+            0xDD => Some(VirtualKey::Oem6),
+            0xDE => Some(VirtualKey::Oem7),
+            0xDF => Some(VirtualKey::Oem8),
+            0xE1 => Some(VirtualKey::OemAx),
+            0xE2 => Some(VirtualKey::Oem102),
+            0xE3 => Some(VirtualKey::IcoHelp),
+            0xE4 => Some(VirtualKey::Ico00),
+            
+            _ => None,
+        }
+    }
+}
+
 pub fn create_vk_map() -> HashMap<&'static str, VirtualKey> {
     let mut map = HashMap::new();
 
