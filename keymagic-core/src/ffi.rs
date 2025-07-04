@@ -303,10 +303,16 @@ pub extern "C" fn keymagic_engine_process_key_win(
     caps_lock: c_int,
     output: *mut ProcessKeyOutput,
 ) -> KeyMagicResult {
-    // Now that process_key accepts VK codes directly, just forward the call
+    // Convert Windows VK code to VirtualKey, return error if unsupported
+    let virtual_key = match VirtualKey::from_win_vk(vk_code as u16) {
+        Some(vk) => vk,
+        None => return KeyMagicResult::ErrorInvalidParameter,
+    };
+    
+    // Forward the call to the regular process_key function
     keymagic_engine_process_key(
         handle,
-        VirtualKey::from_win_vk(vk_code as u16).unwrap() as i32,
+        virtual_key as i32,
         character,
         shift,
         ctrl,

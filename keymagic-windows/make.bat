@@ -140,7 +140,6 @@ if %errorlevel% equ 0 (
     echo [SUCCESS] TSF registered successfully from temp location
     :: Store temp DLL path in registry for later cleanup
     reg add "%KEYMAGIC_REG_SETTINGS%" /v "TempDllPath_%BUILD_CONFIG%" /t REG_SZ /d "%TEMP_DLL_PATH%" /f >nul
-    call :configure_registry
 ) else (
     echo [ERROR] Failed to register TSF
     del "%TEMP_DLL_PATH%" 2>nul
@@ -376,10 +375,10 @@ exit /b %errorlevel%
 
 :configure_registry
 :: Set up default keyboard configuration
-reg add "%KEYMAGIC_REG_SETTINGS%" /v "DefaultKeyboard" /t REG_SZ /d "zawcode" /f >nul
-reg add "%KEYMAGIC_REG_KEYBOARDS%\zawcode" /v "Path" /t REG_SZ /d "%TEST_KEYBOARD_PATH%" /f >nul
-reg add "%KEYMAGIC_REG_KEYBOARDS%\zawcode" /v "Name" /t REG_SZ /d "ZawCode" /f >nul
-reg add "%KEYMAGIC_REG_KEYBOARDS%\zawcode" /v "Enabled" /t REG_DWORD /d 1 /f >nul
+reg add "%KEYMAGIC_REG_SETTINGS%" /v "DefaultKeyboard" /t REG_SZ /d "ZawCode" /f >nul
+reg add "%KEYMAGIC_REG_KEYBOARDS%\ZawCode" /v "Path" /t REG_SZ /d "%TEST_KEYBOARD_PATH%" /f >nul
+reg add "%KEYMAGIC_REG_KEYBOARDS%\ZawCode" /v "Name" /t REG_SZ /d "ZawCode" /f >nul
+reg add "%KEYMAGIC_REG_KEYBOARDS%\ZawCode" /v "Enabled" /t REG_DWORD /d 1 /f >nul
 echo [OK] Registry configured
 exit /b 0
 
