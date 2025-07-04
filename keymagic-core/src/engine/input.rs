@@ -1,12 +1,10 @@
 //! Input representation for the KeyMagic engine
 
-use crate::engine::types::Predefined;
-
 /// Represents a keyboard input event
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyInput {
-    /// Virtual key code
-    pub key_code: Predefined,
+    /// Virtual key code (platform-specific, e.g., Windows VK codes)
+    pub key_code: u16,
     /// Modifier keys state
     pub modifiers: ModifierState,
     /// Character representation (if any)
@@ -15,7 +13,7 @@ pub struct KeyInput {
 
 impl KeyInput {
     /// Creates a new keyboard input
-    pub fn new(key_code: Predefined, modifiers: ModifierState, character: Option<char>) -> Self {
+    pub fn new(key_code: u16, modifiers: ModifierState, character: Option<char>) -> Self {
         Self {
             key_code,
             modifiers,
@@ -26,14 +24,14 @@ impl KeyInput {
     /// Creates a simple character input without modifiers
     pub fn from_char(ch: char) -> Self {
         Self {
-            key_code: Predefined::NONE,
+            key_code: 0, // No VK code for character-only input
             modifiers: ModifierState::default(),
             character: Some(ch),
         }
     }
 
     /// Creates a virtual key input
-    pub fn from_vk(key_code: Predefined, modifiers: ModifierState) -> Self {
+    pub fn from_vk(key_code: u16, modifiers: ModifierState) -> Self {
         Self {
             key_code,
             modifiers,

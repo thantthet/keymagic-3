@@ -81,7 +81,14 @@ impl RuleMatcher {
                         match_success = false;
                         break;
                     }
-                    if context.vk_code() != Some(*vk) {
+                    // Convert VK code to Predefined for comparison
+                    if let Some(vk_code) = context.vk_code() {
+                        if vk_code != vk.raw() {
+                            match_success = false;
+                            break;
+                        }
+                    } else {
+                        // No VK code in context
                         match_success = false;
                         break;
                     }

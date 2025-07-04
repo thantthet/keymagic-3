@@ -4,9 +4,8 @@
 //! that supports C FFI (Python, C, C++, etc.) across all platforms.
 
 use crate::{KeyMagicEngine, KeyInput};
-use crate::engine::{ModifierState, ActionType, Predefined};
+use crate::engine::{ModifierState, ActionType};
 use crate::km2::Km2Loader;
-use crate::types::VirtualKey;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::ptr;
@@ -170,7 +169,7 @@ pub extern "C" fn keymagic_engine_process_key(
     };
 
     let key_input = KeyInput {
-        key_code: Predefined::from_raw(key_code as u16),
+        key_code: key_code as u16,  // Accept VK codes directly
         modifiers: ModifierState {
             shift: shift != 0,
             ctrl: ctrl != 0,
@@ -294,8 +293,8 @@ pub extern "C" fn keymagic_get_version() -> *const c_char {
 
 /// Process a key event with Windows VK code
 /// 
-/// This is a Windows-specific variant that accepts Windows Virtual Key codes
-/// and converts them to KeyMagic predefined values before processing.
+/// This is now just an alias for keymagic_engine_process_key since it accepts VK codes directly.
+/// Kept for backward compatibility.
 #[no_mangle]
 pub extern "C" fn keymagic_engine_process_key_win(
     handle: *mut EngineHandle,
@@ -307,23 +306,10 @@ pub extern "C" fn keymagic_engine_process_key_win(
     caps_lock: c_int,
     output: *mut ProcessKeyOutput,
 ) -> KeyMagicResult {
-    if handle.is_null() || output.is_null() {
-        return KeyMagicResult::ErrorInvalidParameter;
-    }
-
-    // Convert Windows VK code to KeyMagic predefined value
-    let predefined_code = if let Some(vk) = VirtualKey::from_win_vk(vk_code as u16) {
-        vk as u16
-    } else {
-        // If we don't recognize the VK code, pass it through as-is
-        // This allows for potential custom handling
-        vk_code as u16
-    };
-
-    // Call the standard process_key function with the converted code
+    // Now that process_key accepts VK codes directly, just forward the call
     keymagic_engine_process_key(
         handle,
-        predefined_code as c_int,
+        vk_code,
         character,
         shift,
         ctrl,

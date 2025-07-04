@@ -4,8 +4,9 @@ mod common;
 use common::*;
 
 use keymagic_core::BinaryFormatElement;
-use keymagic_core::engine::{KeyInput, ModifierState, Predefined, ActionType};
+use keymagic_core::engine::ActionType;
 use keymagic_core::types::km2::{Km2File, LayoutOptions};
+use kms2km2::VirtualKey;
 
 /// Create a simple test keyboard with auto_bksp enabled
 fn create_test_keyboard_with_auto_bksp() -> Km2File {
@@ -47,11 +48,7 @@ fn test_auto_backspace_enabled() {
     let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Type 'k' - should show in composing
-    let input_k = KeyInput {
-        key_code: Predefined::from_raw('K' as u16),
-        modifiers: ModifierState::default(),
-        character: Some('k'),
-    };
+    let input_k = key_input_vk_char(VirtualKey::KeyK, 'k');
     
     let output_k = engine.process_key(input_k).unwrap();
     assert_eq!(output_k.composing_text, "k");
@@ -59,11 +56,7 @@ fn test_auto_backspace_enabled() {
     assert!(output_k.is_processed);
     
     // Press backspace - no rule matches, auto_bksp should delete 'k'
-    let input_backspace = KeyInput {
-        key_code: Predefined::from_raw(0x08), // VK_BACK
-        modifiers: ModifierState::default(),
-        character: None, // Backspace has no character
-    };
+    let input_backspace = key_input_from_vk(VirtualKey::Back);
     
     let output_backspace = engine.process_key(input_backspace).unwrap();
     assert_eq!(output_backspace.composing_text, "", "Should have backspaced the 'k'");
@@ -78,11 +71,7 @@ fn test_auto_backspace_disabled() {
     let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Type 'k' - should show in composing
-    let input_k = KeyInput {
-        key_code: Predefined::from_raw('K' as u16),
-        modifiers: ModifierState::default(),
-        character: Some('k'),
-    };
+    let input_k = key_input_vk_char(VirtualKey::KeyK, 'k');
     
     let output_k = engine.process_key(input_k).unwrap();
     assert_eq!(output_k.composing_text, "k");
@@ -90,11 +79,7 @@ fn test_auto_backspace_disabled() {
     assert!(output_k.is_processed);
     
     // Press backspace - no rule matches, auto_bksp disabled, should NOT delete
-    let input_backspace = KeyInput {
-        key_code: Predefined::from_raw(0x08), // VK_BACK
-        modifiers: ModifierState::default(),
-        character: None, // Backspace has no character
-    };
+    let input_backspace = key_input_from_vk(VirtualKey::Back);
     
     let output_backspace = engine.process_key(input_backspace).unwrap();
     assert_eq!(output_backspace.composing_text, "k", "Should keep 'k' as backspace has no character");
@@ -109,11 +94,7 @@ fn test_auto_backspace_empty_buffer() {
     let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Press backspace with empty buffer - should not delete anything
-    let input_backspace = KeyInput {
-        key_code: Predefined::from_raw(0x08), // VK_BACK
-        modifiers: ModifierState::default(),
-        character: None,
-    };
+    let input_backspace = key_input_from_vk(VirtualKey::Back);
     
     let output_backspace = engine.process_key(input_backspace).unwrap();
     assert_eq!(output_backspace.composing_text, "", "Buffer should remain empty");
@@ -128,21 +109,13 @@ fn test_auto_backspace_with_successful_match() {
     let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Type 'k'
-    let input_k = KeyInput {
-        key_code: Predefined::from_raw('K' as u16),
-        modifiers: ModifierState::default(),
-        character: Some('k'),
-    };
+    let input_k = key_input_vk_char(VirtualKey::KeyK, 'k');
     
     let output_k = engine.process_key(input_k).unwrap();
     assert_eq!(output_k.composing_text, "k");
     
     // Type 'a' - matches "ka" => "က", auto_bksp should not trigger
-    let input_a = KeyInput {
-        key_code: Predefined::from_raw('A' as u16),
-        modifiers: ModifierState::default(),
-        character: Some('a'),
-    };
+    let input_a = key_input_vk_char(VirtualKey::KeyA, 'a');
     
     let output_a = engine.process_key(input_a).unwrap();
     assert_eq!(output_a.composing_text, "က");
@@ -157,20 +130,12 @@ fn test_auto_backspace_with_normal_character() {
     let mut engine = create_engine_from_binary(&binary).unwrap();
     
     // Type 'k'
-    let input_k = KeyInput {
-        key_code: Predefined::from_raw('K' as u16),
-        modifiers: ModifierState::default(),
-        character: Some('k'),
-    };
+    let input_k = key_input_vk_char(VirtualKey::KeyK, 'k');
     
     engine.process_key(input_k).unwrap();
     
     // Type 'x' - should append normally (auto_bksp only works with backspace key)
-    let input_x = KeyInput {
-        key_code: Predefined::from_raw('X' as u16),
-        modifiers: ModifierState::default(),
-        character: Some('x'),
-    };
+    let input_x = key_input_vk_char(VirtualKey::KeyX, 'x');
     
     let output_x = engine.process_key(input_x).unwrap();
     assert_eq!(output_x.composing_text, "kx", "Should append 'x' normally");

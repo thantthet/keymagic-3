@@ -4,13 +4,13 @@ use crate::types::{Km2File, Rule};
 use crate::engine::types::Element;
 use crate::engine::{
     input::KeyInput,
-    types::Predefined,
     output::EngineOutput,
     state::EngineState,
     matching::{RuleMatcher, Pattern, MatchContext},
     processing::{RuleProcessor, RecursiveProcessor, ActionGenerator, should_stop_recursion},
 };
 use crate::error::Result;
+use crate::VirtualKey;
 
 /// Main KeyMagic engine for processing keyboard input
 pub struct KeyMagicEngine {
@@ -101,7 +101,7 @@ impl KeyMagicEngine {
             // No rule matched
             
             // Check if this is a backspace key with auto_bksp enabled
-            if input.key_code == Predefined::from_raw(0x02) // VK_BACK
+            if input.key_code == VirtualKey::Back as u16 // VK_BACK Windows code
                 && self.keyboard.header.layout_options.auto_bksp == 1 
                 && !self.state.composing_text().is_empty() {
                 // Auto backspace is enabled, backspace key pressed, and composing buffer is not empty

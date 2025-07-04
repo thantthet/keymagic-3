@@ -1,7 +1,6 @@
 //! Matching context for rule evaluation
 
 use crate::engine::input::KeyInput;
-use crate::engine::types::Predefined;
 
 /// Context for rule matching
 #[derive(Debug, Clone)]
@@ -45,7 +44,7 @@ impl<'a> MatchContext<'a> {
     }
 
     /// Gets the virtual key code if available
-    pub fn vk_code(&self) -> Option<Predefined> {
+    pub fn vk_code(&self) -> Option<u16> {
         self.key_input.map(|input| input.key_code)
     }
 

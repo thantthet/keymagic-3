@@ -30,7 +30,9 @@ pub fn new_test_engine() -> Result<KeyMagicEngine> {
 
 /// Convert VirtualKey to KeyInput for tests
 pub fn key_input_from_vk_char(vk: VirtualKey, ch: Option<char>) -> KeyInput {
-    KeyInput::new(vk.into(), ModifierState::default(), ch)
+    // Convert VirtualKey enum to Windows VK code
+    let vk_code = vk.to_win_vk();
+    KeyInput::new(vk_code, ModifierState::default(), ch)
 }
 
 /// Create KeyInput from just a character
