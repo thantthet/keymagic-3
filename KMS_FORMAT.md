@@ -215,11 +215,12 @@ Note: ANY will NOT match:
 
 #### NULL Keyword
 
-Used to delete/remove output:
+Used to delete/remove output. **Important**: NULL is only allowed in the right-hand side (RHS) of rules as an output value. It cannot be used in patterns (LHS).
 
 ```kms
-U200B + U104D + <VK_BACK> => NULL
-$ZWS + $row1U[*] + <VK_BACK> => NULL
+U200B + U104D + <VK_BACK> => NULL      // Correct: NULL in output
+$ZWS + $row1U[*] + <VK_BACK> => NULL   // Correct: NULL in output
+// NULL + "a" => "something"           // INVALID: NULL not allowed in pattern
 ```
 
 ## State Management

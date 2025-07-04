@@ -179,11 +179,21 @@ All opcodes are 2-byte values (16-bit integers):
 | 0x00F0 | opSTRING | String literal | Length + UTF-16LE string |
 | 0x00F1 | opVARIABLE | Variable reference | 1-based variable index |
 | 0x00F2 | opREFERENCE | Back-reference | Segment number (1-based) |
-| 0x00F3 | opPREDEFINED | Virtual key code | VK_* constant value |
+| 0x00F3 | opPREDEFINED | Virtual key code | Internal predefined value (NOT Windows VK code) |
 | 0x00F4 | opMODIFIER | Modifier/Index | Context-dependent: modifier flags in LHS, or index reference in RHS |
 | 0x00F6 | opAND | Logical AND | Combines conditions |
 | 0x00F8 | opANY | Match any character | None |
 | 0x00F9 | opSWITCH | State switch | State index (integer) |
+
+#### Important Notes on opPREDEFINED
+
+- **opPREDEFINED values are internal enum values**, not platform-specific key codes
+- In LHS: Can only appear after opAND to form virtual key combinations
+- In RHS: The special value 1 (VirtualKey::Null) represents NULL output
+- Examples:
+  - VirtualKey::Back = 2 (NOT Windows VK_BACK 0x08)
+  - VirtualKey::Space = 12 (NOT Windows VK_SPACE 0x20)
+  - VirtualKey::KeyA = 26 (NOT Windows VK_A 0x41)
 
 ### Modifier Flags
 
