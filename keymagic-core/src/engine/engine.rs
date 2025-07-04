@@ -101,7 +101,7 @@ impl KeyMagicEngine {
             // No rule matched
             
             // Check if this is a backspace key with auto_bksp enabled
-            if input.key_code == Predefined::from_raw(0x08) // VK_BACK
+            if input.key_code == Predefined::from_raw(0x02) // VK_BACK
                 && self.keyboard.header.layout_options.auto_bksp == 1 
                 && !self.state.composing_text().is_empty() {
                 // Auto backspace is enabled, backspace key pressed, and composing buffer is not empty
