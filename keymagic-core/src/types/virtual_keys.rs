@@ -3,9 +3,6 @@ use std::collections::HashMap;
 #[repr(u16)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VirtualKey {
-    // Special values
-    Null = 1,              // pdNULL
-
     // Control keys
     Back = 2,              // pdVK_BACK (Backspace)
     Tab = 3,               // pdVK_TAB
@@ -127,9 +124,6 @@ impl VirtualKey {
     /// Convert this VirtualKey to Windows Virtual Key code
     pub fn to_win_vk(&self) -> u16 {
         match self {
-            // Special values
-            VirtualKey::Null => 0x00,
-            
             // Control keys
             VirtualKey::Back => 0x08,
             VirtualKey::Tab => 0x09,
@@ -251,7 +245,6 @@ impl VirtualKey {
     /// Convert from raw enum value to VirtualKey
     pub fn from_raw(raw_value: u16) -> Option<Self> {
         match raw_value {
-            1 => Some(VirtualKey::Null),
             2 => Some(VirtualKey::Back),
             3 => Some(VirtualKey::Tab),
             4 => Some(VirtualKey::Return),
@@ -359,9 +352,6 @@ impl VirtualKey {
     /// Convert Windows Virtual Key code to VirtualKey
     pub fn from_win_vk(vk_code: u16) -> Option<Self> {
         match vk_code {
-            // Special values
-            0x00 => Some(VirtualKey::Null),
-            
             // Control keys
             0x08 => Some(VirtualKey::Back),
             0x09 => Some(VirtualKey::Tab),
@@ -485,10 +475,6 @@ impl VirtualKey {
 
 pub fn create_vk_map() -> HashMap<&'static str, VirtualKey> {
     let mut map = HashMap::new();
-
-    // Special keys
-    map.insert("NULL", VirtualKey::Null);
-    map.insert("null", VirtualKey::Null);
 
     // Control keys
     map.insert("VK_BACK", VirtualKey::Back);
