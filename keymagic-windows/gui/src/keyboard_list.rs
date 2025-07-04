@@ -15,10 +15,15 @@ const IDC_KEYBOARD_LIST: i32 = 1001;
 pub struct KeyboardListView {
     hwnd: HWND,
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
+    dpi: u32,
 }
 
 impl KeyboardListView {
-    pub fn new(parent: HWND, keyboard_manager: Arc<Mutex<KeyboardManager>>) -> Result<Self> {
+    fn scale_for_dpi(value: i32, dpi: u32) -> i32 {
+        (value as f32 * dpi as f32 / 96.0) as i32
+    }
+    
+    pub fn new(parent: HWND, keyboard_manager: Arc<Mutex<KeyboardManager>>, dpi: u32) -> Result<Self> {
         unsafe {
             // Initialize common controls
             let icc = INITCOMMONCONTROLSEX {
@@ -27,16 +32,16 @@ impl KeyboardListView {
             };
             InitCommonControlsEx(&icc);
             
-            // Create ListView
+            // Create ListView with DPI-scaled dimensions
             let hwnd = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 WC_LISTVIEW,
                 w!(""),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS),
-                10,
-                10,
-                760,
-                200,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(760, dpi),
+                Self::scale_for_dpi(200, dpi),
                 parent,
                 HMENU(IDC_KEYBOARD_LIST as _),
                 GetModuleHandleW(None)?,
@@ -52,12 +57,12 @@ impl KeyboardListView {
                 WPARAM(0), 
                 LPARAM((LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER) as isize));
             
-            // Add columns
+            // Add columns with DPI-scaled widths
             // Column 1: Name
             let name_text: Vec<u16> = "Name".encode_utf16().chain(std::iter::once(0)).collect();
             let mut lvc = LVCOLUMNW {
                 mask: LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM,
-                cx: 200,
+                cx: Self::scale_for_dpi(200, dpi),
                 pszText: PWSTR(name_text.as_ptr() as *mut _),
                 iSubItem: 0,
                 ..Default::default()
@@ -66,21 +71,21 @@ impl KeyboardListView {
             
             // Column 2: Description
             let desc_text: Vec<u16> = "Description".encode_utf16().chain(std::iter::once(0)).collect();
-            lvc.cx = 300;
+            lvc.cx = Self::scale_for_dpi(300, dpi);
             lvc.pszText = PWSTR(desc_text.as_ptr() as *mut _);
             lvc.iSubItem = 1;
             SendMessageW(hwnd, LVM_INSERTCOLUMNW, WPARAM(1), LPARAM(&lvc as *const _ as _));
             
             // Column 3: Hotkey
             let hotkey_text: Vec<u16> = "Hotkey".encode_utf16().chain(std::iter::once(0)).collect();
-            lvc.cx = 150;
+            lvc.cx = Self::scale_for_dpi(150, dpi);
             lvc.pszText = PWSTR(hotkey_text.as_ptr() as *mut _);
             lvc.iSubItem = 2;
             SendMessageW(hwnd, LVM_INSERTCOLUMNW, WPARAM(2), LPARAM(&lvc as *const _ as _));
             
             // Column 4: Status
             let status_text: Vec<u16> = "Status".encode_utf16().chain(std::iter::once(0)).collect();
-            lvc.cx = 100;
+            lvc.cx = Self::scale_for_dpi(100, dpi);
             lvc.pszText = PWSTR(status_text.as_ptr() as *mut _);
             lvc.iSubItem = 3;
             SendMessageW(hwnd, LVM_INSERTCOLUMNW, WPARAM(3), LPARAM(&lvc as *const _ as _));
@@ -88,6 +93,7 @@ impl KeyboardListView {
             let list_view = Self {
                 hwnd,
                 keyboard_manager: keyboard_manager.clone(),
+                dpi,
             };
             
             // Populate the list

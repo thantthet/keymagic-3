@@ -28,20 +28,24 @@ pub struct KeyboardPreview {
 }
 
 impl KeyboardPreview {
-    pub fn new(parent: HWND) -> Result<Arc<Self>> {
+    fn scale_for_dpi(value: i32, dpi: u32) -> i32 {
+        (value as f32 * dpi as f32 / 96.0) as i32
+    }
+    
+    pub fn new(parent: HWND, dpi: u32) -> Result<Arc<Self>> {
         unsafe {
             let instance = GetModuleHandleW(None)?;
             
-            // Create container static control
+            // Create container static control with DPI scaling
             let hwnd = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("STATIC"),
                 w!(""),
                 WS_CHILD | WS_VISIBLE,
-                10,
-                250,
-                860,
-                350,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(250, dpi),
+                Self::scale_for_dpi(860, dpi),
+                Self::scale_for_dpi(350, dpi),
                 parent,
                 None,
                 instance,
@@ -60,8 +64,8 @@ impl KeyboardPreview {
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
                 0,
                 0,
-                860,
-                350,
+                Self::scale_for_dpi(860, dpi),
+                Self::scale_for_dpi(350, dpi),
                 hwnd,
                 None,
                 instance,
@@ -69,45 +73,45 @@ impl KeyboardPreview {
             );
             
             // Create labels
-            CreateWindowExW(
+            let label1 = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("STATIC"),
                 w!("Type here to test keyboard (press keys to see real-time processing):"),
                 WS_CHILD | WS_VISIBLE,
-                10,
-                30,
-                400,
-                20,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(30, dpi),
+                Self::scale_for_dpi(600, dpi),  // Increased width for better text display
+                Self::scale_for_dpi(20, dpi),
                 hwnd,
                 None,
                 instance,
                 None,
             );
             
-            CreateWindowExW(
+            let label2 = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("STATIC"),
                 w!("Composing:"),
                 WS_CHILD | WS_VISIBLE,
-                10,
-                90,
-                100,
-                20,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(90, dpi),
+                Self::scale_for_dpi(100, dpi),
+                Self::scale_for_dpi(20, dpi),
                 hwnd,
                 None,
                 instance,
                 None,
             );
             
-            CreateWindowExW(
+            let label3 = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("STATIC"),
                 w!("Output:"),
                 WS_CHILD | WS_VISIBLE,
-                10,
-                150,
-                100,
-                20,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(150, dpi),
+                Self::scale_for_dpi(100, dpi),
+                Self::scale_for_dpi(20, dpi),
                 hwnd,
                 None,
                 instance,
@@ -120,10 +124,10 @@ impl KeyboardPreview {
                 w!("EDIT"),
                 w!(""),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE((ES_MULTILINE | ES_AUTOVSCROLL) as u32) | WS_VSCROLL,
-                10,
-                50,
-                840,
-                35,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(50, dpi),
+                Self::scale_for_dpi(840, dpi),
+                Self::scale_for_dpi(40, dpi),  // Increased height
                 hwnd,
                 HMENU(IDC_TEST_INPUT as _),
                 instance,
@@ -136,10 +140,10 @@ impl KeyboardPreview {
                 w!("EDIT"),
                 w!(""),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE((ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL) as u32) | WS_VSCROLL,
-                10,
-                110,
-                840,
-                35,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(110, dpi),
+                Self::scale_for_dpi(840, dpi),
+                Self::scale_for_dpi(40, dpi),  // Increased height
                 hwnd,
                 HMENU(IDC_COMPOSING_LABEL as _),
                 instance,
@@ -152,10 +156,10 @@ impl KeyboardPreview {
                 w!("EDIT"),
                 w!(""),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE((ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL) as u32) | WS_VSCROLL,
-                10,
-                170,
-                840,
-                100,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(170, dpi),
+                Self::scale_for_dpi(840, dpi),
+                Self::scale_for_dpi(120, dpi),  // Increased height
                 hwnd,
                 HMENU(IDC_TEST_OUTPUT as _),
                 instance,
@@ -163,15 +167,15 @@ impl KeyboardPreview {
             );
             
             // Create clear button
-            CreateWindowExW(
+            let clear_button = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("BUTTON"),
                 w!("Clear"),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                10,
-                280,
-                80,
-                30,
+                Self::scale_for_dpi(10, dpi),
+                Self::scale_for_dpi(280, dpi),
+                Self::scale_for_dpi(80, dpi),
+                Self::scale_for_dpi(30, dpi),
                 hwnd,
                 HMENU(IDC_CLEAR_BUTTON as _),
                 instance,
@@ -179,15 +183,15 @@ impl KeyboardPreview {
             );
             
             // Create note
-            CreateWindowExW(
+            let note_label = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("STATIC"),
                 w!("Note: This preview shows how the engine processes each key. Composing text shows the engine's internal state."),
                 WS_CHILD | WS_VISIBLE,
-                100,
-                285,
-                700,
-                20,
+                Self::scale_for_dpi(100, dpi),
+                Self::scale_for_dpi(285, dpi),
+                Self::scale_for_dpi(700, dpi),
+                Self::scale_for_dpi(20, dpi),
                 hwnd,
                 None,
                 instance,
@@ -195,24 +199,27 @@ impl KeyboardPreview {
             );
             
             // Create info label
-            CreateWindowExW(
+            let info_label = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("STATIC"),
                 w!("Press Space/Enter to commit, Escape to cancel composition. Backspace works with smart rules."),
                 WS_CHILD | WS_VISIBLE,
-                100,
-                305,
-                700,
-                20,
+                Self::scale_for_dpi(100, dpi),
+                Self::scale_for_dpi(305, dpi),
+                Self::scale_for_dpi(700, dpi),
+                Self::scale_for_dpi(20, dpi),
                 hwnd,
                 None,
                 instance,
                 None,
             );
             
-            // Set a nice font
-            let font = CreateFontW(
-                16,
+            // Set fonts with DPI scaling
+            let edit_font_size = Self::scale_for_dpi(14, dpi);  // Font for edit controls
+            let label_font_size = Self::scale_for_dpi(11, dpi); // Font for labels
+            
+            let edit_font = CreateFontW(
+                edit_font_size,
                 0,
                 0,
                 0,
@@ -228,10 +235,37 @@ impl KeyboardPreview {
                 w!("Segoe UI"),
             );
             
-            if font.0 != 0 {
-                let _ = SendMessageW(input_hwnd, WM_SETFONT, WPARAM(font.0 as _), LPARAM(1));
-                let _ = SendMessageW(output_hwnd, WM_SETFONT, WPARAM(font.0 as _), LPARAM(1));
-                let _ = SendMessageW(composing_hwnd, WM_SETFONT, WPARAM(font.0 as _), LPARAM(1));
+            let label_font = CreateFontW(
+                label_font_size,
+                0,
+                0,
+                0,
+                FW_NORMAL.0 as i32,
+                FALSE.0 as u32,
+                FALSE.0 as u32,
+                FALSE.0 as u32,
+                DEFAULT_CHARSET.0 as u32,
+                OUT_DEFAULT_PRECIS.0 as u32,
+                CLIP_DEFAULT_PRECIS.0 as u32,
+                CLEARTYPE_QUALITY.0 as u32,
+                (DEFAULT_PITCH.0 | FF_DONTCARE.0) as u32,
+                w!("Segoe UI"),
+            );
+            
+            // Apply fonts to controls
+            if label_font.0 != 0 {
+                let _ = SendMessageW(label1, WM_SETFONT, WPARAM(label_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(label2, WM_SETFONT, WPARAM(label_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(label3, WM_SETFONT, WPARAM(label_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(clear_button, WM_SETFONT, WPARAM(label_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(note_label, WM_SETFONT, WPARAM(label_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(info_label, WM_SETFONT, WPARAM(label_font.0 as _), LPARAM(1));
+            }
+            
+            if edit_font.0 != 0 {
+                let _ = SendMessageW(input_hwnd, WM_SETFONT, WPARAM(edit_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(output_hwnd, WM_SETFONT, WPARAM(edit_font.0 as _), LPARAM(1));
+                let _ = SendMessageW(composing_hwnd, WM_SETFONT, WPARAM(edit_font.0 as _), LPARAM(1));
             }
             
             let preview = Arc::new(Self {

@@ -7,6 +7,7 @@ use windows::{
         UI::WindowsAndMessaging::*,
         UI::Controls::*,
         UI::Controls::Dialogs::*,
+        UI::HiDpi::*,
     },
 };
 use std::sync::{Arc, Mutex};
@@ -37,11 +38,23 @@ pub struct MainWindow {
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
     list_view: RefCell<Option<KeyboardListView>>,
     preview: RefCell<Option<Arc<KeyboardPreview>>>,
+    dpi: RefCell<u32>,
 }
 
 impl MainWindow {
+    fn scale_for_dpi(value: i32, dpi: u32) -> i32 {
+        (value as f32 * dpi as f32 / 96.0) as i32
+    }
+    
+    fn get_dpi_for_system() -> u32 {
+        unsafe { GetDpiForSystem() }
+    }
+    
     pub fn new(app: &Arc<App>) -> Result<Arc<Self>> {
         unsafe {
+            // Get system DPI
+            let system_dpi = Self::get_dpi_for_system();
+            
             // Create keyboard manager
             let keyboard_manager = Arc::new(Mutex::new(KeyboardManager::new().map_err(|e| Error::new(HRESULT(-1), HSTRING::from(e.to_string())))?));
             
@@ -75,12 +88,13 @@ impl MainWindow {
                 keyboard_manager,
                 list_view: RefCell::new(None),
                 preview: RefCell::new(None),
+                dpi: RefCell::new(system_dpi),
             });
             
             // Store window pointer for WM_CREATE
             let window_ptr = Arc::as_ptr(&window) as *const c_void;
             
-            // Create window
+            // Create window with DPI-scaled dimensions
             let hwnd = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 WINDOW_CLASS_NAME,
@@ -88,8 +102,8 @@ impl MainWindow {
                 WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
-                900,
-                700,
+                Self::scale_for_dpi(900, system_dpi),
+                Self::scale_for_dpi(700, system_dpi),
                 None,
                 Self::create_menu()?,
                 instance,
@@ -151,16 +165,19 @@ impl MainWindow {
                 let window_ptr = (*create_struct).lpCreateParams as *const MainWindow;
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, window_ptr as isize);
                 
-                // Create the ListView
+                // Set the hwnd in the window struct
                 if !window_ptr.is_null() {
                     let window = &*window_ptr;
-                    let list_view = KeyboardListView::new(hwnd, window.keyboard_manager.clone());
+                    // Need to cast away const to set hwnd - this is safe during window creation
+                    let window_mut = window_ptr as *mut MainWindow;
+                    (*window_mut).hwnd = hwnd;
+                    let list_view = KeyboardListView::new(hwnd, window.keyboard_manager.clone(), *window.dpi.borrow());
                     if let Ok(lv) = list_view {
                         *window.list_view.borrow_mut() = Some(lv);
                     }
                     
                     // Create the preview area
-                    let preview = KeyboardPreview::new(hwnd);
+                    let preview = KeyboardPreview::new(hwnd, *window.dpi.borrow());
                     if let Ok(pv) = preview {
                         *window.preview.borrow_mut() = Some(pv);
                     }
@@ -222,15 +239,42 @@ impl MainWindow {
                 let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
                 if !window_ptr.is_null() {
                     let window = &*window_ptr;
+                    let dpi = *window.dpi.borrow();
                     if let Some(_list_view) = window.list_view.borrow().as_ref() {
+                        let margin = MainWindow::scale_for_dpi(10, dpi);
+                        let list_height = MainWindow::scale_for_dpi(200, dpi);
                         SetWindowPos(
                             HWND(SendMessageW(hwnd, WM_USER, WPARAM(1001), LPARAM(0)).0 as _),
                             None,
-                            10,
-                            10,
-                            width - 20,
-                            200,  // Fixed height for ListView
+                            margin,
+                            margin,
+                            width - margin * 2,
+                            list_height,
                             SWP_NOZORDER,
+                        );
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_DPICHANGED => {
+                let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
+                if !window_ptr.is_null() {
+                    let window = &*window_ptr;
+                    let new_dpi = (wparam.0 & 0xFFFF) as u32;
+                    *window.dpi.borrow_mut() = new_dpi;
+                    
+                    // Suggested new window size is in lparam
+                    let suggested_rect = lparam.0 as *const RECT;
+                    if !suggested_rect.is_null() {
+                        let rect = &*suggested_rect;
+                        SetWindowPos(
+                            hwnd,
+                            None,
+                            rect.left,
+                            rect.top,
+                            rect.right - rect.left,
+                            rect.bottom - rect.top,
+                            SWP_NOZORDER | SWP_NOACTIVATE,
                         );
                     }
                 }
