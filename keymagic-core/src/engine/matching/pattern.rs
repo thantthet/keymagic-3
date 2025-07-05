@@ -134,7 +134,7 @@ impl Pattern {
                             }
                         }
                         
-                        vk_count += 1;
+                        vk_count += virtual_keys.len();
                         pattern_elements.push(PatternElement::VirtualKey(virtual_keys));
                         
                         i = j - 1; // Skip all processed VK elements

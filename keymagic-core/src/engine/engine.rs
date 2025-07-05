@@ -57,7 +57,7 @@ impl KeyMagicEngine {
         );
 
         // Track whether a rule was matched (input was processed)
-        let mut is_processed = false;
+        let is_processed: bool;
 
         // Try to find a matching rule
         if let Some((rule, pattern, captures)) = RuleMatcher::find_match(&self.rules, &context, &self.strings) {

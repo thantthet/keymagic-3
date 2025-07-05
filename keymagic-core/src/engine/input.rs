@@ -3,7 +3,7 @@
 /// Represents a keyboard input event
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyInput {
-    /// Virtual key code (platform-specific, e.g., Windows VK codes)
+    /// Virtual key code (internal key code)
     pub key_code: u16,
     /// Modifier keys state
     pub modifiers: ModifierState,

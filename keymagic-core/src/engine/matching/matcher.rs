@@ -45,6 +45,9 @@ impl RuleMatcher {
                 if let Some(input) = context.key_input {
                     if let Some(ch) = input.character {
                         text.push(ch);
+                    } else {
+                        // No character to match against
+                        return None;
                     }
                 }
                 text
