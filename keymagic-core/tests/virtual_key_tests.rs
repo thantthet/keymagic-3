@@ -9,6 +9,15 @@ fn test_virtual_key_with_modifiers() {
     // Test: <VK_SHIFT & VK_KEY_A> => "A"
     let mut km2 = create_basic_km2();
     
+    // Rule with modifier combination: AND + VK_KEY_A
+    add_rule(&mut km2,
+        vec![
+            BinaryFormatElement::And,
+            BinaryFormatElement::Predefined(VirtualKey::KeyA as u16)
+        ],
+        vec![BinaryFormatElement::String("a".to_string())]
+    );
+    
     // Rule with modifier combination: AND + VK_SHIFT + VK_KEY_A
     add_rule(&mut km2,
         vec![

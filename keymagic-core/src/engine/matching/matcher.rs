@@ -128,31 +128,27 @@ impl RuleMatcher {
                             }
                         }
                         
-                        // For combinations with modifiers, also check modifier state
+                        // Check modifier state - must match exactly
+                        // First, determine which modifiers are required by the pattern
+                        let mut required_shift = false;
+                        let mut required_ctrl = false;
+                        let mut required_alt = false;
+                        
                         for vk in vks {
                             match vk {
-                                VirtualKey::Shift => {
-                                    if !key_input.modifiers.shift {
-                                        match_success = false;
-                                        break;
-                                    }
-                                }
-                                VirtualKey::Control => {
-                                    if !key_input.modifiers.ctrl {
-                                        match_success = false;
-                                        break;
-                                    }
-                                }
-                                VirtualKey::Menu => {
-                                    if !key_input.modifiers.alt {
-                                        match_success = false;
-                                        break;
-                                    }
-                                }
-                                _ => {
-                                    // Non-modifier keys are already checked above
-                                }
+                                VirtualKey::Shift => required_shift = true,
+                                VirtualKey::Control => required_ctrl = true,
+                                VirtualKey::Menu => required_alt = true,
+                                _ => {}
                             }
+                        }
+                        
+                        // Now check that the input modifiers match exactly
+                        if key_input.modifiers.shift != required_shift ||
+                           key_input.modifiers.ctrl != required_ctrl ||
+                           key_input.modifiers.alt != required_alt {
+                            match_success = false;
+                            break;
                         }
                     } else {
                         // No VK code in context

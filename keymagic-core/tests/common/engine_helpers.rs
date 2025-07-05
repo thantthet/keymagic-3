@@ -5,6 +5,20 @@ use keymagic_core::engine::{ModifierState, ActionType};
 use keymagic_core::VirtualKey;
 use keymagic_core::km2::Km2Loader;
 
+/// Create an engine from KMS rules string
+pub fn create_engine(kms_rules: &str) -> Result<KeyMagicEngine, Box<dyn std::error::Error>> {
+    // Compile KMS to KM2
+    let km2_file = kms2km2::compile_kms(kms_rules)?;
+    
+    // Convert to binary
+    let mut buffer = Vec::new();
+    let writer = kms2km2::binary::Km2Writer::new(&mut buffer);
+    writer.write_km2_file(&km2_file)?;
+    
+    // Load the binary and create engine
+    create_engine_from_binary(&buffer)
+}
+
 /// Create an engine from binary data
 pub fn create_engine_from_binary(data: &[u8]) -> Result<KeyMagicEngine, Box<dyn std::error::Error>> {
     let km2 = Km2Loader::load(data)?;
