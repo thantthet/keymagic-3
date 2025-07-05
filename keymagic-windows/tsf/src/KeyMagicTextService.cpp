@@ -1,4 +1,5 @@
 #include "KeyMagicTextService.h"
+#include "KeyMagicGuids.h"
 #include "Globals.h"
 #include "Debug.h"
 #include <string>
@@ -44,6 +45,12 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_pCompositionMgr = nullptr;
     m_supportsComposition = TRUE;  // Assume composition support initially
     
+    // Initialize display attributes
+    m_ppDisplayAttributeInfo = nullptr;
+    m_displayAttributeInfoCount = 0;
+    m_inputDisplayAttributeAtom = TF_INVALID_GUIDATOM;
+    m_convertedDisplayAttributeAtom = TF_INVALID_GUIDATOM;
+    
     InitializeCriticalSection(&m_cs);
     DllAddRef();
 }
@@ -55,6 +62,21 @@ CKeyMagicTextService::~CKeyMagicTextService()
         m_pCompositionMgr->Release();
         m_pCompositionMgr = nullptr;
     }
+    
+    // Clean up display attributes
+    if (m_ppDisplayAttributeInfo)
+    {
+        for (ULONG i = 0; i < m_displayAttributeInfoCount; i++)
+        {
+            if (m_ppDisplayAttributeInfo[i])
+            {
+                m_ppDisplayAttributeInfo[i]->Release();
+            }
+        }
+        delete[] m_ppDisplayAttributeInfo;
+        m_ppDisplayAttributeInfo = nullptr;
+    }
+    
     UninitializeEngine();
     DeleteCriticalSection(&m_cs);
     DllRelease();
@@ -87,6 +109,10 @@ STDAPI CKeyMagicTextService::QueryInterface(REFIID riid, void **ppvObject)
     else if (IsEqualIID(riid, IID_ITfMouseSink))
     {
         *ppvObject = static_cast<ITfMouseSink*>(this);
+    }
+    else if (IsEqualIID(riid, IID_ITfDisplayAttributeProvider))
+    {
+        *ppvObject = static_cast<ITfDisplayAttributeProvider*>(this);
     }
 
     if (*ppvObject)
@@ -148,6 +174,10 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
         pKeystrokeMgr->Release();
     }
 
+    // Register display attribute provider and create display attribute info
+    RegisterDisplayAttributeProvider();
+    CreateDisplayAttributeInfo();
+
     LeaveCriticalSection(&m_cs);
     return S_OK;
 }
@@ -175,6 +205,9 @@ STDAPI CKeyMagicTextService::Deactivate()
     // Clean up sinks
     UninitTextEditSink();
     UninitMouseSink();
+
+    // Unregister display attribute provider
+    UnregisterDisplayAttributeProvider();
 
     // Release thread manager
     if (m_pThreadMgr)
@@ -981,6 +1014,183 @@ HRESULT CKeyMagicTextService::UninitMouseSink()
         m_dwMouseSinkCookie = TF_INVALID_COOKIE;
     }
 
+    return S_OK;
+}
+
+// ITfDisplayAttributeProvider implementation
+STDAPI CKeyMagicTextService::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **ppEnum)
+{
+    DEBUG_LOG_FUNC();
+    
+    if (ppEnum == nullptr)
+        return E_INVALIDARG;
+        
+    *ppEnum = nullptr;
+    
+    if (!m_ppDisplayAttributeInfo || m_displayAttributeInfoCount == 0)
+    {
+        DEBUG_LOG(L"No display attribute info available");
+        return E_FAIL;
+    }
+    
+    CEnumDisplayAttributeInfo *pEnum = new CEnumDisplayAttributeInfo();
+    if (!pEnum)
+        return E_OUTOFMEMORY;
+        
+    HRESULT hr = pEnum->Initialize(m_ppDisplayAttributeInfo, m_displayAttributeInfoCount);
+    if (FAILED(hr))
+    {
+        pEnum->Release();
+        return hr;
+    }
+    
+    *ppEnum = pEnum;
+    DEBUG_LOG(L"Enumerated " + std::to_wstring(m_displayAttributeInfoCount) + L" display attributes");
+    return S_OK;
+}
+
+STDAPI CKeyMagicTextService::GetDisplayAttributeInfo(REFGUID guidInfo, ITfDisplayAttributeInfo **ppInfo)
+{
+    DEBUG_LOG_FUNC();
+    
+    if (ppInfo == nullptr)
+        return E_INVALIDARG;
+        
+    *ppInfo = nullptr;
+    
+    // Search for the requested GUID
+    for (ULONG i = 0; i < m_displayAttributeInfoCount; i++)
+    {
+        if (m_ppDisplayAttributeInfo[i])
+        {
+            GUID guid;
+            if (SUCCEEDED(m_ppDisplayAttributeInfo[i]->GetGUID(&guid)) && 
+                IsEqualGUID(guid, guidInfo))
+            {
+                *ppInfo = m_ppDisplayAttributeInfo[i];
+                (*ppInfo)->AddRef();
+                DEBUG_LOG(L"Found display attribute info for requested GUID");
+                return S_OK;
+            }
+        }
+    }
+    
+    DEBUG_LOG(L"Display attribute info not found for requested GUID");
+    return E_INVALIDARG;
+}
+
+// Display attribute management
+HRESULT CKeyMagicTextService::RegisterDisplayAttributeProvider()
+{
+    DEBUG_LOG_FUNC();
+    
+    ITfCategoryMgr *pCategoryMgr;
+    HRESULT hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
+                                 IID_ITfCategoryMgr, (void**)&pCategoryMgr);
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Failed to create category manager");
+        return hr;
+    }
+    
+    // Register as display attribute provider
+    hr = pCategoryMgr->RegisterCategory(CLSID_KeyMagicTextService,
+                                       GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+                                       CLSID_KeyMagicTextService);
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Failed to register display attribute provider");
+    }
+    else
+    {
+        DEBUG_LOG(L"Successfully registered display attribute provider");
+        
+        // Register our display attribute GUIDs and get atoms
+        hr = pCategoryMgr->RegisterGUID(GUID_KeyMagicDisplayAttributeInput, &m_inputDisplayAttributeAtom);
+        if (SUCCEEDED(hr))
+        {
+            DEBUG_LOG(L"Registered input display attribute GUID, atom: " + std::to_wstring(m_inputDisplayAttributeAtom));
+        }
+        
+        hr = pCategoryMgr->RegisterGUID(GUID_KeyMagicDisplayAttributeConverted, &m_convertedDisplayAttributeAtom);
+        if (SUCCEEDED(hr))
+        {
+            DEBUG_LOG(L"Registered converted display attribute GUID, atom: " + std::to_wstring(m_convertedDisplayAttributeAtom));
+        }
+    }
+    
+    pCategoryMgr->Release();
+    return hr;
+}
+
+HRESULT CKeyMagicTextService::UnregisterDisplayAttributeProvider()
+{
+    DEBUG_LOG_FUNC();
+    
+    ITfCategoryMgr *pCategoryMgr;
+    HRESULT hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
+                                 IID_ITfCategoryMgr, (void**)&pCategoryMgr);
+    if (FAILED(hr))
+        return hr;
+    
+    // Unregister display attribute provider
+    hr = pCategoryMgr->UnregisterCategory(CLSID_KeyMagicTextService,
+                                         GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+                                         CLSID_KeyMagicTextService);
+    if (SUCCEEDED(hr))
+    {
+        DEBUG_LOG(L"Successfully unregistered display attribute provider");
+    }
+    
+    pCategoryMgr->Release();
+    return hr;
+}
+
+HRESULT CKeyMagicTextService::CreateDisplayAttributeInfo()
+{
+    DEBUG_LOG_FUNC();
+    
+    // Clean up any existing display attribute info
+    if (m_ppDisplayAttributeInfo)
+    {
+        for (ULONG i = 0; i < m_displayAttributeInfoCount; i++)
+        {
+            if (m_ppDisplayAttributeInfo[i])
+            {
+                m_ppDisplayAttributeInfo[i]->Release();
+            }
+        }
+        delete[] m_ppDisplayAttributeInfo;
+    }
+    
+    // Create display attribute info objects
+    m_displayAttributeInfoCount = 2;  // Input and converted
+    m_ppDisplayAttributeInfo = new ITfDisplayAttributeInfo*[m_displayAttributeInfoCount];
+    if (!m_ppDisplayAttributeInfo)
+    {
+        m_displayAttributeInfoCount = 0;
+        return E_OUTOFMEMORY;
+    }
+    
+    // Create input display attribute
+    TF_DISPLAYATTRIBUTE inputAttr = CreateInputDisplayAttribute();
+    m_ppDisplayAttributeInfo[0] = new CKeyMagicDisplayAttributeInfo(
+        GUID_KeyMagicDisplayAttributeInput,
+        inputAttr,
+        L"KeyMagic Input Composition",
+        L"KeyMagic"
+    );
+    
+    // Create converted display attribute
+    TF_DISPLAYATTRIBUTE convertedAttr = CreateConvertedDisplayAttribute();
+    m_ppDisplayAttributeInfo[1] = new CKeyMagicDisplayAttributeInfo(
+        GUID_KeyMagicDisplayAttributeConverted,
+        convertedAttr,
+        L"KeyMagic Converted Composition",
+        L"KeyMagic"
+    );
+    
+    DEBUG_LOG(L"Created " + std::to_wstring(m_displayAttributeInfoCount) + L" display attribute info objects");
     return S_OK;
 }
 

@@ -7,6 +7,7 @@
 #include <memory>
 #include "../include/keymagic_ffi.h"
 #include "Composition.h"
+#include "DisplayAttribute.h"
 
 // Forward declaration
 class CKeyMagicTextService;
@@ -16,7 +17,8 @@ class CKeyMagicTextService : public ITfTextInputProcessor,
                             public ITfThreadMgrEventSink,
                             public ITfKeyEventSink,
                             public ITfTextEditSink,
-                            public ITfMouseSink
+                            public ITfMouseSink,
+                            public ITfDisplayAttributeProvider
 {
 public:
     CKeyMagicTextService();
@@ -52,6 +54,10 @@ public:
     // ITfMouseSink
     STDMETHODIMP OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dwBtnStatus, BOOL *pfEaten);
 
+    // ITfDisplayAttributeProvider
+    STDMETHODIMP EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **ppEnum);
+    STDMETHODIMP GetDisplayAttributeInfo(REFGUID guidInfo, ITfDisplayAttributeInfo **ppInfo);
+
     // Public methods
     EngineHandle* GetEngineHandle() { return m_pEngine; }
 
@@ -85,6 +91,11 @@ private:
     HRESULT InitMouseSink(); 
     HRESULT UninitMouseSink();
     
+    // Display attribute management
+    HRESULT RegisterDisplayAttributeProvider();
+    HRESULT UnregisterDisplayAttributeProvider();
+    HRESULT CreateDisplayAttributeInfo();
+    
     // Member variables
     LONG m_cRef;
     ITfThreadMgr *m_pThreadMgr;
@@ -110,9 +121,16 @@ private:
     // Application compatibility
     BOOL m_supportsComposition;
     
+    // Display attributes
+    ITfDisplayAttributeInfo **m_ppDisplayAttributeInfo;
+    ULONG m_displayAttributeInfoCount;
+    TfGuidAtom m_inputDisplayAttributeAtom;
+    TfGuidAtom m_convertedDisplayAttributeAtom;
+    
     // Friend classes
     friend class CDirectEditSession;
     friend class CCompositionEditSession;
+    friend class CCompositionManager;
 };
 
 // Edit session for direct text manipulation (no composition)

@@ -14,6 +14,7 @@ set(SOURCES
     src/ClassFactory.cpp
     src/KeyMagicTextService.cpp
     src/Composition.cpp
+    src/DisplayAttribute.cpp
     src/Globals.cpp
     src/Registry.cpp
     src/KeyMagicTSF.rc

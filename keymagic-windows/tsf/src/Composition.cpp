@@ -275,13 +275,37 @@ HRESULT CCompositionManager::ApplyDisplayAttributes(ITfContext *pContext, TfEdit
     if (FAILED(hr))
         return hr;
         
-    // Create a variant with our display attribute GUID
-    VARIANT var;
-    var.vt = VT_I4;
-    var.lVal = 1;  // Display attribute value for composition (will show underline)
+    // Get the GUID atom for our input display attribute from the text service
+    TfGuidAtom guidAtom = TF_INVALID_GUIDATOM;
+    if (m_pTextService)
+    {
+        guidAtom = m_pTextService->m_inputDisplayAttributeAtom;
+    }
     
-    // Apply the attribute to the range
-    hr = pDisplayAttributeProperty->SetValue(ec, pRange, &var);
+    if (guidAtom != TF_INVALID_GUIDATOM)
+    {
+        // Create a variant with the proper GUID atom
+        VARIANT var;
+        var.vt = VT_I4;
+        var.lVal = guidAtom;
+        
+        // Apply the attribute to the range
+        hr = pDisplayAttributeProperty->SetValue(ec, pRange, &var);
+        
+        if (SUCCEEDED(hr))
+        {
+            DEBUG_LOG(L"Applied display attribute with GUID atom: " + std::to_wstring(guidAtom));
+        }
+        else
+        {
+            DEBUG_LOG(L"Failed to apply display attribute");
+        }
+    }
+    else
+    {
+        DEBUG_LOG(L"Invalid GUID atom for display attribute");
+        hr = E_FAIL;
+    }
     
     pDisplayAttributeProperty->Release();
     return hr;
