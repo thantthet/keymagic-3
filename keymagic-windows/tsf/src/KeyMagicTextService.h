@@ -6,9 +6,11 @@
 #include <string>
 #include <memory>
 #include "../include/keymagic_ffi.h"
+#include "Composition.h"
 
 // Forward declaration
 class CKeyMagicTextService;
+class CCompositionManager;
 
 class CKeyMagicTextService : public ITfTextInputProcessor,
                             public ITfThreadMgrEventSink,
@@ -64,6 +66,9 @@ private:
     void ResetEngine();
     void SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec);
     
+    // Application compatibility detection
+    BOOL TestCompositionSupport(ITfContext *pContext);
+    
     // Text manipulation
     HRESULT ReadDocumentSuffix(ITfContext *pic, TfEditCookie ec, int maxChars, std::wstring &text);
     HRESULT DeleteCharsBeforeCursor(ITfContext *pic, TfEditCookie ec, int count);
@@ -99,8 +104,15 @@ private:
     // Critical section for thread safety
     CRITICAL_SECTION m_cs;
     
-    // Friend class
+    // Composition manager
+    CCompositionManager *m_pCompositionMgr;
+    
+    // Application compatibility
+    BOOL m_supportsComposition;
+    
+    // Friend classes
     friend class CDirectEditSession;
+    friend class CCompositionEditSession;
 };
 
 // Edit session for direct text manipulation (no composition)

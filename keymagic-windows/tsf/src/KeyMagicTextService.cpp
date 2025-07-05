@@ -41,6 +41,8 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_pTextEditContext = nullptr;
     m_pEngine = nullptr;
     m_tsfEnabled = true;  // Default to enabled
+    m_pCompositionMgr = nullptr;
+    m_supportsComposition = TRUE;  // Assume composition support initially
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -48,6 +50,11 @@ CKeyMagicTextService::CKeyMagicTextService()
 
 CKeyMagicTextService::~CKeyMagicTextService()
 {
+    if (m_pCompositionMgr)
+    {
+        m_pCompositionMgr->Release();
+        m_pCompositionMgr = nullptr;
+    }
     UninitializeEngine();
     DeleteCriticalSection(&m_cs);
     DllRelease();
@@ -220,8 +227,27 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
         if (SUCCEEDED(m_pDocMgrFocus->GetTop(&pContext)) && pContext)
         {
             m_pTextEditContext = pContext; // Takes ownership
+            
+            // Create composition manager for this context
+            if (!m_pCompositionMgr)
+            {
+                m_pCompositionMgr = new CCompositionManager(this);
+            }
+            
+            // Test composition support for this context
+            m_supportsComposition = TestCompositionSupport(pContext);
+            
             InitTextEditSink();
             InitMouseSink();
+        }
+    }
+    else
+    {
+        // No focus, clean up composition manager
+        if (m_pCompositionMgr)
+        {
+            m_pCompositionMgr->Release();
+            m_pCompositionMgr = nullptr;
         }
     }
 
@@ -288,15 +314,38 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
     char character = MapVirtualKeyToChar(wParam, lParam);
     DEBUG_LOG_KEY(L"OnKeyDown", wParam, lParam, character);
 
-    // Process key in edit session
-    CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, CDirectEditSession::EditAction::ProcessKey);
-    if (pEditSession)
+    // Choose processing method based on composition support detected at focus time
+    if (m_pCompositionMgr && m_supportsComposition)
     {
-        pEditSession->SetKeyData(wParam, lParam, pfEaten);
-        
-        HRESULT hr;
-        pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-        pEditSession->Release();
+        // Use composition-based processing (for modern apps like Edge, Explorer, Word)
+        CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic, 
+                                                                           m_pCompositionMgr,
+                                                                           CCompositionEditSession::CompositionAction::ProcessKey);
+        if (pEditSession)
+        {
+            pEditSession->SetKeyData(wParam, lParam, pfEaten);
+            
+            HRESULT hr;
+            pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+            pEditSession->Release();
+        }
+    }
+    else
+    {
+        // Use direct editing (for simple apps like Notepad)
+        CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, CDirectEditSession::EditAction::ProcessKey);
+        if (pEditSession)
+        {
+            pEditSession->SetKeyData(wParam, lParam, pfEaten);
+            
+            HRESULT hr;
+            pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+            pEditSession->Release();
+        }
+        else
+        {
+            *pfEaten = FALSE;
+        }
     }
 
     return S_OK;
@@ -337,7 +386,20 @@ STDAPI CKeyMagicTextService::OnEndEdit(ITfContext *pic, TfEditCookie ecReadOnly,
     if (SUCCEEDED(pEditRecord->GetSelectionStatus(&fSelectionChanged)) && fSelectionChanged)
     {
         DEBUG_LOG(L"Selection/caret changed - resetting engine");
-        // Selection changed, reset engine
+        // Selection changed, reset engine and cancel any composition
+        if (m_pCompositionMgr && m_pCompositionMgr->IsComposing())
+        {
+            // Cancel composition in edit session
+            CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic,
+                                                                               m_pCompositionMgr,
+                                                                               CCompositionEditSession::CompositionAction::Cancel);
+            if (pEditSession)
+            {
+                HRESULT hr;
+                pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+                pEditSession->Release();
+            }
+        }
         ResetEngine();
     }
 
@@ -356,6 +418,19 @@ STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dw
     if (dwBtnStatus & MK_LBUTTON)
     {
         DEBUG_LOG(L"Mouse click detected - resetting engine");
+        // Cancel any active composition
+        if (m_pCompositionMgr && m_pCompositionMgr->IsComposing() && m_pTextEditContext)
+        {
+            CCompositionEditSession *pEditSession = new CCompositionEditSession(this, m_pTextEditContext,
+                                                                               m_pCompositionMgr,
+                                                                               CCompositionEditSession::CompositionAction::Cancel);
+            if (pEditSession)
+            {
+                HRESULT hr;
+                m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+                pEditSession->Release();
+            }
+        }
         ResetEngine();
     }
 
@@ -653,21 +728,54 @@ void CKeyMagicTextService::ResetEngine()
         keymagic_engine_reset(m_pEngine);
         DEBUG_LOG(L"Engine reset completed");
         
-        // After reset, sync with document if possible
-        if (m_pTextEditContext)
-        {
-            CDirectEditSession *pEditSession = new CDirectEditSession(this, m_pTextEditContext, 
-                                                                     CDirectEditSession::EditAction::SyncEngine);
-            if (pEditSession)
-            {
-                HRESULT hr;
-                m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
-                pEditSession->Release();
-            }
-        }
+        // Don't sync with document after reset when using composition mode
+        // The reset is intentional and syncing would re-introduce committed text as composing text
     }
     
     LeaveCriticalSection(&m_cs);
+}
+
+BOOL CKeyMagicTextService::TestCompositionSupport(ITfContext *pContext)
+{
+    DEBUG_LOG_FUNC();
+    
+    if (!pContext)
+    {
+        DEBUG_LOG(L"No context for composition test");
+        return FALSE;
+    }
+    
+    // Test if the context supports composition by checking for ITfContextComposition
+    ITfContextComposition *pContextComposition;
+    HRESULT hr = pContext->QueryInterface(IID_ITfContextComposition, (void **)&pContextComposition);
+    
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Context does not support ITfContextComposition interface - using direct editing");
+        return FALSE;
+    }
+    
+    DEBUG_LOG(L"Context supports ITfContextComposition interface");
+    
+    // For now, assume that if the context supports ITfContextComposition interface,
+    // it supports composition. Most modern applications including Edge, Explorer, Word should support this.
+    // We can add more sophisticated testing later if needed.
+    
+    // Check if it's likely a simple application by testing for basic TSF capabilities
+    ITfInsertAtSelection *pInsertAtSelection;
+    hr = pContext->QueryInterface(IID_ITfInsertAtSelection, (void **)&pInsertAtSelection);
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Context does not support ITfInsertAtSelection - likely a very basic app, using direct editing");
+        pContextComposition->Release();
+        return FALSE;
+    }
+    
+    pInsertAtSelection->Release();
+    
+    DEBUG_LOG(L"Context supports both composition and insertion interfaces - using composition mode");
+    pContextComposition->Release();
+    return TRUE;
 }
 
 void CKeyMagicTextService::SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec)

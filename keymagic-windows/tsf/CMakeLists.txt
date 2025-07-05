@@ -13,6 +13,7 @@ set(SOURCES
     src/DllMain.cpp
     src/ClassFactory.cpp
     src/KeyMagicTextService.cpp
+    src/Composition.cpp
     src/Globals.cpp
     src/Registry.cpp
     src/KeyMagicTSF.rc
