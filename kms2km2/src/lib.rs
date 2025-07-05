@@ -24,9 +24,12 @@ pub fn convert_kms_to_km2(input_path: &Path, output_path: &Path) -> std::result:
 pub fn compile_kms_file(input_path: &Path) -> std::result::Result<Km2File, KmsError> {
     // Read input file
     let input = read_to_string(input_path)?;
-    
+    compile_kms(&input)
+}
+
+pub fn compile_kms(kms_content: &str) -> std::result::Result<Km2File, KmsError> {
     // Parse KMS
-    let mut parser = parser::Parser::new(&input);
+    let mut parser = parser::Parser::new(kms_content);
     let ast = parser.parse()?;
     
     // Compile to KM2
