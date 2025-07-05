@@ -285,6 +285,41 @@ pub extern "C" fn keymagic_engine_get_composition(
     }
 }
 
+/// Sets the composition string
+#[no_mangle]
+pub extern "C" fn keymagic_engine_set_composition(
+    handle: *mut EngineHandle,
+    text: *const c_char,
+) -> KeyMagicResult {
+    if handle.is_null() {
+        return KeyMagicResult::ErrorInvalidParameter;
+    }
+
+    let handle = unsafe { &*handle };
+    
+    // Handle null or empty text
+    let text_str = if text.is_null() {
+        ""
+    } else {
+        match unsafe { CStr::from_ptr(text) }.to_str() {
+            Ok(s) => s,
+            Err(_) => return KeyMagicResult::ErrorUtf8Conversion,
+        }
+    };
+
+    match handle.engine.lock() {
+        Ok(mut engine_opt) => {
+            if let Some(engine) = engine_opt.as_mut() {
+                engine.set_composing_text(text_str.to_string());
+                KeyMagicResult::Success
+            } else {
+                KeyMagicResult::ErrorNoKeyboard
+            }
+        }
+        Err(_) => KeyMagicResult::ErrorEngineFailure,
+    }
+}
+
 /// Get library version
 #[no_mangle]
 pub extern "C" fn keymagic_get_version() -> *const c_char {
