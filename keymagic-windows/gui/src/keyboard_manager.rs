@@ -351,4 +351,44 @@ impl KeyboardManager {
         
         Ok(())
     }
+    
+    // TSF Enable/Disable methods
+    pub fn is_tsf_enabled(&self) -> bool {
+        unsafe {
+            let mut hkey = HKEY::default();
+            
+            if RegOpenKeyExW(
+                HKEY_CURRENT_USER,
+                w!("Software\\KeyMagic\\Settings"),
+                0,
+                KEY_READ,
+                &mut hkey
+            ).is_ok() {
+                let enabled = self.read_registry_dword(hkey, w!("TSFEnabled"))
+                    .unwrap_or(1) != 0; // Default to enabled if not found
+                RegCloseKey(hkey);
+                enabled
+            } else {
+                true // Default to enabled if registry key doesn't exist
+            }
+        }
+    }
+    
+    pub fn set_tsf_enabled(&self, enabled: bool) -> Result<()> {
+        unsafe {
+            let mut hkey = HKEY::default();
+            
+            if RegCreateKeyW(
+                HKEY_CURRENT_USER,
+                w!("Software\\KeyMagic\\Settings"),
+                &mut hkey
+            ).is_ok() {
+                self.write_registry_dword(hkey, w!("TSFEnabled"), if enabled { 1 } else { 0 })?;
+                RegCloseKey(hkey);
+                Ok(())
+            } else {
+                Err(anyhow!("Failed to open registry key"))
+            }
+        }
+    }
 }

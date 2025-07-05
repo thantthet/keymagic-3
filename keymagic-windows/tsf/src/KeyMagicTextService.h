@@ -94,6 +94,7 @@ private:
     EngineHandle *m_pEngine;
     std::wstring m_currentKeyboardPath;
     std::wstring m_currentKeyboardId;
+    bool m_tsfEnabled;
     
     // Critical section for thread safety
     CRITICAL_SECTION m_cs;

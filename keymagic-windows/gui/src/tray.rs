@@ -17,6 +17,7 @@ const TRAY_ICON_ID: u32 = 1;
 // Tray menu command IDs
 const ID_TRAY_SHOW: u16 = 1001;
 const ID_TRAY_EXIT: u16 = 1002;
+const ID_TRAY_TOGGLE_TSF: u16 = 1003;
 const ID_TRAY_KEYBOARD_BASE: u16 = 2000; // Base ID for dynamic keyboard menu items
 
 pub struct TrayIcon {
@@ -96,6 +97,12 @@ impl TrayIcon {
             let manager = self.keyboard_manager.lock().unwrap();
             let keyboards = manager.get_keyboards();
             let active_id = manager.get_active_keyboard();
+            let tsf_enabled = manager.is_tsf_enabled();
+            
+            // Add TSF toggle
+            let toggle_flags = if tsf_enabled { MF_STRING | MF_CHECKED } else { MF_STRING };
+            AppendMenuW(menu, toggle_flags, ID_TRAY_TOGGLE_TSF as usize, w!("Enable KeyMagic"))?;
+            AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null())?;
             
             if !keyboards.is_empty() {
                 // Add keyboard section header
@@ -148,6 +155,14 @@ impl TrayIcon {
             ID_TRAY_EXIT => {
                 unsafe {
                     PostMessageW(self.hwnd, WM_CLOSE, WPARAM(0), LPARAM(0))?;
+                }
+            }
+            ID_TRAY_TOGGLE_TSF => {
+                // Toggle TSF enabled state
+                let manager = self.keyboard_manager.lock().unwrap();
+                let current_state = manager.is_tsf_enabled();
+                if let Err(e) = manager.set_tsf_enabled(!current_state) {
+                    eprintln!("Failed to toggle TSF: {}", e);
                 }
             }
             cmd if cmd >= ID_TRAY_KEYBOARD_BASE => {

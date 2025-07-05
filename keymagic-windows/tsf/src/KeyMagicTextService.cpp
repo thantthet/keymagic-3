@@ -40,6 +40,7 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_pDocMgrFocus = nullptr;
     m_pTextEditContext = nullptr;
     m_pEngine = nullptr;
+    m_tsfEnabled = true;  // Default to enabled
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -255,7 +256,7 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
     *pfEaten = FALSE;
 
     // We want to process most keys
-    if (m_pEngine)
+    if (m_pEngine && m_tsfEnabled)
     {
         // Let some keys pass through without processing
         switch (wParam)
@@ -508,9 +509,24 @@ void CKeyMagicTextService::CheckAndReloadKeyboard()
     
     if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
     {
-        wchar_t defaultKeyboard[256] = {0};
-        DWORD dataSize = sizeof(defaultKeyboard);
+        // First check if TSF is enabled
+        DWORD tsfEnabled = 1; // Default to enabled
+        DWORD dataSize = sizeof(tsfEnabled);
         DWORD dataType;
+        
+        RegQueryValueExW(hKey, L"TSFEnabled", NULL, &dataType, (LPBYTE)&tsfEnabled, &dataSize);
+        m_tsfEnabled = (tsfEnabled != 0);
+        
+        if (!m_tsfEnabled)
+        {
+            DEBUG_LOG(L"TSF is disabled");
+            RegCloseKey(hKey);
+            return;
+        }
+        
+        // Check default keyboard
+        wchar_t defaultKeyboard[256] = {0};
+        dataSize = sizeof(defaultKeyboard);
         
         if (RegQueryValueExW(hKey, L"DefaultKeyboard", NULL, &dataType, (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
         {
@@ -543,6 +559,15 @@ void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARA
     
     // Check if keyboard needs to be reloaded
     CheckAndReloadKeyboard();
+    
+    // Check if TSF is disabled
+    if (!m_tsfEnabled)
+    {
+        DEBUG_LOG(L"TSF is disabled, not processing key");
+        *pfEaten = FALSE;
+        LeaveCriticalSection(&m_cs);
+        return;
+    }
 
     // Get modifiers
     int shift = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
