@@ -1,3 +1,6 @@
+// Hide console window on Windows
+#![windows_subsystem = "windows"]
+
 use windows::{
     core::*,
     Win32::{
