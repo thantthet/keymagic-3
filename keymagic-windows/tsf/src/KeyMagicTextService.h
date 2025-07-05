@@ -13,7 +13,8 @@ class CKeyMagicTextService;
 class CKeyMagicTextService : public ITfTextInputProcessor,
                             public ITfThreadMgrEventSink,
                             public ITfKeyEventSink,
-                            public ITfCompositionSink
+                            public ITfTextEditSink,
+                            public ITfMouseSink
 {
 public:
     CKeyMagicTextService();
@@ -43,8 +44,11 @@ public:
     STDMETHODIMP OnKeyUp(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
     STDMETHODIMP OnPreservedKey(ITfContext *pic, REFGUID rguid, BOOL *pfEaten);
     
-    // ITfCompositionSink
-    STDMETHODIMP OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition);
+    // ITfTextEditSink
+    STDMETHODIMP OnEndEdit(ITfContext *pic, TfEditCookie ecReadOnly, ITfEditRecord *pEditRecord);
+    
+    // ITfMouseSink
+    STDMETHODIMP OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dwBtnStatus, BOOL *pfEaten);
 
     // Public methods
     EngineHandle* GetEngineHandle() { return m_pEngine; }
@@ -54,49 +58,64 @@ private:
     BOOL InitializeEngine();
     void UninitializeEngine();
     BOOL LoadKeyboard(const std::wstring& km2Path);
+    BOOL LoadKeyboardByID(const std::wstring& keyboardId);
+    void CheckAndReloadKeyboard();
     void ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
-    void UpdateComposition(ITfContext *pic, bool shouldCommit, const std::wstring& textToCommit, const std::wstring& composingText);
-    void CommitText(ITfContext *pic, const std::wstring& text);
-    void TerminateComposition(ITfContext *pic);
-    BOOL IsKeyEaten(ITfContext *pic, WPARAM wParam, LPARAM lParam);
+    void ResetEngine();
+    void SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec);
+    
+    // Text manipulation
+    HRESULT ReadDocumentSuffix(ITfContext *pic, TfEditCookie ec, int maxChars, std::wstring &text);
+    HRESULT DeleteCharsBeforeCursor(ITfContext *pic, TfEditCookie ec, int count);
+    HRESULT InsertTextAtCursor(ITfContext *pic, TfEditCookie ec, const std::wstring &text);
+    HRESULT ExecuteTextAction(ITfContext *pic, const ProcessKeyOutput &output);
+    
+    // Key translation
+    char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
+    bool IsPrintableAscii(char c);
+    
+    // Sink management
+    HRESULT InitTextEditSink();
+    HRESULT UninitTextEditSink();
+    HRESULT InitMouseSink(); 
+    HRESULT UninitMouseSink();
     
     // Member variables
     LONG m_cRef;
     ITfThreadMgr *m_pThreadMgr;
     TfClientId m_tfClientId;
     DWORD m_dwThreadMgrEventSinkCookie;
+    DWORD m_dwTextEditSinkCookie;
+    DWORD m_dwMouseSinkCookie;
     ITfDocumentMgr *m_pDocMgrFocus;
+    ITfContext *m_pTextEditContext;
     
     // KeyMagic engine
     EngineHandle *m_pEngine;
     std::wstring m_currentKeyboardPath;
-    
-    // Composition state
-    ITfComposition *m_pComposition;
-    BOOL m_fComposing;
+    std::wstring m_currentKeyboardId;
     
     // Critical section for thread safety
     CRITICAL_SECTION m_cs;
     
     // Friend class
-    friend class CEditSession;
+    friend class CDirectEditSession;
 };
 
-// Edit session for TSF operations
-class CEditSession : public ITfEditSession
+// Edit session for direct text manipulation (no composition)
+class CDirectEditSession : public ITfEditSession
 {
 public:
     enum class EditAction
     {
-        UpdateComposition,
-        CommitText,
-        TerminateComposition
+        ProcessKey,
+        SyncEngine,
+        DeleteAndInsert
     };
     
-    CEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
-                 EditAction action, const std::wstring& textToCommit, 
-                 const std::wstring& composingText);
-    ~CEditSession();
+    CDirectEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
+                       EditAction action);
+    ~CDirectEditSession();
     
     // IUnknown
     STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject);
@@ -106,19 +125,22 @@ public:
     // ITfEditSession
     STDMETHODIMP DoEditSession(TfEditCookie ec);
     
+    // Set parameters for different actions
+    void SetKeyData(WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
+    void SetTextAction(int deleteCount, const std::wstring &insertText);
+    
 private:
     LONG m_cRef;
     CKeyMagicTextService *m_pTextService;
     ITfContext *m_pContext;
     EditAction m_action;
-    std::wstring m_textToCommit;
-    std::wstring m_composingText;
     
-    void UpdateCompositionString(TfEditCookie ec);
-    void CommitText(TfEditCookie ec);
-    void TerminateComposition(TfEditCookie ec);
-    void StartComposition(TfEditCookie ec);
-    void ApplyDisplayAttributes(TfEditCookie ec, ITfRange *pRange);
+    // Action-specific data
+    WPARAM m_wParam;
+    LPARAM m_lParam;
+    BOOL *m_pfEaten;
+    int m_deleteCount;
+    std::wstring m_insertText;
 };
 
 #endif // KEYMAGIC_TEXT_SERVICE_H

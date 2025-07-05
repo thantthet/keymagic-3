@@ -5,17 +5,17 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include "../include/keymagic_ffi.h"
 
 // Debug logging macros and functions for KeyMagic TSF
 
-// Enable debug logging in debug builds
-#ifdef _DEBUG
-    #define DEBUG_LOG(msg) DebugLog(msg)
-    #define DEBUG_LOG_W(msg) DebugLog(msg)
-#else
-    #define DEBUG_LOG(msg) ((void)0)
-    #define DEBUG_LOG_W(msg) ((void)0)
-#endif
+// Always enable logging for both Debug and Release builds
+#define DEBUG_LOG(msg) DebugLog(msg)
+#define DEBUG_LOG_W(msg) DebugLog(msg)
+#define DEBUG_LOG_FUNC() DebugLog(__FUNCTIONW__)
+#define DEBUG_LOG_KEY(context, wParam, lParam, character) DebugLogKeyEvent(context, wParam, lParam, character)
+#define DEBUG_LOG_ENGINE(output) DebugLogEngineOutput(output)
+#define DEBUG_LOG_HR(context, hr) DebugLogHR(context, hr)
 
 // Core debug logging function
 inline void DebugLog(const std::wstring& message)
@@ -68,13 +68,56 @@ inline void DebugLogHR(const std::wstring& context, HRESULT hr)
     DebugLog(oss.str());
 }
 
-// Helper to log key events
-inline void DebugLogKey(const std::wstring& context, WPARAM wParam, LPARAM lParam)
+// Helper to log key events with character
+inline void DebugLogKeyEvent(const std::wstring& context, WPARAM wParam, LPARAM lParam, char character)
 {
     std::wostringstream oss;
     oss << context << L" - VK: 0x" << std::hex << wParam 
-        << L" (" << std::dec << wParam << L")"
-        << L", Scan: 0x" << std::hex << ((lParam >> 16) & 0xFF)
-        << L", Flags: 0x" << std::hex << (lParam >> 24);
+        << L" (" << std::dec << wParam << L")";
+    
+    if (character != '\0' && character >= 0x20 && character <= 0x7E) {
+        oss << L", Char: '" << (wchar_t)character << L"'";
+    } else if (character != '\0') {
+        oss << L", Char: 0x" << std::hex << (int)(unsigned char)character;
+    }
+    
+    oss << L", Scan: 0x" << std::hex << ((lParam >> 16) & 0xFF);
+    
+    // Add modifier states
+    if (GetKeyState(VK_SHIFT) & 0x8000) oss << L" [SHIFT]";
+    if (GetKeyState(VK_CONTROL) & 0x8000) oss << L" [CTRL]";
+    if (GetKeyState(VK_MENU) & 0x8000) oss << L" [ALT]";
+    if (GetKeyState(VK_CAPITAL) & 0x0001) oss << L" [CAPS]";
+    
+    DebugLog(oss.str());
+}
+
+// Helper to log engine output
+inline void DebugLogEngineOutput(const ProcessKeyOutput& output)
+{
+    std::wostringstream oss;
+    oss << L"Engine Output - Processed: " << (output.is_processed ? L"YES" : L"NO");
+    oss << L", Action: ";
+    
+    switch (output.action_type) {
+        case 0: oss << L"None"; break;
+        case 1: oss << L"Insert"; break;
+        case 2: oss << L"Delete(" << output.delete_count << L")"; break;
+        case 3: oss << L"DeleteAndInsert(" << output.delete_count << L")"; break;
+        default: oss << L"Unknown(" << output.action_type << L")"; break;
+    }
+    
+    if (output.text) {
+        std::string text(output.text);
+        std::wstring wtext(text.begin(), text.end());
+        oss << L", Text: \"" << wtext << L"\"";
+    }
+    
+    if (output.composing_text) {
+        std::string comp(output.composing_text);
+        std::wstring wcomp(comp.begin(), comp.end());
+        oss << L", Composing: \"" << wcomp << L"\"";
+    }
+    
     DebugLog(oss.str());
 }

@@ -1,13 +1,9 @@
 #include "KeyMagicTextService.h"
 #include "Globals.h"
+#include "Debug.h"
 #include <string>
 #include <codecvt>
 #include <locale>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <chrono>
-#include "Debug.h"
 
 // Helper function to convert UTF-8 to UTF-16
 std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
@@ -21,16 +17,29 @@ std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
     return utf16;
 }
 
+// Helper function to convert UTF-16 to UTF-8
+std::string ConvertUtf16ToUtf8(const std::wstring& utf16)
+{
+    if (utf16.empty())
+        return std::string();
+        
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), static_cast<int>(utf16.length()), NULL, 0, NULL, NULL);
+    std::string utf8(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), static_cast<int>(utf16.length()), &utf8[0], size_needed, NULL, NULL);
+    return utf8;
+}
+
 CKeyMagicTextService::CKeyMagicTextService()
 {
     m_cRef = 1;
     m_pThreadMgr = nullptr;
     m_tfClientId = TF_CLIENTID_NULL;
     m_dwThreadMgrEventSinkCookie = TF_INVALID_COOKIE;
+    m_dwTextEditSinkCookie = TF_INVALID_COOKIE;
+    m_dwMouseSinkCookie = TF_INVALID_COOKIE;
     m_pDocMgrFocus = nullptr;
+    m_pTextEditContext = nullptr;
     m_pEngine = nullptr;
-    m_pComposition = nullptr;
-    m_fComposing = FALSE;
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -51,11 +60,7 @@ STDAPI CKeyMagicTextService::QueryInterface(REFIID riid, void **ppvObject)
 
     *ppvObject = nullptr;
 
-    if (IsEqualIID(riid, IID_IUnknown))
-    {
-        *ppvObject = static_cast<IUnknown*>(static_cast<ITfTextInputProcessor*>(this));
-    }
-    else if (IsEqualIID(riid, IID_ITfTextInputProcessor))
+    if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfTextInputProcessor))
     {
         *ppvObject = static_cast<ITfTextInputProcessor*>(this);
     }
@@ -67,17 +72,22 @@ STDAPI CKeyMagicTextService::QueryInterface(REFIID riid, void **ppvObject)
     {
         *ppvObject = static_cast<ITfKeyEventSink*>(this);
     }
-    else if (IsEqualIID(riid, IID_ITfCompositionSink))
+    else if (IsEqualIID(riid, IID_ITfTextEditSink))
     {
-        *ppvObject = static_cast<ITfCompositionSink*>(this);
+        *ppvObject = static_cast<ITfTextEditSink*>(this);
     }
-    else
+    else if (IsEqualIID(riid, IID_ITfMouseSink))
     {
-        return E_NOINTERFACE;
+        *ppvObject = static_cast<ITfMouseSink*>(this);
     }
 
-    AddRef();
-    return S_OK;
+    if (*ppvObject)
+    {
+        AddRef();
+        return S_OK;
+    }
+
+    return E_NOINTERFACE;
 }
 
 STDAPI_(ULONG) CKeyMagicTextService::AddRef()
@@ -98,59 +108,48 @@ STDAPI_(ULONG) CKeyMagicTextService::Release()
 // ITfTextInputProcessor
 STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
 {
-    DebugLog(L"=== KeyMagicTextService::Activate START ===");
-    DebugLog(std::wstring(L"Thread ID: ") + std::to_wstring(GetCurrentThreadId()));
-    DebugLog(std::wstring(L"Client ID: ") + std::to_wstring(tid));
+    DEBUG_LOG_FUNC();
+    EnterCriticalSection(&m_cs);
     
     m_pThreadMgr = ptim;
     m_pThreadMgr->AddRef();
     m_tfClientId = tid;
 
-    // Initialize the engine
+    // Initialize engine
     if (!InitializeEngine())
     {
-        DebugLog(L"InitializeEngine failed");
+        DEBUG_LOG(L"Failed to initialize engine");
+        LeaveCriticalSection(&m_cs);
         return E_FAIL;
     }
+    DEBUG_LOG(L"Engine initialized successfully");
 
     // Register thread manager event sink
-    ITfSource *pSource = nullptr;
+    ITfSource *pSource;
     if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource)))
     {
-        pSource->AdviseSink(IID_ITfThreadMgrEventSink, 
-                           static_cast<ITfThreadMgrEventSink*>(this), 
-                           &m_dwThreadMgrEventSinkCookie);
+        pSource->AdviseSink(IID_ITfThreadMgrEventSink, static_cast<ITfThreadMgrEventSink*>(this), &m_dwThreadMgrEventSinkCookie);
         pSource->Release();
-        DebugLog(L"Registered thread manager event sink");
-    }
-    else
-    {
-        DebugLog(L"Failed to register thread manager event sink");
     }
 
     // Register key event sink
-    ITfKeystrokeMgr *pKeystrokeMgr = nullptr;
+    ITfKeystrokeMgr *pKeystrokeMgr;
     if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr)))
     {
-        pKeystrokeMgr->AdviseKeyEventSink(m_tfClientId, 
-                                          static_cast<ITfKeyEventSink*>(this), 
-                                          TRUE);
+        pKeystrokeMgr->AdviseKeyEventSink(m_tfClientId, static_cast<ITfKeyEventSink*>(this), TRUE);
         pKeystrokeMgr->Release();
-        DebugLog(L"Registered key event sink");
-    }
-    else
-    {
-        DebugLog(L"Failed to register key event sink");
     }
 
-    DebugLog(L"=== KeyMagicTextService::Activate END (SUCCESS) ===");
+    LeaveCriticalSection(&m_cs);
     return S_OK;
 }
 
 STDAPI CKeyMagicTextService::Deactivate()
 {
+    EnterCriticalSection(&m_cs);
+
     // Unregister key event sink
-    ITfKeystrokeMgr *pKeystrokeMgr = nullptr;
+    ITfKeystrokeMgr *pKeystrokeMgr;
     if (m_pThreadMgr && SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr)))
     {
         pKeystrokeMgr->UnadviseKeyEventSink(m_tfClientId);
@@ -158,14 +157,18 @@ STDAPI CKeyMagicTextService::Deactivate()
     }
 
     // Unregister thread manager event sink
-    ITfSource *pSource = nullptr;
+    ITfSource *pSource;
     if (m_pThreadMgr && SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource)))
     {
         pSource->UnadviseSink(m_dwThreadMgrEventSinkCookie);
         pSource->Release();
     }
 
-    // Clean up
+    // Clean up sinks
+    UninitTextEditSink();
+    UninitMouseSink();
+
+    // Release thread manager
     if (m_pThreadMgr)
     {
         m_pThreadMgr->Release();
@@ -173,11 +176,8 @@ STDAPI CKeyMagicTextService::Deactivate()
     }
 
     m_tfClientId = TF_CLIENTID_NULL;
-    m_dwThreadMgrEventSinkCookie = TF_INVALID_COOKIE;
 
-    // Uninitialize the engine
-    UninitializeEngine();
-
+    LeaveCriticalSection(&m_cs);
     return S_OK;
 }
 
@@ -194,22 +194,40 @@ STDAPI CKeyMagicTextService::OnUninitDocumentMgr(ITfDocumentMgr *pdim)
 
 STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMgr *pdimPrevFocus)
 {
-    if (m_pDocMgrFocus)
-        m_pDocMgrFocus->Release();
+    DEBUG_LOG_FUNC();
+    DEBUG_LOG(L"Focus changed");
+    EnterCriticalSection(&m_cs);
 
-    m_pDocMgrFocus = pdimFocus;
+    // Clean up previous sinks
+    UninitTextEditSink();
+    UninitMouseSink();
 
-    if (m_pDocMgrFocus)
-        m_pDocMgrFocus->AddRef();
-
-    // Reset engine when focus changes
-    if (m_pEngine)
+    // Release previous context
+    if (m_pTextEditContext)
     {
-        EnterCriticalSection(&m_cs);
-        keymagic_engine_reset(m_pEngine);
-        LeaveCriticalSection(&m_cs);
+        m_pTextEditContext->Release();
+        m_pTextEditContext = nullptr;
     }
 
+    // Update focus
+    m_pDocMgrFocus = pdimFocus;
+
+    // Get new context and set up sinks
+    if (m_pDocMgrFocus)
+    {
+        ITfContext *pContext;
+        if (SUCCEEDED(m_pDocMgrFocus->GetTop(&pContext)) && pContext)
+        {
+            m_pTextEditContext = pContext; // Takes ownership
+            InitTextEditSink();
+            InitMouseSink();
+        }
+    }
+
+    // Reset engine when focus changes
+    ResetEngine();
+
+    LeaveCriticalSection(&m_cs);
     return S_OK;
 }
 
@@ -231,489 +249,610 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
 
 STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
-    *pfEaten = IsKeyEaten(pic, wParam, lParam);
+    if (pfEaten == nullptr)
+        return E_INVALIDARG;
+
+    *pfEaten = FALSE;
+
+    // We want to process most keys
+    if (m_pEngine)
+    {
+        // Let some keys pass through without processing
+        switch (wParam)
+        {
+            case VK_SHIFT:
+            case VK_CONTROL:
+            case VK_MENU:
+            case VK_LWIN:
+            case VK_RWIN:
+            case VK_APPS:
+                *pfEaten = FALSE;
+                break;
+            default:
+                *pfEaten = TRUE;
+                break;
+        }
+    }
+
     return S_OK;
 }
 
 STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
-    ProcessKeyInput(pic, wParam, lParam, pfEaten);
+    if (pfEaten == nullptr)
+        return E_INVALIDARG;
+
+    *pfEaten = FALSE;
+    
+    char character = MapVirtualKeyToChar(wParam, lParam);
+    DEBUG_LOG_KEY(L"OnKeyDown", wParam, lParam, character);
+
+    // Process key in edit session
+    CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, CDirectEditSession::EditAction::ProcessKey);
+    if (pEditSession)
+    {
+        pEditSession->SetKeyData(wParam, lParam, pfEaten);
+        
+        HRESULT hr;
+        pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+        pEditSession->Release();
+    }
+
     return S_OK;
 }
 
 STDAPI CKeyMagicTextService::OnTestKeyUp(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
+    if (pfEaten == nullptr)
+        return E_INVALIDARG;
+
     *pfEaten = FALSE;
     return S_OK;
 }
 
 STDAPI CKeyMagicTextService::OnKeyUp(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
+    if (pfEaten == nullptr)
+        return E_INVALIDARG;
+
     *pfEaten = FALSE;
     return S_OK;
 }
 
 STDAPI CKeyMagicTextService::OnPreservedKey(ITfContext *pic, REFGUID rguid, BOOL *pfEaten)
 {
+    if (pfEaten == nullptr)
+        return E_INVALIDARG;
+
     *pfEaten = FALSE;
     return S_OK;
 }
 
-// ITfCompositionSink
-STDAPI CKeyMagicTextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition)
+// ITfTextEditSink
+STDAPI CKeyMagicTextService::OnEndEdit(ITfContext *pic, TfEditCookie ecReadOnly, ITfEditRecord *pEditRecord)
 {
-    // Composition has been terminated
-    if (m_pComposition == pComposition)
+    // Check if selection changed (caret moved)
+    BOOL fSelectionChanged;
+    if (SUCCEEDED(pEditRecord->GetSelectionStatus(&fSelectionChanged)) && fSelectionChanged)
     {
-        m_pComposition = nullptr;
-        m_fComposing = FALSE;
+        DEBUG_LOG(L"Selection/caret changed - resetting engine");
+        // Selection changed, reset engine
+        ResetEngine();
     }
+
+    return S_OK;
+}
+
+// ITfMouseSink
+STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dwBtnStatus, BOOL *pfEaten)
+{
+    if (pfEaten == nullptr)
+        return E_INVALIDARG;
+
+    *pfEaten = FALSE;
+
+    // Reset engine on mouse click
+    if (dwBtnStatus & MK_LBUTTON)
+    {
+        DEBUG_LOG(L"Mouse click detected - resetting engine");
+        ResetEngine();
+    }
+
     return S_OK;
 }
 
 // Helper methods
 BOOL CKeyMagicTextService::InitializeEngine()
 {
-    DebugLog(L"=== InitializeEngine START ===");
-    
-    EnterCriticalSection(&m_cs);
-    
-    m_pEngine = keymagic_engine_new();
-    
     if (m_pEngine)
+        return TRUE;
+
+    m_pEngine = keymagic_engine_new();
+    if (!m_pEngine)
+        return FALSE;
+
+    // Load default keyboard from registry
+    HKEY hKey;
+    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
+    
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
     {
-        DebugLog(L"Engine created successfully");
+        wchar_t defaultKeyboard[256] = {0};
+        DWORD dataSize = sizeof(defaultKeyboard);
+        DWORD dataType;
         
-        // Try to load a default keyboard from registry
-        HKEY hKey;
-        if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 
-                        0, KEY_READ, &hKey) == ERROR_SUCCESS)
+        if (RegQueryValueExW(hKey, L"DefaultKeyboard", NULL, &dataType, (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
         {
-            DebugLog(L"Found KeyMagic settings in registry");
-            
-            WCHAR defaultKeyboard[MAX_PATH] = {0};
-            DWORD size = sizeof(defaultKeyboard);
-            
-            if (RegQueryValueEx(hKey, L"DefaultKeyboard", NULL, NULL, 
-                              (LPBYTE)defaultKeyboard, &size) == ERROR_SUCCESS)
+            if (dataType == REG_SZ && defaultKeyboard[0] != L'\0')
             {
-                DebugLog(std::wstring(L"Default keyboard: ") + defaultKeyboard);
+                DEBUG_LOG(L"Default keyboard from registry: " + std::wstring(defaultKeyboard));
                 
-                // Now get the path for this keyboard
-                HKEY hKeyboardKey;
-                std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\";
-                keyPath += defaultKeyboard;
-                
-                if (RegOpenKeyEx(HKEY_CURRENT_USER, keyPath.c_str(), 
-                               0, KEY_READ, &hKeyboardKey) == ERROR_SUCCESS)
-                {
-                    WCHAR km2Path[MAX_PATH] = {0};
-                    size = sizeof(km2Path);
-                    
-                    if (RegQueryValueEx(hKeyboardKey, L"Path", NULL, NULL, 
-                                      (LPBYTE)km2Path, &size) == ERROR_SUCCESS)
-                    {
-                        DebugLog(std::wstring(L"Loading keyboard from: ") + km2Path);
-                        if (LoadKeyboard(km2Path))
-                        {
-                            DebugLog(L"Keyboard loaded successfully");
-                        }
-                        else
-                        {
-                            DebugLog(L"Failed to load keyboard");
-                        }
-                    }
-                    else
-                    {
-                        DebugLog(L"Failed to read keyboard path from registry");
-                    }
-                    
-                    RegCloseKey(hKeyboardKey);
-                }
-                else
-                {
-                    DebugLog(L"Failed to open keyboard registry key");
-                }
+                // Load the keyboard
+                LoadKeyboardByID(defaultKeyboard);
             }
-            else
-            {
-                DebugLog(L"No default keyboard configured");
-            }
-            
-            RegCloseKey(hKey);
         }
         else
         {
-            DebugLog(L"No KeyMagic settings found in registry");
+            DEBUG_LOG(L"No default keyboard set in registry");
         }
+        
+        RegCloseKey(hKey);
     }
     else
     {
-        DebugLog(L"Failed to create engine");
+        DEBUG_LOG(L"Failed to open KeyMagic settings registry key");
     }
     
-    LeaveCriticalSection(&m_cs);
-    
-    DebugLog(L"=== InitializeEngine END ===");
-    return (m_pEngine != nullptr);
+    return TRUE;
 }
 
 void CKeyMagicTextService::UninitializeEngine()
 {
-    EnterCriticalSection(&m_cs);
-    
     if (m_pEngine)
     {
         keymagic_engine_free(m_pEngine);
         m_pEngine = nullptr;
     }
-    
-    LeaveCriticalSection(&m_cs);
 }
 
 BOOL CKeyMagicTextService::LoadKeyboard(const std::wstring& km2Path)
 {
-    DebugLog(L"=== LoadKeyboard START ===");
-    DebugLog(std::wstring(L"Path: ") + km2Path);
-    
     if (!m_pEngine)
-    {
-        DebugLog(L"ERROR: Engine is NULL");
         return FALSE;
-    }
-        
-    EnterCriticalSection(&m_cs);
-    
-    // Convert wide string to UTF-8
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    std::string utf8Path;
-    
-    try
-    {
-        utf8Path = converter.to_bytes(km2Path);
-        DebugLog(std::wstring(L"UTF-8 path: ") + ConvertUtf8ToUtf16(utf8Path));
-    }
-    catch (const std::exception& e)
-    {
-        DebugLog(L"ERROR: Failed to convert path to UTF-8");
-        LeaveCriticalSection(&m_cs);
-        return FALSE;
-    }
-    
+
+    std::string utf8Path = ConvertUtf16ToUtf8(km2Path);
     KeyMagicResult result = keymagic_engine_load_keyboard(m_pEngine, utf8Path.c_str());
-    DebugLog(std::wstring(L"Engine load result: ") + std::to_wstring(result));
     
     if (result == KeyMagicResult_Success)
     {
         m_currentKeyboardPath = km2Path;
-        DebugLog(L"Keyboard loaded successfully");
+        DEBUG_LOG(L"Keyboard loaded successfully: " + km2Path);
+        return TRUE;
+    }
+
+    DEBUG_LOG(L"Failed to load keyboard: " + km2Path);
+    return FALSE;
+}
+
+BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
+{
+    if (!m_pEngine || keyboardId.empty())
+        return FALSE;
+
+    // Build registry key path for this keyboard
+    std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + keyboardId;
+    HKEY hKey;
+    
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
+        // Read keyboard path
+        wchar_t km2Path[MAX_PATH] = {0};
+        DWORD dataSize = sizeof(km2Path);
+        DWORD dataType;
+        
+        if (RegQueryValueExW(hKey, L"Path", NULL, &dataType, (LPBYTE)km2Path, &dataSize) == ERROR_SUCCESS)
+        {
+            if (dataType == REG_SZ && km2Path[0] != L'\0')
+            {
+                // Check if keyboard is enabled
+                DWORD enabled = 0;
+                dataSize = sizeof(enabled);
+                
+                if (RegQueryValueExW(hKey, L"Enabled", NULL, &dataType, (LPBYTE)&enabled, &dataSize) == ERROR_SUCCESS)
+                {
+                    if (!enabled)
+                    {
+                        DEBUG_LOG(L"Keyboard is disabled: " + keyboardId);
+                        RegCloseKey(hKey);
+                        return FALSE;
+                    }
+                }
+                
+                // Load the keyboard
+                BOOL result = LoadKeyboard(km2Path);
+                
+                if (result)
+                {
+                    // Store keyboard info
+                    m_currentKeyboardId = keyboardId;
+                    
+                    // Read keyboard name
+                    wchar_t name[256] = {0};
+                    dataSize = sizeof(name);
+                    if (RegQueryValueExW(hKey, L"Name", NULL, &dataType, (LPBYTE)name, &dataSize) == ERROR_SUCCESS)
+                    {
+                        DEBUG_LOG(L"Loaded keyboard: " + std::wstring(name) + L" (" + keyboardId + L")");
+                    }
+                }
+                
+                RegCloseKey(hKey);
+                return result;
+            }
+        }
+        
+        RegCloseKey(hKey);
     }
     else
     {
-        DebugLog(L"Failed to load keyboard");
+        DEBUG_LOG(L"Keyboard not found in registry: " + keyboardId);
     }
     
-    LeaveCriticalSection(&m_cs);
+    return FALSE;
+}
+
+void CKeyMagicTextService::CheckAndReloadKeyboard()
+{
+    // Check if default keyboard has changed
+    HKEY hKey;
+    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
     
-    DebugLog(L"=== LoadKeyboard END ===");
-    return (result == KeyMagicResult_Success);
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
+        wchar_t defaultKeyboard[256] = {0};
+        DWORD dataSize = sizeof(defaultKeyboard);
+        DWORD dataType;
+        
+        if (RegQueryValueExW(hKey, L"DefaultKeyboard", NULL, &dataType, (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
+        {
+            if (dataType == REG_SZ && defaultKeyboard[0] != L'\0')
+            {
+                std::wstring newKeyboardId(defaultKeyboard);
+                if (newKeyboardId != m_currentKeyboardId)
+                {
+                    DEBUG_LOG(L"Default keyboard changed from \"" + m_currentKeyboardId + L"\" to \"" + newKeyboardId + L"\"");
+                    LoadKeyboardByID(newKeyboardId);
+                }
+            }
+        }
+        
+        RegCloseKey(hKey);
+    }
 }
 
 void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
-    *pfEaten = FALSE;
-    
-    // Log entry
-    std::wstringstream logEntry;
-    logEntry << L"=== ProcessKeyInput START ===" << std::endl;
-    logEntry << L"VK Code: 0x" << std::hex << wParam << std::dec << L" (" << wParam << L")" << std::endl;
-    
+    DEBUG_LOG_FUNC();
+    EnterCriticalSection(&m_cs);
+
     if (!m_pEngine)
     {
-        logEntry << L"ERROR: Engine is NULL" << std::endl;
-        DebugLog(logEntry.str());
+        DEBUG_LOG(L"No engine available");
+        LeaveCriticalSection(&m_cs);
         return;
     }
-        
-    EnterCriticalSection(&m_cs);
     
-    ProcessKeyOutput output = {0};
-    
-    // Convert Windows key to FFI format
-    int keyCode = static_cast<int>(wParam);
-    char character = 0;
-    
-    // Map virtual key to character
-    BYTE keyState[256];
-    if (GetKeyboardState(keyState))
-    {
-        WCHAR unicodeChar[2] = {0};
-        int result = ToUnicode(static_cast<UINT>(wParam), 
-                              static_cast<UINT>(lParam >> 16) & 0xFF, 
-                              keyState, unicodeChar, 2, 0);
-        if (result == 1 && unicodeChar[0] < 128)
-        {
-            character = static_cast<char>(unicodeChar[0]);
-        }
-        
-        logEntry << L"ToUnicode result: " << result;
-        if (result > 0)
-        {
-            logEntry << L", char: '" << (wchar_t)unicodeChar[0] << L"' (0x" << std::hex << unicodeChar[0] << std::dec << L")";
-        }
-        logEntry << std::endl;
-    }
-    
-    // Get modifier states
+    // Check if keyboard needs to be reloaded
+    CheckAndReloadKeyboard();
+
+    // Get modifiers
     int shift = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
     int ctrl = (GetKeyState(VK_CONTROL) & 0x8000) ? 1 : 0;
     int alt = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
     int capsLock = (GetKeyState(VK_CAPITAL) & 0x0001) ? 1 : 0;
+
+    // Translate VK to character
+    char character = MapVirtualKeyToChar(wParam, lParam);
     
-    logEntry << L"Modifiers: Shift=" << shift << L", Ctrl=" << ctrl 
-             << L", Alt=" << alt << L", CapsLock=" << capsLock << std::endl;
-    logEntry << L"Character to engine: '" << (character ? (wchar_t)character : L' ') 
-             << L"' (0x" << std::hex << (int)character << std::dec << L")" << std::endl;
+    // Only pass printable ASCII characters
+    if (!IsPrintableAscii(character))
+    {
+        character = '\0';
+    }
+
+    ProcessKeyOutput output = {0};
     
-    // Process key through engine using Windows VK code variant
-    logEntry << L"Calling keymagic_engine_process_key_win..." << std::endl;
+    // Log engine input parameters
+    {
+        std::wostringstream oss;
+        oss << L"Engine Input - VK: 0x" << std::hex << wParam << std::dec;
+        oss << L" (" << wParam << L")";
+        
+        if (character != '\0') {
+            if (character >= 0x20 && character <= 0x7E) {
+                oss << L", Char: '" << (wchar_t)character << L"' (0x" << std::hex << (int)(unsigned char)character << std::dec << L")";
+            } else {
+                oss << L", Char: 0x" << std::hex << (int)(unsigned char)character << std::dec;
+            }
+        } else {
+            oss << L", Char: NULL";
+        }
+        
+        oss << L", Modifiers: ";
+        oss << L"Shift=" << shift;
+        oss << L" Ctrl=" << ctrl;
+        oss << L" Alt=" << alt;
+        oss << L" Caps=" << capsLock;
+        
+        DEBUG_LOG(oss.str());
+    }
+    
+    // Process key with engine
     KeyMagicResult result = keymagic_engine_process_key_win(
-        m_pEngine, keyCode, character, 
-        shift, ctrl, alt, capsLock, &output
+        m_pEngine, 
+        static_cast<int>(wParam),
+        character,
+        shift, ctrl, alt, capsLock,
+        &output
     );
-    
-    logEntry << L"Engine result: " << result << std::endl;
-    logEntry << L"Output:" << std::endl;
-    logEntry << L"  action_type: " << output.action_type << std::endl;
-    logEntry << L"  delete_count: " << output.delete_count << std::endl;
-    logEntry << L"  is_processed: " << output.is_processed << std::endl;
-    
-    if (output.text)
-    {
-        std::string textStr(output.text);
-        logEntry << L"  text: \"" << ConvertUtf8ToUtf16(textStr) << L"\"" << std::endl;
-    }
-    else
-    {
-        logEntry << L"  text: NULL" << std::endl;
-    }
-    
-    if (output.composing_text)
-    {
-        std::string compStr(output.composing_text);
-        logEntry << L"  composing_text: \"" << ConvertUtf8ToUtf16(compStr) << L"\"" << std::endl;
-    }
-    else
-    {
-        logEntry << L"  composing_text: NULL" << std::endl;
-    }
-    
+
     if (result == KeyMagicResult_Success)
     {
-        // Check if we should commit text
-        bool shouldCommit = false;
-        std::wstring textToCommit;
-        std::wstring composingText;
+        DEBUG_LOG_ENGINE(output);
+        *pfEaten = output.is_processed ? TRUE : FALSE;
         
-        if (output.composing_text)
+        // Execute text action if processed
+        if (output.is_processed)
         {
-            // Convert UTF-8 to UTF-16
-            std::string utf8Composing(output.composing_text);
-            composingText = ConvertUtf8ToUtf16(utf8Composing);
-            
-            logEntry << L"Composing text (UTF-16): \"" << composingText << L"\"" << std::endl;
-            logEntry << L"Composing text length: " << composingText.length() << std::endl;
-            logEntry << L"Current m_fComposing: " << m_fComposing << std::endl;
-            
-            // Check if we should commit based on key
-            switch (wParam)
-            {
-                case VK_SPACE:
-                    logEntry << L"Processing SPACE key" << std::endl;
-                    if (output.is_processed)
-                    {
-                        // Engine processed space, check if composing ends with space
-                        if (!composingText.empty() && composingText.back() == L' ')
-                        {
-                            logEntry << L"Composing ends with space, will commit" << std::endl;
-                            shouldCommit = true;
-                            textToCommit = composingText;
-                        }
-                        else
-                        {
-                            logEntry << L"Space processed but not at end, continue composing" << std::endl;
-                        }
-                    }
-                    else
-                    {
-                        // Engine didn't process space, commit current text + space
-                        logEntry << L"Engine didn't process space, commit current + space" << std::endl;
-                        shouldCommit = true;
-                        textToCommit = composingText + L" ";
-                    }
-                    break;
-                    
-                case VK_RETURN:  // Enter key - commit without adding newline
-                case VK_TAB:     // Tab key - commit without adding tab
-                    logEntry << L"Processing " << (wParam == VK_RETURN ? L"ENTER" : L"TAB") << L" key" << std::endl;
-                    if (!composingText.empty())
-                    {
-                        logEntry << L"Has composing text, will commit" << std::endl;
-                        shouldCommit = true;
-                        textToCommit = composingText;
-                        // Don't consume the key after committing
-                        *pfEaten = FALSE;
-                    }
-                    else
-                    {
-                        logEntry << L"No composing text, nothing to commit" << std::endl;
-                    }
-                    break;
-                    
-                case VK_ESCAPE:  // Escape - cancel composition
-                    logEntry << L"Processing ESCAPE key - cancel composition" << std::endl;
-                    keymagic_engine_reset(m_pEngine);
-                    if (m_pComposition)
-                    {
-                        // Request edit session to terminate composition
-                        CEditSession *pEditSession = new CEditSession(this, pic, 
-                            CEditSession::EditAction::TerminateComposition, L"", L"");
-                        HRESULT hr;
-                        pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-                        pEditSession->Release();
-                        logEntry << L"Terminated composition" << std::endl;
-                    }
-                    *pfEaten = TRUE;
-                    logEntry << L"=== ProcessKeyInput END (ESCAPE) ===" << std::endl;
-                    DebugLog(logEntry.str());
-                    goto cleanup;
-                    
-                case VK_BACK:  // Backspace - let engine handle it
-                    logEntry << L"Processing BACKSPACE key" << std::endl;
-                    // Engine will handle backspace internally
-                    break;
-                    
-                default:
-                    logEntry << L"Processing other key" << std::endl;
-                    break;
-            }
-            
-            // Log decision
-            logEntry << L"Decision: shouldCommit=" << shouldCommit 
-                     << L", textToCommit=\"" << textToCommit << L"\"" << std::endl;
-            
-            // Update composition or commit text
-            if (shouldCommit || !composingText.empty())
-            {
-                CEditSession::EditAction action = shouldCommit ? 
-                    CEditSession::EditAction::CommitText : 
-                    CEditSession::EditAction::UpdateComposition;
-                    
-                logEntry << L"Creating edit session: " 
-                         << (action == CEditSession::EditAction::CommitText ? L"CommitText" : L"UpdateComposition") 
-                         << std::endl;
-                
-                CEditSession *pEditSession = new CEditSession(this, pic, 
-                    action, textToCommit, composingText);
-                HRESULT hr;
-                pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-                pEditSession->Release();
-                
-                logEntry << L"Edit session result: 0x" << std::hex << hr << std::dec << std::endl;
-            }
-            else if (composingText.empty() && m_fComposing)
-            {
-                // If composing text is empty but we were composing, terminate composition
-                logEntry << L"Empty composing text but was composing, terminating composition" << std::endl;
-                CEditSession *pEditSession = new CEditSession(this, pic, 
-                    CEditSession::EditAction::TerminateComposition, L"", L"");
-                HRESULT hr;
-                pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-                pEditSession->Release();
-            }
-        }
-        else
-        {
-            logEntry << L"No composing_text in output" << std::endl;
+            ExecuteTextAction(pic, output);
         }
         
-        // Set eaten flag based on whether we processed the key
-        // Note: For Enter/Tab, we already set *pfEaten = FALSE above when committing
-        if (wParam != VK_RETURN && wParam != VK_TAB)
-        {
-            *pfEaten = output.is_processed ? TRUE : FALSE;
-        }
-        logEntry << L"Setting pfEaten=" << (*pfEaten ? L"TRUE" : L"FALSE") << std::endl;
+        // Cleanup
+        if (output.text) keymagic_free_string(output.text);
+        if (output.composing_text) keymagic_free_string(output.composing_text);
     }
     else
     {
-        logEntry << L"Engine processing failed with error: " << result << std::endl;
+        DEBUG_LOG(L"Engine process_key failed");
     }
+
+    LeaveCriticalSection(&m_cs);
+}
+
+void CKeyMagicTextService::ResetEngine()
+{
+    DEBUG_LOG_FUNC();
+    EnterCriticalSection(&m_cs);
     
-cleanup:
-    // Free allocated strings
-    if (output.text) keymagic_free_string(output.text);
-    if (output.composing_text) keymagic_free_string(output.composing_text);
-    
-    logEntry << L"=== ProcessKeyInput END ===" << std::endl;
-    DebugLog(logEntry.str());
+    if (m_pEngine)
+    {
+        keymagic_engine_reset(m_pEngine);
+        DEBUG_LOG(L"Engine reset completed");
+        
+        // After reset, sync with document if possible
+        if (m_pTextEditContext)
+        {
+            CDirectEditSession *pEditSession = new CDirectEditSession(this, m_pTextEditContext, 
+                                                                     CDirectEditSession::EditAction::SyncEngine);
+            if (pEditSession)
+            {
+                HRESULT hr;
+                m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                pEditSession->Release();
+            }
+        }
+    }
     
     LeaveCriticalSection(&m_cs);
 }
 
-void CKeyMagicTextService::UpdateComposition(ITfContext *pic, bool shouldCommit, 
-                                            const std::wstring& textToCommit, 
-                                            const std::wstring& composingText)
+void CKeyMagicTextService::SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec)
 {
-    // These methods are no longer needed - functionality moved to CEditSession
-    // Keep them for backward compatibility but they're not used
+    if (!m_pEngine)
+        return;
+
+    // Read up to 30 characters from document
+    std::wstring documentText;
+    if (SUCCEEDED(ReadDocumentSuffix(pic, ec, 30, documentText)))
+    {
+        DEBUG_LOG(L"Syncing engine with document text: \"" + documentText + L"\"");
+        // Convert to UTF-8 and set as engine composition
+        std::string utf8Text = ConvertUtf16ToUtf8(documentText);
+        keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());
+    }
+    else
+    {
+        DEBUG_LOG(L"Failed to read document text for sync");
+    }
 }
 
-void CKeyMagicTextService::CommitText(ITfContext *pic, const std::wstring& text)
+HRESULT CKeyMagicTextService::ReadDocumentSuffix(ITfContext *pic, TfEditCookie ec, int maxChars, std::wstring &text)
 {
-    // These methods are no longer needed - functionality moved to CEditSession
-    // Keep them for backward compatibility but they're not used
+    text.clear();
+    
+    // Get current selection
+    TF_SELECTION tfSelection;
+    ULONG fetched;
+    if (FAILED(pic->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &tfSelection, &fetched)) || fetched == 0)
+        return E_FAIL;
+
+    ITfRange *pRange = tfSelection.range;
+    
+    // Clone range for manipulation
+    ITfRange *pRangeStart;
+    if (FAILED(pRange->Clone(&pRangeStart)))
+    {
+        pRange->Release();
+        return E_FAIL;
+    }
+
+    // Move start back by maxChars
+    LONG shifted;
+    pRangeStart->ShiftStart(ec, -maxChars, &shifted, nullptr);
+
+    // Read text
+    WCHAR buffer[256];
+    ULONG cch;
+    HRESULT hr = pRangeStart->GetText(ec, 0, buffer, ARRAYSIZE(buffer) - 1, &cch);
+    if (SUCCEEDED(hr))
+    {
+        buffer[cch] = L'\0';
+        text = buffer;
+    }
+
+    pRangeStart->Release();
+    pRange->Release();
+    
+    return hr;
 }
 
-void CKeyMagicTextService::TerminateComposition(ITfContext *pic)
+HRESULT CKeyMagicTextService::DeleteCharsBeforeCursor(ITfContext *pic, TfEditCookie ec, int count)
 {
-    // These methods are no longer needed - functionality moved to CEditSession
-    // Keep them for backward compatibility but they're not used
+    if (count <= 0)
+        return S_OK;
+
+    // Get current selection
+    TF_SELECTION tfSelection;
+    ULONG fetched;
+    if (FAILED(pic->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &tfSelection, &fetched)) || fetched == 0)
+        return E_FAIL;
+
+    ITfRange *pRange = tfSelection.range;
+    
+    // Shift start back by count
+    LONG shifted;
+    pRange->ShiftStart(ec, -count, &shifted, nullptr);
+    
+    // Delete the text
+    HRESULT hr = pRange->SetText(ec, 0, L"", 0);
+    
+    pRange->Release();
+    return hr;
 }
 
-BOOL CKeyMagicTextService::IsKeyEaten(ITfContext *pic, WPARAM wParam, LPARAM lParam)
+HRESULT CKeyMagicTextService::InsertTextAtCursor(ITfContext *pic, TfEditCookie ec, const std::wstring &text)
 {
-    // Always process these keys
-    if (wParam == VK_BACK || wParam == VK_ESCAPE)
-        return TRUE;
-        
-    // Process Enter and Tab only if we have composing text
-    if ((wParam == VK_RETURN || wParam == VK_TAB) && m_fComposing)
-        return TRUE;
-        
-    // Process Space key - let the engine decide if it should be consumed
-    if (wParam == VK_SPACE)
-        return TRUE;
-        
-    // Process all printable ASCII characters
-    if (wParam >= 0x20 && wParam <= 0x7E)
-        return TRUE;
-        
-    // Process function keys if needed by the keyboard
-    if (wParam >= VK_F1 && wParam <= VK_F12)
-        return TRUE;
-        
-    // Don't process navigation keys, system keys, etc.
-    return FALSE;
+    if (text.empty())
+        return S_OK;
+
+    // Get ITfInsertAtSelection interface
+    ITfInsertAtSelection *pInsertAtSelection;
+    if (FAILED(pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsertAtSelection)))
+        return E_FAIL;
+
+    // Insert text
+    ITfRange *pRange;
+    HRESULT hr = pInsertAtSelection->InsertTextAtSelection(ec, 0, text.c_str(), text.length(), &pRange);
+    
+    if (SUCCEEDED(hr) && pRange)
+    {
+        pRange->Release();
+    }
+    
+    pInsertAtSelection->Release();
+    return hr;
 }
 
-//////////////////////////////////////////////////////////////////////////////
-// CEditSession implementation
-//////////////////////////////////////////////////////////////////////////////
+HRESULT CKeyMagicTextService::ExecuteTextAction(ITfContext *pic, const ProcessKeyOutput &output)
+{
+    // Create edit session for text manipulation
+    CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
+                                                              CDirectEditSession::EditAction::DeleteAndInsert);
+    if (!pEditSession)
+        return E_OUTOFMEMORY;
 
-CEditSession::CEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
-                         EditAction action, const std::wstring& textToCommit, 
-                         const std::wstring& composingText)
+    // Set action parameters based on output
+    std::wstring insertText;
+    if (output.text)
+    {
+        insertText = ConvertUtf8ToUtf16(output.text);
+    }
+    
+    pEditSession->SetTextAction(output.delete_count, insertText);
+    
+    HRESULT hr;
+    pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+    pEditSession->Release();
+    
+    return hr;
+}
+
+char CKeyMagicTextService::MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam)
+{
+    BYTE keyState[256];
+    GetKeyboardState(keyState);
+    
+    WCHAR buffer[2] = {0};
+    int result = ToUnicode(static_cast<UINT>(wParam), (lParam >> 16) & 0xFF, keyState, buffer, 2, 0);
+    
+    if (result == 1 && buffer[0] < 128)
+    {
+        return static_cast<char>(buffer[0]);
+    }
+    
+    return '\0';
+}
+
+bool CKeyMagicTextService::IsPrintableAscii(char c)
+{
+    return c >= 0x20 && c <= 0x7E;
+}
+
+HRESULT CKeyMagicTextService::InitTextEditSink()
+{
+    if (!m_pTextEditContext || m_dwTextEditSinkCookie != TF_INVALID_COOKIE)
+        return S_OK;
+
+    ITfSource *pSource;
+    if (SUCCEEDED(m_pTextEditContext->QueryInterface(IID_ITfSource, (void**)&pSource)))
+    {
+        pSource->AdviseSink(IID_ITfTextEditSink, static_cast<ITfTextEditSink*>(this), &m_dwTextEditSinkCookie);
+        pSource->Release();
+    }
+
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::UninitTextEditSink()
+{
+    if (m_pTextEditContext && m_dwTextEditSinkCookie != TF_INVALID_COOKIE)
+    {
+        ITfSource *pSource;
+        if (SUCCEEDED(m_pTextEditContext->QueryInterface(IID_ITfSource, (void**)&pSource)))
+        {
+            pSource->UnadviseSink(m_dwTextEditSinkCookie);
+            pSource->Release();
+        }
+        m_dwTextEditSinkCookie = TF_INVALID_COOKIE;
+    }
+
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::InitMouseSink()
+{
+    // Mouse sink initialization is complex and not strictly necessary for basic functionality
+    // Skip for now to simplify implementation
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::UninitMouseSink()
+{
+    if (m_pTextEditContext && m_dwMouseSinkCookie != TF_INVALID_COOKIE)
+    {
+        ITfMouseTracker *pMouseTracker;
+        if (SUCCEEDED(m_pTextEditContext->QueryInterface(IID_ITfMouseTracker, (void**)&pMouseTracker)))
+        {
+            pMouseTracker->UnadviseMouseSink(m_dwMouseSinkCookie);
+            pMouseTracker->Release();
+        }
+        m_dwMouseSinkCookie = TF_INVALID_COOKIE;
+    }
+
+    return S_OK;
+}
+
+// CDirectEditSession implementation
+CDirectEditSession::CDirectEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, EditAction action)
 {
     m_cRef = 1;
     m_pTextService = pTextService;
@@ -721,20 +860,20 @@ CEditSession::CEditSession(CKeyMagicTextService *pTextService, ITfContext *pCont
     m_pContext = pContext;
     m_pContext->AddRef();
     m_action = action;
-    m_textToCommit = textToCommit;
-    m_composingText = composingText;
+    m_wParam = 0;
+    m_lParam = 0;
+    m_pfEaten = nullptr;
+    m_deleteCount = 0;
 }
 
-CEditSession::~CEditSession()
+CDirectEditSession::~CDirectEditSession()
 {
-    if (m_pTextService)
-        m_pTextService->Release();
-    if (m_pContext)
-        m_pContext->Release();
+    m_pContext->Release();
+    m_pTextService->Release();
 }
 
 // IUnknown
-STDAPI CEditSession::QueryInterface(REFIID riid, void **ppvObject)
+STDAPI CDirectEditSession::QueryInterface(REFIID riid, void **ppvObject)
 {
     if (ppvObject == nullptr)
         return E_INVALIDARG;
@@ -745,21 +884,22 @@ STDAPI CEditSession::QueryInterface(REFIID riid, void **ppvObject)
     {
         *ppvObject = static_cast<ITfEditSession*>(this);
     }
-    else
+
+    if (*ppvObject)
     {
-        return E_NOINTERFACE;
+        AddRef();
+        return S_OK;
     }
 
-    AddRef();
-    return S_OK;
+    return E_NOINTERFACE;
 }
 
-STDAPI_(ULONG) CEditSession::AddRef()
+STDAPI_(ULONG) CDirectEditSession::AddRef()
 {
     return InterlockedIncrement(&m_cRef);
 }
 
-STDAPI_(ULONG) CEditSession::Release()
+STDAPI_(ULONG) CDirectEditSession::Release()
 {
     LONG cRef = InterlockedDecrement(&m_cRef);
     if (cRef == 0)
@@ -770,151 +910,83 @@ STDAPI_(ULONG) CEditSession::Release()
 }
 
 // ITfEditSession
-STDAPI CEditSession::DoEditSession(TfEditCookie ec)
+STDAPI CDirectEditSession::DoEditSession(TfEditCookie ec)
 {
     switch (m_action)
     {
-        case EditAction::UpdateComposition:
-            UpdateCompositionString(ec);
-            break;
-            
-        case EditAction::CommitText:
-            CommitText(ec);
-            // No need to call TerminateComposition - CommitText handles it
-            // Reset engine after commit
-            if (m_pTextService->GetEngineHandle())
+        case EditAction::ProcessKey:
+        {
+            // First sync engine with document
+            char* engineComposing = keymagic_engine_get_composition(m_pTextService->GetEngineHandle());
+            if (engineComposing)
             {
-                keymagic_engine_reset(m_pTextService->GetEngineHandle());
+                std::string engineText(engineComposing);
+                keymagic_free_string(engineComposing);
+                
+                // Read document suffix
+                std::wstring documentText;
+                int compareLength = static_cast<int>(engineText.length());
+                if (compareLength > 0)
+                {
+                    m_pTextService->ReadDocumentSuffix(m_pContext, ec, compareLength, documentText);
+                    
+                    // Compare texts
+                    std::string docUtf8 = ConvertUtf16ToUtf8(documentText);
+                    
+                    DEBUG_LOG(L"Comparing engine text: \"" + std::wstring(engineText.begin(), engineText.end()) + 
+                              L"\" with document: \"" + documentText + L"\"");
+                    
+                    if (docUtf8 != engineText)
+                    {
+                        DEBUG_LOG(L"Text mismatch - resetting engine");
+                        // Texts don't match, reset engine
+                        m_pTextService->ResetEngine();
+                    }
+                }
+            }
+            
+            // Process the key
+            m_pTextService->ProcessKeyInput(m_pContext, m_wParam, m_lParam, m_pfEaten);
+            break;
+        }
+        
+        case EditAction::SyncEngine:
+        {
+            m_pTextService->SyncEngineWithDocument(m_pContext, ec);
+            break;
+        }
+        
+        case EditAction::DeleteAndInsert:
+        {
+            // Delete characters if needed
+            if (m_deleteCount > 0)
+            {
+                DEBUG_LOG(L"Deleting " + std::to_wstring(m_deleteCount) + L" characters");
+                m_pTextService->DeleteCharsBeforeCursor(m_pContext, ec, m_deleteCount);
+            }
+            
+            // Insert new text
+            if (!m_insertText.empty())
+            {
+                DEBUG_LOG(L"Inserting text: \"" + m_insertText + L"\"");
+                m_pTextService->InsertTextAtCursor(m_pContext, ec, m_insertText);
             }
             break;
-            
-        case EditAction::TerminateComposition:
-            TerminateComposition(ec);
-            break;
+        }
     }
     
     return S_OK;
 }
 
-void CEditSession::UpdateCompositionString(TfEditCookie ec)
+void CDirectEditSession::SetKeyData(WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
-    if (!m_pTextService->m_pComposition)
-    {
-        StartComposition(ec);
-    }
-    
-    if (m_pTextService->m_pComposition)
-    {
-        ITfRange *pRange = nullptr;
-        if (SUCCEEDED(m_pTextService->m_pComposition->GetRange(&pRange)))
-        {
-            // Set the composition text
-            pRange->SetText(ec, 0, m_composingText.c_str(), static_cast<LONG>(m_composingText.length()));
-            
-            // Move the selection to the end of the composition
-            // First, collapse the range to the end
-            pRange->Collapse(ec, TF_ANCHOR_END);
-            
-            // Then set the selection to this position
-            TF_SELECTION tfSelection;
-            tfSelection.range = pRange;
-            tfSelection.style.ase = TF_AE_NONE;
-            tfSelection.style.fInterimChar = FALSE;
-            
-            m_pContext->SetSelection(ec, 1, &tfSelection);
-            
-            // Apply underline display attribute
-            ITfRange *pCompRange = nullptr;
-            if (SUCCEEDED(m_pTextService->m_pComposition->GetRange(&pCompRange)))
-            {
-                ApplyDisplayAttributes(ec, pCompRange);
-                pCompRange->Release();
-            }
-            
-            pRange->Release();
-        }
-    }
+    m_wParam = wParam;
+    m_lParam = lParam;
+    m_pfEaten = pfEaten;
 }
 
-void CEditSession::StartComposition(TfEditCookie ec)
+void CDirectEditSession::SetTextAction(int deleteCount, const std::wstring &insertText)
 {
-    ITfInsertAtSelection *pInsertAtSelection = nullptr;
-    ITfRange *pRange = nullptr;
-    
-    if (SUCCEEDED(m_pContext->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsertAtSelection)))
-    {
-        if (SUCCEEDED(pInsertAtSelection->InsertTextAtSelection(ec, TF_IAS_QUERYONLY, nullptr, 0, &pRange)))
-        {
-            ITfContextComposition *pContextComposition = nullptr;
-            if (SUCCEEDED(m_pContext->QueryInterface(IID_ITfContextComposition, (void**)&pContextComposition)))
-            {
-                ITfComposition *pComposition = nullptr;
-                if (SUCCEEDED(pContextComposition->StartComposition(ec, pRange, 
-                    static_cast<ITfCompositionSink*>(m_pTextService), &pComposition)))
-                {
-                    m_pTextService->m_pComposition = pComposition;
-                    m_pTextService->m_fComposing = TRUE;
-                }
-                pContextComposition->Release();
-            }
-            pRange->Release();
-        }
-        pInsertAtSelection->Release();
-    }
-}
-
-void CEditSession::CommitText(TfEditCookie ec)
-{
-    if (m_pTextService->m_pComposition)
-    {
-        // When we have a composition, we need to finalize it with the text we want
-        // First, get the composition range
-        ITfRange *pRange = nullptr;
-        if (SUCCEEDED(m_pTextService->m_pComposition->GetRange(&pRange)))
-        {
-            // Set the final text in the composition range
-            pRange->SetText(ec, 0, m_textToCommit.c_str(), static_cast<LONG>(m_textToCommit.length()));
-            pRange->Release();
-        }
-        
-        // Now end the composition - this will commit the text
-        m_pTextService->m_pComposition->EndComposition(ec);
-        m_pTextService->m_pComposition->Release();
-        m_pTextService->m_pComposition = nullptr;
-        m_pTextService->m_fComposing = FALSE;
-    }
-    else
-    {
-        // No composition active, insert text directly
-        ITfInsertAtSelection *pInsertAtSelection = nullptr;
-        ITfRange *pRange = nullptr;
-        
-        if (SUCCEEDED(m_pContext->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsertAtSelection)))
-        {
-            if (SUCCEEDED(pInsertAtSelection->InsertTextAtSelection(
-                ec, 0, m_textToCommit.c_str(), static_cast<LONG>(m_textToCommit.length()), &pRange)))
-            {
-                pRange->Release();
-            }
-            pInsertAtSelection->Release();
-        }
-    }
-}
-
-void CEditSession::TerminateComposition(TfEditCookie ec)
-{
-    if (m_pTextService->m_pComposition)
-    {
-        m_pTextService->m_pComposition->EndComposition(ec);
-        m_pTextService->m_pComposition->Release();
-        m_pTextService->m_pComposition = nullptr;
-        m_pTextService->m_fComposing = FALSE;
-    }
-}
-
-void CEditSession::ApplyDisplayAttributes(TfEditCookie ec, ITfRange *pRange)
-{
-    // The composition range automatically gets default display attributes (underline)
-    // TSF handles this for us when we create a composition
-    // If we need custom attributes in the future, we can implement ITfDisplayAttributeProvider
+    m_deleteCount = deleteCount;
+    m_insertText = insertText;
 }

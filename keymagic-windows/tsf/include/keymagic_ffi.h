@@ -60,6 +60,7 @@ void keymagic_free_string(char* s);
 // Engine control
 KeyMagicResult keymagic_engine_reset(EngineHandle* handle);
 char* keymagic_engine_get_composition(EngineHandle* handle);
+KeyMagicResult keymagic_engine_set_composition(EngineHandle* handle, const char* text);
 
 // Version info
 const char* keymagic_get_version(void);
