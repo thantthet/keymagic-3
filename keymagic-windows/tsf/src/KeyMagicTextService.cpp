@@ -5,6 +5,7 @@
 #include <string>
 #include <codecvt>
 #include <locale>
+#include <vector>
 
 // Helper function to convert UTF-8 to UTF-16
 std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
@@ -30,6 +31,75 @@ std::string ConvertUtf16ToUtf8(const std::wstring& utf16)
     return utf8;
 }
 
+// Helper function to send Unicode text using SendInput
+void SendUnicodeText(const std::wstring& text, ULONG_PTR dwExtraInfo = 0, DWORD* pLastSendTime = nullptr)
+{
+    if (text.empty())
+        return;
+        
+    std::vector<INPUT> inputs;
+    inputs.reserve(text.length() * 2); // Each char needs keydown + keyup
+    
+    for (wchar_t ch : text) {
+        INPUT input = {0};
+        input.type = INPUT_KEYBOARD;
+        input.ki.wScan = ch;
+        input.ki.dwFlags = KEYEVENTF_UNICODE;
+        input.ki.dwExtraInfo = dwExtraInfo;
+        inputs.push_back(input);
+        
+        // Key up
+        input.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+        input.ki.dwExtraInfo = dwExtraInfo;
+        inputs.push_back(input);
+    }
+    
+    UINT sent = SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+    if (sent != inputs.size()) {
+        DEBUG_LOG(L"SendInput failed to send all inputs. Sent: " + std::to_wstring(sent) + 
+                  L" of " + std::to_wstring(inputs.size()));
+    }
+    
+    // Record the time we sent input
+    if (pLastSendTime) {
+        *pLastSendTime = GetTickCount();
+    }
+}
+
+// Helper function to send backspace keys
+void SendBackspaces(int count, ULONG_PTR dwExtraInfo = 0, DWORD* pLastSendTime = nullptr)
+{
+    if (count <= 0)
+        return;
+        
+    std::vector<INPUT> inputs;
+    inputs.reserve(count * 2);
+    
+    for (int i = 0; i < count; i++) {
+        INPUT input = {0};
+        input.type = INPUT_KEYBOARD;
+        input.ki.wVk = VK_BACK;
+        input.ki.dwExtraInfo = dwExtraInfo;
+        inputs.push_back(input);
+        
+        // Key up
+        input.ki.dwFlags = KEYEVENTF_KEYUP;
+        input.ki.dwExtraInfo = dwExtraInfo;
+        inputs.push_back(input);
+    }
+    
+    UINT sent = SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+    if (sent != inputs.size()) {
+        DEBUG_LOG(L"SendInput failed to send all backspaces. Sent: " + std::to_wstring(sent) + 
+                  L" of " + std::to_wstring(inputs.size()));
+    }
+    
+    // Record the time we sent input
+    if (pLastSendTime) {
+        *pLastSendTime = GetTickCount();
+    }
+}
+
 CKeyMagicTextService::CKeyMagicTextService()
 {
     m_cRef = 1;
@@ -43,12 +113,15 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_pEngine = nullptr;
     m_tsfEnabled = true;  // Default to enabled
     m_pCompositionMgr = nullptr;
-    m_supportsComposition = TRUE;  // Assume composition support initially
+    m_supportsComposition = FALSE;  // Not using composition anymore
     
     // Initialize display attributes
     m_ppDisplayAttributeInfo = nullptr;
     m_displayAttributeInfoCount = 0;
     m_inputDisplayAttributeAtom = TF_INVALID_GUIDATOM;
+    
+    m_isProcessingKey = false;
+    m_lastSendInputTime = 0;
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -260,26 +333,8 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
         {
             m_pTextEditContext = pContext; // Takes ownership
             
-            // Create composition manager for this context
-            if (!m_pCompositionMgr)
-            {
-                m_pCompositionMgr = new CCompositionManager(this);
-            }
-            
-            // Test composition support for this context
-            m_supportsComposition = TestCompositionSupport(pContext);
-            
             InitTextEditSink();
             InitMouseSink();
-        }
-    }
-    else
-    {
-        // No focus, clean up composition manager
-        if (m_pCompositionMgr)
-        {
-            m_pCompositionMgr->Release();
-            m_pCompositionMgr = nullptr;
         }
     }
 
@@ -313,6 +368,16 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
 
     *pfEaten = FALSE;
 
+    // Check if this is our own SendInput by examining the extra info
+    ULONG_PTR extraInfo = GetMessageExtraInfo();
+    if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+    {
+        return S_OK;
+    }
+    
+    // Mark that we're processing a key to help OnEndEdit
+    m_isProcessingKey = true;
+
     // We want to process most keys
     if (m_pEngine && m_tsfEnabled)
     {
@@ -343,42 +408,22 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
 
     *pfEaten = FALSE;
     
+    // Check if this is our own SendInput by examining the extra info
+    ULONG_PTR extraInfo = GetMessageExtraInfo();
+    if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+    {
+        DEBUG_LOG(L"Skipping key event from our SendInput");
+        return S_OK;
+    }
+    
     char character = MapVirtualKeyToChar(wParam, lParam);
     DEBUG_LOG_KEY(L"OnKeyDown", wParam, lParam, character);
 
-    // Choose processing method based on composition support detected at focus time
-    if (m_pCompositionMgr && m_supportsComposition)
-    {
-        // Use composition-based processing (for modern apps like Edge, Explorer, Word)
-        CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic, 
-                                                                           m_pCompositionMgr,
-                                                                           CCompositionEditSession::CompositionAction::ProcessKey);
-        if (pEditSession)
-        {
-            pEditSession->SetKeyData(wParam, lParam, pfEaten);
-            
-            HRESULT hr;
-            pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-            pEditSession->Release();
-        }
-    }
-    else
-    {
-        // Use direct editing (for simple apps like Notepad)
-        CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, CDirectEditSession::EditAction::ProcessKey);
-        if (pEditSession)
-        {
-            pEditSession->SetKeyData(wParam, lParam, pfEaten);
-            
-            HRESULT hr;
-            pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-            pEditSession->Release();
-        }
-        else
-        {
-            *pfEaten = FALSE;
-        }
-    }
+    // Process key directly without using TSF text manipulation
+    ProcessKeyWithSendInput(pic, wParam, lParam, pfEaten);
+    
+    // Clear the processing flag after key is processed
+    m_isProcessingKey = false;
 
     return S_OK;
 }
@@ -417,21 +462,29 @@ STDAPI CKeyMagicTextService::OnEndEdit(ITfContext *pic, TfEditCookie ecReadOnly,
     BOOL fSelectionChanged;
     if (SUCCEEDED(pEditRecord->GetSelectionStatus(&fSelectionChanged)) && fSelectionChanged)
     {
-        DEBUG_LOG(L"Selection/caret changed - resetting engine");
-        // Selection changed, reset engine and cancel any composition
-        if (m_pCompositionMgr && m_pCompositionMgr->IsComposing())
+        // Skip if we're actively processing a key
+        if (m_isProcessingKey)
         {
-            // Cancel composition in edit session
-            CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic,
-                                                                               m_pCompositionMgr,
-                                                                               CCompositionEditSession::CompositionAction::Cancel);
-            if (pEditSession)
-            {
-                HRESULT hr;
-                pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-                pEditSession->Release();
-            }
+            DEBUG_LOG(L"Selection changed during key processing - ignoring");
+            return S_OK;
         }
+        
+        // Skip if we recently sent input (within 100ms)
+        DWORD currentTime = GetTickCount();
+        DWORD timeSinceLastInput = currentTime - m_lastSendInputTime;
+        const DWORD IGNORE_SELECTION_TIMEOUT = 100; // milliseconds
+        
+        // Note: In practice, most OnEndEdit events from SendInput occur within 20ms,
+        // but we use 100ms to provide a safety margin for slower systems or when
+        // sending multiple characters that might take longer to process.
+        if (m_lastSendInputTime > 0 && timeSinceLastInput < IGNORE_SELECTION_TIMEOUT)
+        {
+            DEBUG_LOG(L"Selection changed within " + std::to_wstring(timeSinceLastInput) + L"ms of SendInput - ignoring");
+            return S_OK;
+        }
+        
+        // If we get here, it's a genuine user-initiated selection change
+        DEBUG_LOG(L"Selection changed by user - resetting engine");
         ResetEngine();
     }
 
@@ -450,19 +503,6 @@ STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dw
     if (dwBtnStatus & MK_LBUTTON)
     {
         DEBUG_LOG(L"Mouse click detected - resetting engine");
-        // Cancel any active composition
-        if (m_pCompositionMgr && m_pCompositionMgr->IsComposing() && m_pTextEditContext)
-        {
-            CCompositionEditSession *pEditSession = new CCompositionEditSession(this, m_pTextEditContext,
-                                                                               m_pCompositionMgr,
-                                                                               CCompositionEditSession::CompositionAction::Cancel);
-            if (pEditSession)
-            {
-                HRESULT hr;
-                m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-                pEditSession->Release();
-            }
-        }
         ResetEngine();
     }
 
@@ -652,6 +692,150 @@ void CKeyMagicTextService::CheckAndReloadKeyboard()
     }
 }
 
+void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
+{
+    DEBUG_LOG_FUNC();
+    EnterCriticalSection(&m_cs);
+
+    if (!m_pEngine)
+    {
+        DEBUG_LOG(L"No engine available");
+        LeaveCriticalSection(&m_cs);
+        return;
+    }
+    
+    // Check if keyboard needs to be reloaded
+    CheckAndReloadKeyboard();
+    
+    // Check if TSF is disabled
+    if (!m_tsfEnabled)
+    {
+        DEBUG_LOG(L"TSF is disabled, not processing key");
+        *pfEaten = FALSE;
+        LeaveCriticalSection(&m_cs);
+        return;
+    }
+
+    // Get modifiers
+    int shift = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
+    int ctrl = (GetKeyState(VK_CONTROL) & 0x8000) ? 1 : 0;
+    int alt = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
+    int capsLock = (GetKeyState(VK_CAPITAL) & 0x0001) ? 1 : 0;
+
+    // Translate VK to character
+    char character = MapVirtualKeyToChar(wParam, lParam);
+    
+    // Only pass printable ASCII characters
+    if (!IsPrintableAscii(character))
+    {
+        character = '\0';
+    }
+
+    ProcessKeyOutput output = {0};
+    
+    // Log engine input parameters
+    {
+        std::wostringstream oss;
+        oss << L"Engine Input - VK: 0x" << std::hex << wParam << std::dec;
+        oss << L" (" << wParam << L")";
+        
+        if (character != '\0') {
+            if (character >= 0x20 && character <= 0x7E) {
+                oss << L", Char: '" << (wchar_t)character << L"' (0x" << std::hex << (int)(unsigned char)character << std::dec << L")";
+            } else {
+                oss << L", Char: 0x" << std::hex << (int)(unsigned char)character << std::dec;
+            }
+        } else {
+            oss << L", Char: NULL";
+        }
+        
+        oss << L", Modifiers: ";
+        oss << L"Shift=" << shift;
+        oss << L" Ctrl=" << ctrl;
+        oss << L" Alt=" << alt;
+        oss << L" Caps=" << capsLock;
+        
+        DEBUG_LOG(oss.str());
+    }
+    
+    // Process key with engine
+    KeyMagicResult result = keymagic_engine_process_key_win(
+        m_pEngine, 
+        static_cast<int>(wParam),
+        character,
+        shift, ctrl, alt, capsLock,
+        &output
+    );
+
+    if (result == KeyMagicResult_Success)
+    {
+        DEBUG_LOG_ENGINE(output);
+        *pfEaten = output.is_processed ? TRUE : FALSE;
+        
+        // Execute text action using SendInput if processed
+        if (output.is_processed && output.action_type != 0) // Not None
+        {
+            // Handle backspaces
+            if (output.delete_count > 0)
+            {
+                DEBUG_LOG(L"Sending " + std::to_wstring(output.delete_count) + L" backspaces");
+                SendBackspaces(output.delete_count, KEYMAGIC_EXTRAINFO_SIGNATURE, &m_lastSendInputTime);
+            }
+            
+            // Handle text insertion
+            if (output.text && strlen(output.text) > 0)
+            {
+                std::wstring textToInsert = ConvertUtf8ToUtf16(output.text);
+                DEBUG_LOG(L"Sending text: \"" + textToInsert + L"\"");
+                SendUnicodeText(textToInsert, KEYMAGIC_EXTRAINFO_SIGNATURE, &m_lastSendInputTime);
+            }
+        }
+        
+        // Handle special keys that might trigger commit
+        if (output.composing_text)
+        {
+            std::string composingUtf8(output.composing_text);
+            std::wstring composingText = ConvertUtf8ToUtf16(composingUtf8);
+            
+            switch (wParam)
+            {
+                case VK_SPACE:
+                    if (!output.is_processed || (composingText.length() > 0 && composingText.back() == L' '))
+                    {
+                        // Reset engine after space
+                        DEBUG_LOG(L"Space key - resetting engine");
+                        keymagic_engine_reset(m_pEngine);
+                    }
+                    break;
+                    
+                case VK_RETURN:
+                case VK_TAB:
+                    // Reset engine after these keys
+                    DEBUG_LOG(L"Enter/Tab key - resetting engine");
+                    keymagic_engine_reset(m_pEngine);
+                    break;
+                    
+                case VK_ESCAPE:
+                    // Cancel and reset
+                    DEBUG_LOG(L"Escape key - resetting engine");
+                    keymagic_engine_reset(m_pEngine);
+                    *pfEaten = TRUE;
+                    break;
+            }
+        }
+        
+        // Cleanup
+        if (output.text) keymagic_free_string(output.text);
+        if (output.composing_text) keymagic_free_string(output.composing_text);
+    }
+    else
+    {
+        DEBUG_LOG(L"Engine process_key failed");
+    }
+
+    LeaveCriticalSection(&m_cs);
+}
+
 void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
     DEBUG_LOG_FUNC();
@@ -759,9 +943,6 @@ void CKeyMagicTextService::ResetEngine()
     {
         keymagic_engine_reset(m_pEngine);
         DEBUG_LOG(L"Engine reset completed");
-        
-        // Don't sync with document after reset when using composition mode
-        // The reset is intentional and syncing would re-introduce committed text as composing text
     }
     
     LeaveCriticalSection(&m_cs);
@@ -819,9 +1000,9 @@ void CKeyMagicTextService::SyncEngineWithDocument(ITfContext *pic, TfEditCookie 
     std::wstring documentText;
     if (SUCCEEDED(ReadDocumentSuffix(pic, ec, 30, documentText)))
     {
-        DEBUG_LOG(L"Syncing engine with document text: \"" + documentText + L"\"");
         // Convert to UTF-8 and set as engine composition
         std::string utf8Text = ConvertUtf16ToUtf8(documentText);
+        DEBUG_LOG(L"Syncing engine with document text: \"" + documentText + L"\"");
         keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());
     }
     else
@@ -1264,8 +1445,9 @@ STDAPI CDirectEditSession::DoEditSession(TfEditCookie ec)
                     // Compare texts
                     std::string docUtf8 = ConvertUtf16ToUtf8(documentText);
                     
-                    DEBUG_LOG(L"Comparing engine text: \"" + std::wstring(engineText.begin(), engineText.end()) + 
-                              L"\" with document: \"" + documentText + L"\"");
+                    DEBUG_LOG(L"Comparing engine text with document");
+                    DEBUG_LOG(L"Engine: \"" + ConvertUtf8ToUtf16(engineText) + L"\"");
+                    DEBUG_LOG(L"Document: \"" + documentText + L"\"");
                     
                     if (docUtf8 != engineText)
                     {

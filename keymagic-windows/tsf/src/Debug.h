@@ -16,6 +16,32 @@
 #define DEBUG_LOG_KEY(context, wParam, lParam, character) DebugLogKeyEvent(context, wParam, lParam, character)
 #define DEBUG_LOG_ENGINE(output) DebugLogEngineOutput(output)
 #define DEBUG_LOG_HR(context, hr) DebugLogHR(context, hr)
+// DEBUG_LOG_UTF8 is deprecated - all DEBUG_LOG calls now automatically format Unicode
+
+// Helper to format wide string with Unicode notation for non-ASCII characters
+inline std::wstring FormatWideStringWithUnicodeNotation(const std::wstring& wideStr)
+{
+    std::wostringstream oss;
+    
+    // Format each character
+    for (wchar_t ch : wideStr) {
+        if (ch >= 0x20 && ch <= 0x7E) {
+            // ASCII printable characters
+            oss << ch;
+        } else if (ch == L'\n') {
+            oss << L"\\n";
+        } else if (ch == L'\r') {
+            oss << L"\\r";
+        } else if (ch == L'\t') {
+            oss << L"\\t";
+        } else {
+            // Non-ASCII or control characters - show Unicode notation
+            oss << L"\\u" << std::hex << std::setfill(L'0') << std::setw(4) << (unsigned int)ch;
+        }
+    }
+    
+    return oss.str();
+}
 
 // Core debug logging function
 inline void DebugLog(const std::wstring& message)
@@ -28,12 +54,15 @@ inline void DebugLog(const std::wstring& message)
     std::tm tm;
     localtime_s(&tm, &time_t);
     
+    // Format the message with Unicode notation
+    std::wstring formattedMessage = FormatWideStringWithUnicodeNotation(message);
+    
     std::wostringstream oss;
     oss << L"[KeyMagicTSF] "
         << std::put_time(&tm, L"%H:%M:%S") 
         << L"." << std::setfill(L'0') << std::setw(3) << ms.count() 
         << L" [" << GetCurrentThreadId() << L"] "
-        << message << L"\n";
+        << formattedMessage << L"\n";
     
     OutputDebugStringW(oss.str().c_str());
 }
@@ -75,10 +104,12 @@ inline void DebugLogKeyEvent(const std::wstring& context, WPARAM wParam, LPARAM 
     oss << context << L" - VK: 0x" << std::hex << wParam 
         << L" (" << std::dec << wParam << L")";
     
-    if (character != '\0' && character >= 0x20 && character <= 0x7E) {
-        oss << L", Char: '" << (wchar_t)character << L"'";
-    } else if (character != '\0') {
-        oss << L", Char: 0x" << std::hex << (int)(unsigned char)character;
+    if (character != '\0') {
+        if (character >= 0x20 && character <= 0x7E) {
+            oss << L", Char: '" << (wchar_t)character << L"' (0x" << std::hex << (int)(unsigned char)character << L")";
+        } else {
+            oss << L", Char: 0x" << std::hex << (int)(unsigned char)character;
+        }
     }
     
     oss << L", Scan: 0x" << std::hex << ((lParam >> 16) & 0xFF);
@@ -91,6 +122,33 @@ inline void DebugLogKeyEvent(const std::wstring& context, WPARAM wParam, LPARAM 
     
     DebugLog(oss.str());
 }
+
+// Helper to format string with Unicode notation for non-ASCII characters
+inline std::wstring FormatStringWithUnicodeNotation(const std::string& utf8Str)
+{
+    std::wostringstream oss;
+    
+    // Convert UTF-8 to UTF-16
+    int wideSize = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, nullptr, 0);
+    if (wideSize == 0) return L"[Invalid UTF-8]";
+    
+    std::wstring wideStr(wideSize - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, &wideStr[0], wideSize);
+    
+    // Format each character
+    for (wchar_t ch : wideStr) {
+        if (ch >= 0x20 && ch <= 0x7E) {
+            // ASCII printable characters
+            oss << ch;
+        } else {
+            // Non-ASCII or control characters - show Unicode notation
+            oss << L"\\u" << std::hex << std::setfill(L'0') << std::setw(4) << (unsigned int)ch;
+        }
+    }
+    
+    return oss.str();
+}
+
 
 // Helper to log engine output
 inline void DebugLogEngineOutput(const ProcessKeyOutput& output)
@@ -109,14 +167,12 @@ inline void DebugLogEngineOutput(const ProcessKeyOutput& output)
     
     if (output.text) {
         std::string text(output.text);
-        std::wstring wtext(text.begin(), text.end());
-        oss << L", Text: \"" << wtext << L"\"";
+        oss << L", Text: \"" << FormatStringWithUnicodeNotation(text) << L"\"";
     }
     
     if (output.composing_text) {
         std::string comp(output.composing_text);
-        std::wstring wcomp(comp.begin(), comp.end());
-        oss << L", Composing: \"" << wcomp << L"\"";
+        oss << L", Composing: \"" << FormatStringWithUnicodeNotation(comp) << L"\"";
     }
     
     DebugLog(oss.str());

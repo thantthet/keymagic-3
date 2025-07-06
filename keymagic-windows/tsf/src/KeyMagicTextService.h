@@ -69,6 +69,7 @@ private:
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
     void CheckAndReloadKeyboard();
     void ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
+    void ProcessKeyWithSendInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
     void ResetEngine();
     void SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec);
     
@@ -125,6 +126,13 @@ private:
     ITfDisplayAttributeInfo **m_ppDisplayAttributeInfo;
     ULONG m_displayAttributeInfoCount;
     TfGuidAtom m_inputDisplayAttributeAtom;
+    
+    // SendInput signature
+    static const ULONG_PTR KEYMAGIC_EXTRAINFO_SIGNATURE = 0x4B4D5453; // "KMTS" in hex
+    
+    // Processing state
+    bool m_isProcessingKey;
+    DWORD m_lastSendInputTime;
     
     // Friend classes
     friend class CDirectEditSession;
