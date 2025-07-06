@@ -528,6 +528,18 @@ STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dw
 }
 
 // Helper methods
+// Always open the 64-bit view of the registry, regardless of host process
+HKEY CKeyMagicTextService::OpenSettingsKey(REGSAM samDesired)
+{
+    HKEY hKey;
+    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, samDesired | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+    {
+        return hKey;
+    }
+    return nullptr;
+}
+
 BOOL CKeyMagicTextService::InitializeEngine()
 {
     if (m_pEngine)
@@ -538,10 +550,8 @@ BOOL CKeyMagicTextService::InitializeEngine()
         return FALSE;
 
     // Load default keyboard from registry
-    HKEY hKey;
-    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
-    
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    HKEY hKey = OpenSettingsKey(KEY_READ);
+    if (hKey)
     {
         wchar_t defaultKeyboard[256] = {0};
         DWORD dataSize = sizeof(defaultKeyboard);
@@ -568,7 +578,16 @@ BOOL CKeyMagicTextService::InitializeEngine()
     {
         DEBUG_LOG(L"Failed to open KeyMagic settings registry key");
     }
-    
+
+    // read KeyProcessingEnabled from registry using RegGetValue
+    DWORD keyProcessingEnabled = 1;
+    DWORD dataSize = sizeof(keyProcessingEnabled);
+    DWORD dataType;
+    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", L"KeyProcessingEnabled", RRF_RT_REG_DWORD, &dataType, (LPBYTE)&keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
+    {
+        DEBUG_LOG(L"InitializeEngine::KeyProcessingEnabled: " + std::to_wstring(keyProcessingEnabled));
+        m_tsfEnabled = (keyProcessingEnabled != 0);
+    }
     return TRUE;
 }
 
@@ -609,7 +628,7 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
     std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + keyboardId;
     HKEY hKey;
     
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
     {
         // Read keyboard path
         wchar_t km2Path[MAX_PATH] = {0};
@@ -669,22 +688,20 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
 void CKeyMagicTextService::CheckAndReloadKeyboard()
 {
     // Check if default keyboard has changed
-    HKEY hKey;
-    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
-    
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    HKEY hKey = OpenSettingsKey(KEY_READ);
+    if (hKey)
     {
         // First check if TSF is enabled
         DWORD tsfEnabled = 1; // Default to enabled
         DWORD dataSize = sizeof(tsfEnabled);
         DWORD dataType;
         
-        RegQueryValueExW(hKey, L"TSFEnabled", NULL, &dataType, (LPBYTE)&tsfEnabled, &dataSize);
+        RegQueryValueExW(hKey, L"KeyProcessingEnabled", NULL, &dataType, (LPBYTE)&tsfEnabled, &dataSize);
         m_tsfEnabled = (tsfEnabled != 0);
         
         if (!m_tsfEnabled)
         {
-            DEBUG_LOG(L"TSF is disabled");
+            DEBUG_LOG(L"Key processing is disabled");
             RegCloseKey(hKey);
             return;
         }
@@ -726,7 +743,7 @@ void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wPara
     // Check if TSF is disabled (value is now updated by registry monitor thread)
     if (!m_tsfEnabled)
     {
-        DEBUG_LOG(L"TSF is disabled, not processing key");
+        DEBUG_LOG(L"Key processing is disabled, not processing key");
         *pfEaten = FALSE;
         LeaveCriticalSection(&m_cs);
         return;
@@ -870,7 +887,7 @@ void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARA
     // Check if TSF is disabled
     if (!m_tsfEnabled)
     {
-        DEBUG_LOG(L"TSF is disabled, not processing key");
+        DEBUG_LOG(L"Key processing is disabled, not processing key");
         *pfEaten = FALSE;
         LeaveCriticalSection(&m_cs);
         return;
@@ -1525,9 +1542,9 @@ HRESULT CKeyMagicTextService::StartRegistryMonitoring()
 {
     DEBUG_LOG_FUNC();
     
-    // Open the registry key
-    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_NOTIFY | KEY_READ, &m_hRegistryKey) != ERROR_SUCCESS)
+    // Open the registry key using the helper to ensure 64-bit view
+    m_hRegistryKey = OpenSettingsKey(KEY_NOTIFY | KEY_READ);
+    if (!m_hRegistryKey)
     {
         DEBUG_LOG(L"Failed to open registry key for monitoring");
         return E_FAIL;
@@ -1642,16 +1659,16 @@ void CKeyMagicTextService::RegistryMonitorLoop()
             // Enter critical section to update values
             EnterCriticalSection(&m_cs);
             
-            // Read TSFEnabled flag
-            DWORD tsfEnabled = 1;
-            DWORD dataSize = sizeof(tsfEnabled);
+            // Read KeyProcessingEnabled flag
+            DWORD keyProcessingEnabled = 1;
+            DWORD dataSize = sizeof(keyProcessingEnabled);
             DWORD dataType;
-            if (RegQueryValueExW(m_hRegistryKey, L"TSFEnabled", NULL, &dataType, (LPBYTE)&tsfEnabled, &dataSize) == ERROR_SUCCESS)
+            if (RegQueryValueExW(m_hRegistryKey, L"KeyProcessingEnabled", NULL, &dataType, (LPBYTE)&keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
             {
-                bool newEnabled = (tsfEnabled != 0);
+                bool newEnabled = (keyProcessingEnabled != 0);
                 if (newEnabled != m_tsfEnabled)
                 {
-                    DEBUG_LOG(L"TSFEnabled changed from " + std::to_wstring(m_tsfEnabled) + L" to " + std::to_wstring(newEnabled));
+                    DEBUG_LOG(L"KeyProcessingEnabled changed from " + std::to_wstring(m_tsfEnabled) + L" to " + std::to_wstring(newEnabled));
                     m_tsfEnabled = newEnabled;
                 }
             }

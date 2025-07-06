@@ -354,8 +354,8 @@ impl KeyboardManager {
         Ok(())
     }
     
-    // TSF Enable/Disable methods
-    pub fn is_tsf_enabled(&self) -> bool {
+    // Key Processing Enable/Disable methods
+    pub fn is_key_processing_enabled(&self) -> bool {
         unsafe {
             let mut hkey = HKEY::default();
             
@@ -366,7 +366,7 @@ impl KeyboardManager {
                 KEY_READ,
                 &mut hkey
             ).is_ok() {
-                let enabled = self.read_registry_dword(hkey, w!("TSFEnabled"))
+                let enabled = self.read_registry_dword(hkey, w!("KeyProcessingEnabled"))
                     .unwrap_or(1) != 0; // Default to enabled if not found
                 RegCloseKey(hkey);
                 enabled
@@ -376,7 +376,7 @@ impl KeyboardManager {
         }
     }
     
-    pub fn set_tsf_enabled(&self, enabled: bool) -> Result<()> {
+    pub fn set_key_processing_enabled(&self, enabled: bool) -> Result<()> {
         unsafe {
             let mut hkey = HKEY::default();
             
@@ -385,7 +385,7 @@ impl KeyboardManager {
                 w!("Software\\KeyMagic\\Settings"),
                 &mut hkey
             ).is_ok() {
-                self.write_registry_dword(hkey, w!("TSFEnabled"), if enabled { 1 } else { 0 })?;
+                self.write_registry_dword(hkey, w!("KeyProcessingEnabled"), if enabled { 1 } else { 0 })?;
                 RegCloseKey(hkey);
                 Ok(())
             } else {

@@ -264,11 +264,11 @@ impl MainWindow {
                     log_info!("WM_HOTKEY received with id: {}", hotkey_id);
                     
                     if hotkey_id == 1 { // HOTKEY_ID_TOGGLE
-                        log_info!("Toggling TSF enabled state");
+                        log_info!("Toggling key processing enabled state");
                         if let Some(tray) = window.tray_icon.borrow().as_ref() {
-                            match tray.toggle_tsf_enabled() {
-                                Ok(()) => log_info!("TSF toggle successful"),
-                                Err(e) => log_error!("TSF toggle failed: {}", e),
+                            match tray.toggle_key_processing_enabled() {
+                                Ok(()) => log_info!("Key processing toggle successful"),
+                                Err(e) => log_error!("Key processing toggle failed: {}", e),
                             }
                         } else {
                             log_error!("No tray icon available");

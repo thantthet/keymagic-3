@@ -22,7 +22,7 @@ const HOTKEY_ID_TOGGLE: i32 = 1;
 // Tray menu command IDs
 const ID_TRAY_SHOW: u16 = 1001;
 const ID_TRAY_EXIT: u16 = 1002;
-const ID_TRAY_TOGGLE_TSF: u16 = 1003;
+const ID_TRAY_TOGGLE_KEY_PROCESSING: u16 = 1003;
 const ID_TRAY_SETTINGS: u16 = 1004;
 const ID_TRAY_KEYBOARD_BASE: u16 = 2000; // Base ID for dynamic keyboard menu items
 
@@ -123,12 +123,12 @@ impl TrayIcon {
         self.register_toggle_hotkey()
     }
     
-    pub fn toggle_tsf_enabled(&self) -> Result<()> {
+    pub fn toggle_key_processing_enabled(&self) -> Result<()> {
         let manager = self.keyboard_manager.lock().unwrap();
-        let enabled = manager.is_tsf_enabled();
-        if let Err(e) = manager.set_tsf_enabled(!enabled) {
+        let enabled = manager.is_key_processing_enabled();
+        if let Err(e) = manager.set_key_processing_enabled(!enabled) {
             drop(manager);
-            return Err(Error::new(HRESULT(-1), format!("Failed to set TSF enabled: {}", e).into()));
+            return Err(Error::new(HRESULT(-1), format!("Failed to set key processing enabled: {}", e).into()));
         }
         
         // Update tray icon and tooltip
@@ -210,7 +210,7 @@ impl TrayIcon {
     
     fn create_icon(&self) -> Result<()> {
         let manager = self.keyboard_manager.lock().unwrap();
-        let enabled = manager.is_tsf_enabled();
+        let enabled = manager.is_key_processing_enabled();
         let tooltip = if enabled {
             "KeyMagic - Enabled"
         } else {
@@ -279,11 +279,11 @@ impl TrayIcon {
             let manager = self.keyboard_manager.lock().unwrap();
             let keyboards = manager.get_keyboards();
             let active_id = manager.get_active_keyboard();
-            let tsf_enabled = manager.is_tsf_enabled();
+            let key_processing_enabled = manager.is_key_processing_enabled();
             
-            // Add TSF toggle
-            let toggle_flags = if tsf_enabled { MF_STRING | MF_CHECKED } else { MF_STRING };
-            AppendMenuW(menu, toggle_flags, ID_TRAY_TOGGLE_TSF as usize, w!("Enable KeyMagic"))?;
+            // Add key processing toggle
+            let toggle_flags = if key_processing_enabled { MF_STRING | MF_CHECKED } else { MF_STRING };
+            AppendMenuW(menu, toggle_flags, ID_TRAY_TOGGLE_KEY_PROCESSING as usize, w!("Enable KeyMagic"))?;
             AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null())?;
             
             if !keyboards.is_empty() {
@@ -339,12 +339,12 @@ impl TrayIcon {
                     PostMessageW(self.hwnd, WM_CLOSE, WPARAM(0), LPARAM(0))?;
                 }
             }
-            ID_TRAY_TOGGLE_TSF => {
-                // Toggle TSF enabled state
+            ID_TRAY_TOGGLE_KEY_PROCESSING => {
+                // Toggle key processing enabled state
                 let manager = self.keyboard_manager.lock().unwrap();
-                let current_state = manager.is_tsf_enabled();
-                if let Err(e) = manager.set_tsf_enabled(!current_state) {
-                    eprintln!("Failed to toggle TSF: {}", e);
+                let current_state = manager.is_key_processing_enabled();
+                if let Err(e) = manager.set_key_processing_enabled(!current_state) {
+                    eprintln!("Failed to toggle key processing: {}", e);
                 }
             }
             cmd if cmd >= ID_TRAY_KEYBOARD_BASE => {

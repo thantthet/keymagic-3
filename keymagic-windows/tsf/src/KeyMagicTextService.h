@@ -65,6 +65,7 @@ private:
     // Helper methods
     BOOL InitializeEngine();
     void UninitializeEngine();
+    HKEY OpenSettingsKey(REGSAM samDesired);
     BOOL LoadKeyboard(const std::wstring& km2Path);
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
     void CheckAndReloadKeyboard();
