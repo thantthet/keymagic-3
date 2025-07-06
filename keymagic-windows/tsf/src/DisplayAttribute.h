@@ -64,8 +64,7 @@ private:
     ULONG m_index;
 };
 
-// Helper functions to create standard display attributes
+// Helper function to create standard display attribute
 TF_DISPLAYATTRIBUTE CreateInputDisplayAttribute();
-TF_DISPLAYATTRIBUTE CreateConvertedDisplayAttribute();
 
 #endif // DISPLAY_ATTRIBUTE_H

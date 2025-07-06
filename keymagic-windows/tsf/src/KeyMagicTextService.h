@@ -125,7 +125,6 @@ private:
     ITfDisplayAttributeInfo **m_ppDisplayAttributeInfo;
     ULONG m_displayAttributeInfoCount;
     TfGuidAtom m_inputDisplayAttributeAtom;
-    TfGuidAtom m_convertedDisplayAttributeAtom;
     
     // Friend classes
     friend class CDirectEditSession;

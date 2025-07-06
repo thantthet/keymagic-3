@@ -264,40 +264,16 @@ TF_DISPLAYATTRIBUTE CreateInputDisplayAttribute()
     // Background color - use default
     attr.crBk.type = TF_CT_NONE;
     
-    // Underline style - solid line
-    attr.lsStyle = TF_LS_SOLID;
+    // Underline style - dotted line (standard for IME composing text)
+    attr.lsStyle = TF_LS_DOT;
     attr.fBoldLine = FALSE;
     
-    // Underline color - use system window text color
-    attr.crLine.type = TF_CT_SYSCOLOR;
-    attr.crLine.nIndex = COLOR_WINDOWTEXT;
+    // Underline color - blue (standard for IME)
+    attr.crLine.type = TF_CT_COLORREF;
+    attr.crLine.cr = RGB(0, 0, 255);  // Blue
     
     // Attribute type - input composition
     attr.bAttr = TF_ATTR_INPUT;
-    
-    return attr;
-}
-
-TF_DISPLAYATTRIBUTE CreateConvertedDisplayAttribute()
-{
-    TF_DISPLAYATTRIBUTE attr = {};
-    
-    // Text color - use default
-    attr.crText.type = TF_CT_NONE;
-    
-    // Background color - use default
-    attr.crBk.type = TF_CT_NONE;
-    
-    // Underline style - solid line, bold
-    attr.lsStyle = TF_LS_SOLID;
-    attr.fBoldLine = TRUE;
-    
-    // Underline color - use system window text color
-    attr.crLine.type = TF_CT_SYSCOLOR;
-    attr.crLine.nIndex = COLOR_WINDOWTEXT;
-    
-    // Attribute type - converted composition
-    attr.bAttr = TF_ATTR_CONVERTED;
     
     return attr;
 }

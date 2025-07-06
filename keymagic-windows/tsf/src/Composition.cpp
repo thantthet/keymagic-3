@@ -273,7 +273,10 @@ HRESULT CCompositionManager::ApplyDisplayAttributes(ITfContext *pContext, TfEdit
     ITfProperty *pDisplayAttributeProperty;
     HRESULT hr = pContext->GetProperty(GUID_PROP_ATTRIBUTE, &pDisplayAttributeProperty);
     if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Failed to get display attribute property");
         return hr;
+    }
         
     // Get the GUID atom for our input display attribute from the text service
     TfGuidAtom guidAtom = TF_INVALID_GUIDATOM;
@@ -298,13 +301,14 @@ HRESULT CCompositionManager::ApplyDisplayAttributes(ITfContext *pContext, TfEdit
         }
         else
         {
-            DEBUG_LOG(L"Failed to apply display attribute");
+            DEBUG_LOG(L"Failed to apply display attribute, error: 0x" + std::to_wstring(hr));
         }
     }
     else
     {
-        DEBUG_LOG(L"Invalid GUID atom for display attribute");
-        hr = E_FAIL;
+        DEBUG_LOG(L"Warning: Display attribute GUID atom is invalid - composition will not have underline");
+        // Don't fail - allow composition to continue without display attributes
+        hr = S_OK;
     }
     
     pDisplayAttributeProperty->Release();

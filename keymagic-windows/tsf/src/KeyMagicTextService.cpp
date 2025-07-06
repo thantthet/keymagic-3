@@ -49,7 +49,6 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_ppDisplayAttributeInfo = nullptr;
     m_displayAttributeInfoCount = 0;
     m_inputDisplayAttributeAtom = TF_INVALID_GUIDATOM;
-    m_convertedDisplayAttributeAtom = TF_INVALID_GUIDATOM;
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -1105,17 +1104,15 @@ HRESULT CKeyMagicTextService::RegisterDisplayAttributeProvider()
     {
         DEBUG_LOG(L"Successfully registered display attribute provider");
         
-        // Register our display attribute GUIDs and get atoms
+        // Register our display attribute GUID and get atom
         hr = pCategoryMgr->RegisterGUID(GUID_KeyMagicDisplayAttributeInput, &m_inputDisplayAttributeAtom);
         if (SUCCEEDED(hr))
         {
             DEBUG_LOG(L"Registered input display attribute GUID, atom: " + std::to_wstring(m_inputDisplayAttributeAtom));
         }
-        
-        hr = pCategoryMgr->RegisterGUID(GUID_KeyMagicDisplayAttributeConverted, &m_convertedDisplayAttributeAtom);
-        if (SUCCEEDED(hr))
+        else
         {
-            DEBUG_LOG(L"Registered converted display attribute GUID, atom: " + std::to_wstring(m_convertedDisplayAttributeAtom));
+            DEBUG_LOG(L"Failed to register input display attribute GUID");
         }
     }
     
@@ -1164,7 +1161,7 @@ HRESULT CKeyMagicTextService::CreateDisplayAttributeInfo()
     }
     
     // Create display attribute info objects
-    m_displayAttributeInfoCount = 2;  // Input and converted
+    m_displayAttributeInfoCount = 1;  // Only input composition attribute
     m_ppDisplayAttributeInfo = new ITfDisplayAttributeInfo*[m_displayAttributeInfoCount];
     if (!m_ppDisplayAttributeInfo)
     {
@@ -1177,16 +1174,7 @@ HRESULT CKeyMagicTextService::CreateDisplayAttributeInfo()
     m_ppDisplayAttributeInfo[0] = new CKeyMagicDisplayAttributeInfo(
         GUID_KeyMagicDisplayAttributeInput,
         inputAttr,
-        L"KeyMagic Input Composition",
-        L"KeyMagic"
-    );
-    
-    // Create converted display attribute
-    TF_DISPLAYATTRIBUTE convertedAttr = CreateConvertedDisplayAttribute();
-    m_ppDisplayAttributeInfo[1] = new CKeyMagicDisplayAttributeInfo(
-        GUID_KeyMagicDisplayAttributeConverted,
-        convertedAttr,
-        L"KeyMagic Converted Composition",
+        L"KeyMagic Composing Text",
         L"KeyMagic"
     );
     
