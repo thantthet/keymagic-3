@@ -10,6 +10,7 @@ use windows::{
 };
 use std::sync::{Arc, Mutex};
 use crate::keyboard_manager::KeyboardManager;
+use crate::hud::HudNotification;
 
 // Tray icon constants
 const WM_TRAYICON: u32 = WM_USER + 100;
@@ -35,6 +36,7 @@ pub struct TrayIcon {
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
     icon_enabled: HICON,
     icon_disabled: HICON,
+    hud: Arc<HudNotification>,
 }
 
 impl TrayIcon {
@@ -44,11 +46,15 @@ impl TrayIcon {
             let icon_enabled = LoadIconW(GetModuleHandleW(None)?, PCWSTR(1 as *const u16))?;
             let icon_disabled = LoadIconW(GetModuleHandleW(None)?, PCWSTR(1 as *const u16))?;
             
+            // Create HUD notification
+            let hud = HudNotification::new()?;
+            
             let mut tray = TrayIcon {
                 hwnd,
                 keyboard_manager,
                 icon_enabled,
                 icon_disabled,
+                hud,
             };
             
             tray.create_icon()?;
@@ -160,7 +166,7 @@ impl TrayIcon {
     }
     
     pub fn toggle_tsf_enabled(&self) -> Result<()> {
-        let mut manager = self.keyboard_manager.lock().unwrap();
+        let manager = self.keyboard_manager.lock().unwrap();
         let enabled = manager.is_tsf_enabled();
         if let Err(e) = manager.set_tsf_enabled(!enabled) {
             drop(manager);
@@ -171,10 +177,10 @@ impl TrayIcon {
         drop(manager); // Release lock before calling update_icon
         self.update_icon(!enabled)?;
         
-        // Show balloon notification
-        self.show_notification(
-            "KeyMagic",
-            if !enabled { "KeyMagic enabled" } else { "KeyMagic disabled" }
+        // Show HUD notification
+        self.hud.show(
+            if !enabled { "KeyMagic enabled" } else { "KeyMagic disabled" },
+            !enabled
         )?;
         
         Ok(())
