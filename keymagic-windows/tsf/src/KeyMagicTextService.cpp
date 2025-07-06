@@ -123,12 +123,21 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_isProcessingKey = false;
     m_lastSendInputTime = 0;
     
+    // Initialize registry monitoring
+    m_hRegistryThread = nullptr;
+    m_hRegistryStopEvent = nullptr;
+    m_hRegistryKey = nullptr;
+    m_hRegistryChangeEvent = nullptr;
+    
     InitializeCriticalSection(&m_cs);
     DllAddRef();
 }
 
 CKeyMagicTextService::~CKeyMagicTextService()
 {
+    // Stop registry monitoring
+    StopRegistryMonitoring();
+    
     if (m_pCompositionMgr)
     {
         m_pCompositionMgr->Release();
@@ -249,6 +258,12 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
     // Register display attribute provider and create display attribute info
     RegisterDisplayAttributeProvider();
     CreateDisplayAttributeInfo();
+    
+    // Load initial keyboard
+    CheckAndReloadKeyboard();
+    
+    // Start registry monitoring
+    StartRegistryMonitoring();
 
     LeaveCriticalSection(&m_cs);
     return S_OK;
@@ -340,6 +355,9 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
 
     // Reset engine when focus changes
     ResetEngine();
+    
+    // Check and reload keyboard for new context
+    CheckAndReloadKeyboard();
 
     LeaveCriticalSection(&m_cs);
     return S_OK;
@@ -700,14 +718,12 @@ void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wPara
     if (!m_pEngine)
     {
         DEBUG_LOG(L"No engine available");
+        *pfEaten = FALSE;
         LeaveCriticalSection(&m_cs);
         return;
     }
     
-    // Check if keyboard needs to be reloaded
-    CheckAndReloadKeyboard();
-    
-    // Check if TSF is disabled
+    // Check if TSF is disabled (value is now updated by registry monitor thread)
     if (!m_tsfEnabled)
     {
         DEBUG_LOG(L"TSF is disabled, not processing key");
@@ -1502,4 +1518,174 @@ void CDirectEditSession::SetTextAction(int deleteCount, const std::wstring &inse
 {
     m_deleteCount = deleteCount;
     m_insertText = insertText;
+}
+
+// Registry monitoring implementation
+HRESULT CKeyMagicTextService::StartRegistryMonitoring()
+{
+    DEBUG_LOG_FUNC();
+    
+    // Open the registry key
+    const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, KEY_NOTIFY | KEY_READ, &m_hRegistryKey) != ERROR_SUCCESS)
+    {
+        DEBUG_LOG(L"Failed to open registry key for monitoring");
+        return E_FAIL;
+    }
+    
+    // Create stop event
+    m_hRegistryStopEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+    if (!m_hRegistryStopEvent)
+    {
+        RegCloseKey(m_hRegistryKey);
+        m_hRegistryKey = nullptr;
+        return E_FAIL;
+    }
+    
+    // Create registry change event
+    m_hRegistryChangeEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+    if (!m_hRegistryChangeEvent)
+    {
+        CloseHandle(m_hRegistryStopEvent);
+        m_hRegistryStopEvent = nullptr;
+        RegCloseKey(m_hRegistryKey);
+        m_hRegistryKey = nullptr;
+        return E_FAIL;
+    }
+    
+    // Start monitoring thread
+    m_hRegistryThread = CreateThread(nullptr, 0, RegistryMonitorThread, this, 0, nullptr);
+    if (!m_hRegistryThread)
+    {
+        CloseHandle(m_hRegistryChangeEvent);
+        m_hRegistryChangeEvent = nullptr;
+        CloseHandle(m_hRegistryStopEvent);
+        m_hRegistryStopEvent = nullptr;
+        RegCloseKey(m_hRegistryKey);
+        m_hRegistryKey = nullptr;
+        return E_FAIL;
+    }
+    
+    DEBUG_LOG(L"Registry monitoring started successfully");
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::StopRegistryMonitoring()
+{
+    DEBUG_LOG_FUNC();
+    
+    if (m_hRegistryThread)
+    {
+        // Signal the thread to stop
+        if (m_hRegistryStopEvent)
+        {
+            SetEvent(m_hRegistryStopEvent);
+        }
+        
+        // Wait for thread to finish
+        WaitForSingleObject(m_hRegistryThread, 5000);
+        CloseHandle(m_hRegistryThread);
+        m_hRegistryThread = nullptr;
+    }
+    
+    if (m_hRegistryChangeEvent)
+    {
+        CloseHandle(m_hRegistryChangeEvent);
+        m_hRegistryChangeEvent = nullptr;
+    }
+    
+    if (m_hRegistryStopEvent)
+    {
+        CloseHandle(m_hRegistryStopEvent);
+        m_hRegistryStopEvent = nullptr;
+    }
+    
+    if (m_hRegistryKey)
+    {
+        RegCloseKey(m_hRegistryKey);
+        m_hRegistryKey = nullptr;
+    }
+    
+    DEBUG_LOG(L"Registry monitoring stopped");
+    return S_OK;
+}
+
+DWORD WINAPI CKeyMagicTextService::RegistryMonitorThread(LPVOID lpParam)
+{
+    CKeyMagicTextService* pThis = static_cast<CKeyMagicTextService*>(lpParam);
+    pThis->RegistryMonitorLoop();
+    return 0;
+}
+
+void CKeyMagicTextService::RegistryMonitorLoop()
+{
+    DEBUG_LOG_FUNC();
+    
+    HANDLE handles[2] = { m_hRegistryChangeEvent, m_hRegistryStopEvent };
+    
+    while (true)
+    {
+        // Request notification for registry changes
+        if (RegNotifyChangeKeyValue(m_hRegistryKey, FALSE, REG_NOTIFY_CHANGE_LAST_SET, m_hRegistryChangeEvent, TRUE) != ERROR_SUCCESS)
+        {
+            DEBUG_LOG(L"RegNotifyChangeKeyValue failed");
+            break;
+        }
+        
+        // Wait for either registry change or stop event
+        DWORD dwWait = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+        
+        if (dwWait == WAIT_OBJECT_0)  // Registry changed
+        {
+            DEBUG_LOG(L"Registry change detected");
+            
+            // Enter critical section to update values
+            EnterCriticalSection(&m_cs);
+            
+            // Read TSFEnabled flag
+            DWORD tsfEnabled = 1;
+            DWORD dataSize = sizeof(tsfEnabled);
+            DWORD dataType;
+            if (RegQueryValueExW(m_hRegistryKey, L"TSFEnabled", NULL, &dataType, (LPBYTE)&tsfEnabled, &dataSize) == ERROR_SUCCESS)
+            {
+                bool newEnabled = (tsfEnabled != 0);
+                if (newEnabled != m_tsfEnabled)
+                {
+                    DEBUG_LOG(L"TSFEnabled changed from " + std::to_wstring(m_tsfEnabled) + L" to " + std::to_wstring(newEnabled));
+                    m_tsfEnabled = newEnabled;
+                }
+            }
+            
+            // Read default keyboard
+            wchar_t defaultKeyboard[256] = {0};
+            dataSize = sizeof(defaultKeyboard);
+            if (RegQueryValueExW(m_hRegistryKey, L"DefaultKeyboard", NULL, &dataType, (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
+            {
+                if (dataType == REG_SZ && defaultKeyboard[0] != L'\0')
+                {
+                    std::wstring newKeyboardId(defaultKeyboard);
+                    if (newKeyboardId != m_currentKeyboardId)
+                    {
+                        DEBUG_LOG(L"Default keyboard changed from \"" + m_currentKeyboardId + L"\" to \"" + newKeyboardId + L"\"");
+                        LoadKeyboardByID(newKeyboardId);
+                    }
+                }
+            }
+            
+            LeaveCriticalSection(&m_cs);
+            
+            // Reset the event
+            ResetEvent(m_hRegistryChangeEvent);
+        }
+        else if (dwWait == WAIT_OBJECT_0 + 1)  // Stop event
+        {
+            DEBUG_LOG(L"Registry monitor thread stopping");
+            break;
+        }
+        else
+        {
+            DEBUG_LOG(L"WaitForMultipleObjects failed or timed out");
+            break;
+        }
+    }
 }

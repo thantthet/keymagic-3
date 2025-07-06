@@ -19,7 +19,7 @@ use crate::keyboard_list::KeyboardListView;
 use crate::keyboard_preview::KeyboardPreview;
 use crate::tray::{TrayIcon, tray_message};
 use crate::tsf_status::TsfStatus;
-use crate::{log_info, log_error, log_debug};
+use crate::{log_info, log_error};
 
 const WINDOW_CLASS_NAME: PCWSTR = w!("KeyMagicConfigWindow");
 const WINDOW_TITLE: PCWSTR = w!("KeyMagic Configuration Manager");
@@ -28,6 +28,7 @@ const WINDOW_TITLE: PCWSTR = w!("KeyMagic Configuration Manager");
 const ID_FILE_ADD_KEYBOARD: u16 = 101;
 const ID_FILE_REMOVE_KEYBOARD: u16 = 102;
 const ID_FILE_EXIT: u16 = 103;
+const ID_FILE_SETTINGS: u16 = 104;
 const ID_KEYBOARD_ACTIVATE: u16 = 201;
 const ID_KEYBOARD_CONFIGURE: u16 = 202;
 const ID_HELP_ABOUT: u16 = 301;
@@ -169,6 +170,8 @@ impl MainWindow {
         AppendMenuW(file_menu, MF_STRING, ID_FILE_ADD_KEYBOARD as usize, w!("&Add Keyboard..."))?;
         AppendMenuW(file_menu, MF_STRING, ID_FILE_REMOVE_KEYBOARD as usize, w!("&Remove Keyboard"))?;
         AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null())?;
+        AppendMenuW(file_menu, MF_STRING, ID_FILE_SETTINGS as usize, w!("&Settings..."))?;
+        AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null())?;
         AppendMenuW(file_menu, MF_STRING, ID_FILE_EXIT as usize, w!("E&xit"))?;
         AppendMenuW(menu_bar, MF_POPUP, file_menu.0 as usize, w!("&File"))?;
         
@@ -249,6 +252,28 @@ impl MainWindow {
                 PostQuitMessage(0);
                 LRESULT(0)
             }
+            WM_HOTKEY => {
+                let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
+                if !window_ptr.is_null() {
+                    let window = &*window_ptr;
+                    let hotkey_id = wparam.0 as i32;
+                    
+                    log_info!("WM_HOTKEY received with id: {}", hotkey_id);
+                    
+                    if hotkey_id == 1 { // HOTKEY_ID_TOGGLE
+                        log_info!("Toggling TSF enabled state");
+                        if let Some(tray) = window.tray_icon.borrow().as_ref() {
+                            match tray.toggle_tsf_enabled() {
+                                Ok(()) => log_info!("TSF toggle successful"),
+                                Err(e) => log_error!("TSF toggle failed: {}", e),
+                            }
+                        } else {
+                            log_error!("No tray icon available");
+                        }
+                    }
+                }
+                LRESULT(0)
+            }
             WM_COMMAND => {
                 let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
                 if !window_ptr.is_null() {
@@ -261,6 +286,9 @@ impl MainWindow {
                         }
                         ID_FILE_REMOVE_KEYBOARD => {
                             window.remove_keyboard();
+                        }
+                        ID_FILE_SETTINGS => {
+                            window.show_settings();
                         }
                         ID_FILE_EXIT => {
                             PostQuitMessage(0);
@@ -501,5 +529,9 @@ impl MainWindow {
         if let Some(tray) = self.tray_icon.borrow().as_ref() {
             let _ = tray.update_tooltip(&tooltip);
         }
+    }
+    
+    fn show_settings(&self) {
+        let _ = crate::settings::SettingsDialog::show(self.hwnd, self.keyboard_manager.clone());
     }
 }

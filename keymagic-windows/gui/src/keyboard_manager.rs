@@ -391,4 +391,68 @@ impl KeyboardManager {
             }
         }
     }
+    
+    pub fn read_registry_value(&self, subkey: &str) -> Option<String> {
+        unsafe {
+            let mut hkey = HKEY::default();
+            
+            // Parse the subkey to extract the key path and value name
+            let (key_path, value_name) = if let Some(pos) = subkey.rfind('\\') {
+                let path = &subkey[..pos];
+                let value = &subkey[pos + 1..];
+                (format!("Software\\KeyMagic\\{}", path), value)
+            } else {
+                // If no backslash, assume it's just a value under Settings
+                ("Software\\KeyMagic\\Settings".to_string(), subkey)
+            };
+            
+            let wide_path: Vec<u16> = key_path.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_value: Vec<u16> = value_name.encode_utf16().chain(std::iter::once(0)).collect();
+            
+            if RegOpenKeyExW(
+                HKEY_CURRENT_USER,
+                PCWSTR(wide_path.as_ptr()),
+                0,
+                KEY_READ,
+                &mut hkey
+            ).is_ok() {
+                let result = self.read_registry_string(hkey, PCWSTR(wide_value.as_ptr()));
+                RegCloseKey(hkey);
+                result
+            } else {
+                None
+            }
+        }
+    }
+    
+    pub fn write_registry_value(&self, subkey: &str, value: &str) -> Result<()> {
+        unsafe {
+            let mut hkey = HKEY::default();
+            
+            // Parse the subkey to extract the key path and value name
+            let (key_path, value_name) = if let Some(pos) = subkey.rfind('\\') {
+                let path = &subkey[..pos];
+                let val = &subkey[pos + 1..];
+                (format!("Software\\KeyMagic\\{}", path), val)
+            } else {
+                // If no backslash, assume it's just a value under Settings
+                ("Software\\KeyMagic\\Settings".to_string(), subkey)
+            };
+            
+            let wide_path: Vec<u16> = key_path.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_value_name: Vec<u16> = value_name.encode_utf16().chain(std::iter::once(0)).collect();
+            
+            if RegCreateKeyW(
+                HKEY_CURRENT_USER,
+                PCWSTR(wide_path.as_ptr()),
+                &mut hkey
+            ).is_ok() {
+                self.write_registry_string(hkey, PCWSTR(wide_value_name.as_ptr()), value)?;
+                RegCloseKey(hkey);
+                Ok(())
+            } else {
+                Err(anyhow!("Failed to open registry key"))
+            }
+        }
+    }
 }

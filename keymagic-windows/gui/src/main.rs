@@ -16,6 +16,7 @@ mod keyboard_preview;
 mod tray;
 mod tsf_status;
 mod logger;
+mod settings;
 
 use window::MainWindow;
 use app::App;

@@ -97,6 +97,12 @@ private:
     HRESULT UnregisterDisplayAttributeProvider();
     HRESULT CreateDisplayAttributeInfo();
     
+    // Registry monitoring
+    HRESULT StartRegistryMonitoring();
+    HRESULT StopRegistryMonitoring();
+    static DWORD WINAPI RegistryMonitorThread(LPVOID lpParam);
+    void RegistryMonitorLoop();
+    
     // Member variables
     LONG m_cRef;
     ITfThreadMgr *m_pThreadMgr;
@@ -115,6 +121,12 @@ private:
     
     // Critical section for thread safety
     CRITICAL_SECTION m_cs;
+    
+    // Registry monitoring
+    HANDLE m_hRegistryThread;
+    HANDLE m_hRegistryStopEvent;
+    HKEY m_hRegistryKey;
+    HANDLE m_hRegistryChangeEvent;
     
     // Composition manager
     CCompositionManager *m_pCompositionMgr;

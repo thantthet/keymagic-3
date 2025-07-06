@@ -35,6 +35,8 @@ pub fn log_error(message: &str) {
 pub fn log_debug(message: &str) {
     #[cfg(debug_assertions)]
     log_message("DEBUG", message);
+    #[cfg(not(debug_assertions))]
+    let _ = message; // Suppress unused warning in release builds
 }
 
 fn log_message(level: &str, message: &str) {

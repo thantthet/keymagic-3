@@ -5,6 +5,7 @@ use windows::{
         UI::WindowsAndMessaging::*,
         UI::Shell::*,
         System::LibraryLoader::GetModuleHandleW,
+        UI::Input::KeyboardAndMouse::*,
     },
 };
 use std::sync::{Arc, Mutex};
@@ -14,29 +15,246 @@ use crate::keyboard_manager::KeyboardManager;
 const WM_TRAYICON: u32 = WM_USER + 100;
 const TRAY_ICON_ID: u32 = 1;
 
+// Hotkey constants
+const HOTKEY_ID_TOGGLE: i32 = 1;
+
 // Tray menu command IDs
 const ID_TRAY_SHOW: u16 = 1001;
 const ID_TRAY_EXIT: u16 = 1002;
 const ID_TRAY_TOGGLE_TSF: u16 = 1003;
+const ID_TRAY_SETTINGS: u16 = 1004;
 const ID_TRAY_KEYBOARD_BASE: u16 = 2000; // Base ID for dynamic keyboard menu items
+
+// Export the tray message constant
+pub fn tray_message() -> u32 {
+    WM_TRAYICON
+}
 
 pub struct TrayIcon {
     hwnd: HWND,
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
+    icon_enabled: HICON,
+    icon_disabled: HICON,
 }
 
 impl TrayIcon {
     pub fn new(hwnd: HWND, keyboard_manager: Arc<Mutex<KeyboardManager>>) -> Result<Self> {
-        let tray = TrayIcon {
-            hwnd,
-            keyboard_manager,
+        unsafe {
+            // Load icons - use the same icon for now, can customize later
+            let icon_enabled = LoadIconW(GetModuleHandleW(None)?, PCWSTR(1 as *const u16))?;
+            let icon_disabled = LoadIconW(GetModuleHandleW(None)?, PCWSTR(1 as *const u16))?;
+            
+            let mut tray = TrayIcon {
+                hwnd,
+                keyboard_manager,
+                icon_enabled,
+                icon_disabled,
+            };
+            
+            tray.create_icon()?;
+            tray.register_toggle_hotkey()?;
+            Ok(tray)
+        }
+    }
+    
+    fn register_toggle_hotkey(&mut self) -> Result<()> {
+        unsafe {
+            // Read hotkey from registry (default: Ctrl+Shift+Space)
+            let hotkey_str = self.keyboard_manager.lock().unwrap()
+                .read_registry_value("Settings\\ToggleHotkey")
+                .unwrap_or_else(|| "Ctrl+Shift+Space".to_string());
+            
+            println!("Registering hotkey: {}", hotkey_str);
+            
+            // Parse hotkey string
+            let (modifiers, vk) = Self::parse_hotkey(&hotkey_str)?;
+            
+            println!("Parsed hotkey - modifiers: {}, vk: {}", modifiers, vk);
+            
+            // Register with Windows
+            println!("Calling RegisterHotKey with hwnd: {:?}, id: {}, modifiers: 0x{:X}, vk: 0x{:X}", 
+                self.hwnd, HOTKEY_ID_TOGGLE, modifiers, vk);
+            
+            if RegisterHotKey(self.hwnd, HOTKEY_ID_TOGGLE, HOT_KEY_MODIFIERS(modifiers), vk).is_err() {
+                let error = Error::from_win32();
+                println!("Failed to register custom hotkey: {:?}", error);
+                
+                // Try with default if custom hotkey fails
+                let default_modifiers = MOD_CONTROL.0 | MOD_SHIFT.0;
+                let default_vk = VK_SPACE.0 as u32;
+                println!("Trying default hotkey with modifiers: 0x{:X}, vk: 0x{:X}", 
+                    default_modifiers, default_vk);
+                
+                if RegisterHotKey(self.hwnd, HOTKEY_ID_TOGGLE, 
+                    HOT_KEY_MODIFIERS(default_modifiers), default_vk).is_err() {
+                    let error = Error::from_win32();
+                    println!("Failed to register default hotkey: {:?}", error);
+                    return Err(error);
+                }
+                println!("Registered default hotkey: Ctrl+Shift+Space");
+            } else {
+                println!("Successfully registered hotkey");
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn parse_hotkey(hotkey_str: &str) -> Result<(u32, u32)> {
+        let parts: Vec<&str> = hotkey_str.split('+').collect();
+        let mut modifiers = 0u32;
+        let mut vk = 0u32;
+        
+        for part in parts {
+            match part.trim().to_uppercase().as_str() {
+                "CTRL" | "CONTROL" => modifiers |= MOD_CONTROL.0,
+                "ALT" => modifiers |= MOD_ALT.0,
+                "SHIFT" => modifiers |= MOD_SHIFT.0,
+                "WIN" | "WINDOWS" => modifiers |= MOD_WIN.0,
+                key => {
+                    // Parse the actual key
+                    vk = match key {
+                        "SPACE" => VK_SPACE.0 as u32,
+                        "TAB" => VK_TAB.0 as u32,
+                        "ENTER" | "RETURN" => VK_RETURN.0 as u32,
+                        "ESC" | "ESCAPE" => VK_ESCAPE.0 as u32,
+                        s if s.len() == 1 => {
+                            // Single character
+                            let ch = s.chars().next().unwrap();
+                            if ch.is_ascii_alphanumeric() {
+                                ch.to_ascii_uppercase() as u32
+                            } else {
+                                return Err(Error::from_win32());
+                            }
+                        }
+                        s if s.starts_with('F') && s.len() <= 3 => {
+                            // Function keys F1-F24
+                            if let Ok(num) = s[1..].parse::<u32>() {
+                                if num >= 1 && num <= 24 {
+                                    VK_F1.0 as u32 + num - 1
+                                } else {
+                                    return Err(Error::from_win32());
+                                }
+                            } else {
+                                return Err(Error::from_win32());
+                            }
+                        }
+                        _ => return Err(Error::from_win32()),
+                    };
+                }
+            }
+        }
+        
+        if vk == 0 {
+            return Err(Error::from_win32());
+        }
+        
+        Ok((modifiers, vk))
+    }
+    
+    pub fn unregister_hotkey(&self) -> Result<()> {
+        unsafe {
+            UnregisterHotKey(self.hwnd, HOTKEY_ID_TOGGLE);
+        }
+        Ok(())
+    }
+    
+    pub fn toggle_tsf_enabled(&self) -> Result<()> {
+        let mut manager = self.keyboard_manager.lock().unwrap();
+        let enabled = manager.is_tsf_enabled();
+        if let Err(e) = manager.set_tsf_enabled(!enabled) {
+            drop(manager);
+            return Err(Error::new(HRESULT(-1), format!("Failed to set TSF enabled: {}", e).into()));
+        }
+        
+        // Update tray icon and tooltip
+        drop(manager); // Release lock before calling update_icon
+        self.update_icon(!enabled)?;
+        
+        // Show balloon notification
+        self.show_notification(
+            "KeyMagic",
+            if !enabled { "KeyMagic enabled" } else { "KeyMagic disabled" }
+        )?;
+        
+        Ok(())
+    }
+    
+    fn show_notification(&self, title: &str, text: &str) -> Result<()> {
+        unsafe {
+            let mut nid = NOTIFYICONDATAW {
+                cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+                hWnd: self.hwnd,
+                uID: TRAY_ICON_ID,
+                uFlags: NIF_INFO,
+                dwInfoFlags: NIIF_INFO,
+                szInfoTitle: {
+                    let mut buf = [0u16; 64];
+                    let wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+                    let len = wide.len().min(63);
+                    buf[..len].copy_from_slice(&wide[..len]);
+                    buf
+                },
+                szInfo: {
+                    let mut buf = [0u16; 256];
+                    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+                    let len = wide.len().min(255);
+                    buf[..len].copy_from_slice(&wide[..len]);
+                    buf
+                },
+                ..Default::default()
+            };
+            
+            Shell_NotifyIconW(NIM_MODIFY, &mut nid).ok();
+        }
+        
+        Ok(())
+    }
+    
+    pub fn update_icon(&self, enabled: bool) -> Result<()> {
+        let manager = self.keyboard_manager.lock().unwrap();
+        let tooltip = if enabled {
+            "KeyMagic - Enabled"
+        } else {
+            "KeyMagic - Disabled"
         };
         
-        tray.create_icon()?;
-        Ok(tray)
+        drop(manager); // Release lock
+        
+        unsafe {
+            let mut nid = NOTIFYICONDATAW {
+                cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+                hWnd: self.hwnd,
+                uID: TRAY_ICON_ID,
+                uFlags: NIF_ICON | NIF_TIP,
+                hIcon: if enabled { self.icon_enabled } else { self.icon_disabled },
+                szTip: {
+                    let mut tip = [0u16; 128];
+                    let wide: Vec<u16> = tooltip.encode_utf16().chain(std::iter::once(0)).collect();
+                    let len = wide.len().min(127);
+                    tip[..len].copy_from_slice(&wide[..len]);
+                    tip
+                },
+                ..Default::default()
+            };
+            
+            Shell_NotifyIconW(NIM_MODIFY, &mut nid).ok();
+        }
+        
+        Ok(())
     }
     
     fn create_icon(&self) -> Result<()> {
+        let manager = self.keyboard_manager.lock().unwrap();
+        let enabled = manager.is_tsf_enabled();
+        let tooltip = if enabled {
+            "KeyMagic - Enabled"
+        } else {
+            "KeyMagic - Disabled"
+        };
+        
+        drop(manager); // Release lock
+        
         unsafe {
             let mut nid = NOTIFYICONDATAW {
                 cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
@@ -44,12 +262,12 @@ impl TrayIcon {
                 uID: TRAY_ICON_ID,
                 uFlags: NIF_MESSAGE | NIF_ICON | NIF_TIP,
                 uCallbackMessage: WM_TRAYICON,
-                hIcon: LoadIconW(GetModuleHandleW(None)?, PCWSTR(1 as *const u16))?, // IDI_KEYMAGIC
+                hIcon: if enabled { self.icon_enabled } else { self.icon_disabled },
                 szTip: {
                     let mut tip = [0u16; 128];
-                    let tip_text = w!("KeyMagic Configuration Manager");
-                    let len = tip_text.as_wide().len().min(127);
-                    tip[..len].copy_from_slice(&tip_text.as_wide()[..len]);
+                    let wide: Vec<u16> = tooltip.encode_utf16().chain(std::iter::once(0)).collect();
+                    let len = wide.len().min(127);
+                    tip[..len].copy_from_slice(&wide[..len]);
                     tip
                 },
                 ..Default::default()
@@ -204,11 +422,8 @@ impl TrayIcon {
 
 impl Drop for TrayIcon {
     fn drop(&mut self) {
+        let _ = self.unregister_hotkey();
         let _ = self.remove();
     }
 }
 
-// Export the tray message constant for use in window procedure
-pub const fn tray_message() -> u32 {
-    WM_TRAYICON
-}
