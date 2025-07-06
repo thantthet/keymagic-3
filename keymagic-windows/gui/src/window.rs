@@ -24,6 +24,9 @@ use crate::{log_info, log_error};
 const WINDOW_CLASS_NAME: PCWSTR = w!("KeyMagicConfigWindow");
 const WINDOW_TITLE: PCWSTR = w!("KeyMagic Configuration Manager");
 
+// Custom messages
+const WM_HOTKEY_CHANGED: u32 = WM_USER + 200;
+
 // Menu command IDs
 const ID_FILE_ADD_KEYBOARD: u16 = 101;
 const ID_FILE_REMOVE_KEYBOARD: u16 = 102;
@@ -418,6 +421,23 @@ impl MainWindow {
                             }
                         }
                         _ => {}
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_HOTKEY_CHANGED => {
+                let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const MainWindow;
+                if !window_ptr.is_null() {
+                    let window = &*window_ptr;
+                    
+                    log_info!("Hotkey changed, re-registering...");
+                    
+                    // Re-register the hotkey with the tray icon
+                    if let Some(tray) = window.tray_icon.borrow_mut().as_mut() {
+                        match tray.reregister_hotkey() {
+                            Ok(()) => log_info!("Hotkey re-registered successfully"),
+                            Err(e) => log_error!("Failed to re-register hotkey: {}", e),
+                        }
                     }
                 }
                 LRESULT(0)

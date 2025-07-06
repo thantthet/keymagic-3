@@ -73,7 +73,8 @@ impl TrayIcon {
             println!("Registering hotkey: {}", hotkey_str);
             
             // Parse hotkey string
-            let (modifiers, vk) = Self::parse_hotkey(&hotkey_str)?;
+            let (vk, modifiers) = KeyboardManager::parse_hotkey_string(&hotkey_str)
+                .ok_or_else(|| Error::from_win32())?;
             
             println!("Parsed hotkey - modifiers: {}, vk: {}", modifiers, vk);
             
@@ -106,63 +107,20 @@ impl TrayIcon {
         Ok(())
     }
     
-    fn parse_hotkey(hotkey_str: &str) -> Result<(u32, u32)> {
-        let parts: Vec<&str> = hotkey_str.split('+').collect();
-        let mut modifiers = 0u32;
-        let mut vk = 0u32;
-        
-        for part in parts {
-            match part.trim().to_uppercase().as_str() {
-                "CTRL" | "CONTROL" => modifiers |= MOD_CONTROL.0,
-                "ALT" => modifiers |= MOD_ALT.0,
-                "SHIFT" => modifiers |= MOD_SHIFT.0,
-                "WIN" | "WINDOWS" => modifiers |= MOD_WIN.0,
-                key => {
-                    // Parse the actual key
-                    vk = match key {
-                        "SPACE" => VK_SPACE.0 as u32,
-                        "TAB" => VK_TAB.0 as u32,
-                        "ENTER" | "RETURN" => VK_RETURN.0 as u32,
-                        "ESC" | "ESCAPE" => VK_ESCAPE.0 as u32,
-                        s if s.len() == 1 => {
-                            // Single character
-                            let ch = s.chars().next().unwrap();
-                            if ch.is_ascii_alphanumeric() {
-                                ch.to_ascii_uppercase() as u32
-                            } else {
-                                return Err(Error::from_win32());
-                            }
-                        }
-                        s if s.starts_with('F') && s.len() <= 3 => {
-                            // Function keys F1-F24
-                            if let Ok(num) = s[1..].parse::<u32>() {
-                                if num >= 1 && num <= 24 {
-                                    VK_F1.0 as u32 + num - 1
-                                } else {
-                                    return Err(Error::from_win32());
-                                }
-                            } else {
-                                return Err(Error::from_win32());
-                            }
-                        }
-                        _ => return Err(Error::from_win32()),
-                    };
-                }
-            }
-        }
-        
-        if vk == 0 {
-            return Err(Error::from_win32());
-        }
-        
-        Ok((modifiers, vk))
-    }
     
     pub fn unregister_hotkey(&self) -> Result<()> {
         unsafe {
             UnregisterHotKey(self.hwnd, HOTKEY_ID_TOGGLE);
         }
         Ok(())
+    }
+    
+    pub fn reregister_hotkey(&mut self) -> Result<()> {
+        // Unregister the old hotkey first
+        self.unregister_hotkey()?;
+        
+        // Register the new hotkey
+        self.register_toggle_hotkey()
     }
     
     pub fn toggle_tsf_enabled(&self) -> Result<()> {

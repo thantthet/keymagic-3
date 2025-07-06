@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use std::ffi::CString;
 use windows::core::*;
 use windows::Win32::System::Registry::*;
+use windows::Win32::UI::Input::KeyboardAndMouse::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::{Result, anyhow};
 
 // Import FFI types from keymagic-core
@@ -454,5 +456,71 @@ impl KeyboardManager {
                 Err(anyhow!("Failed to open registry key"))
             }
         }
+    }
+    
+    /// Parse a hotkey string (e.g., "Ctrl+Shift+Space") into Windows virtual key code and modifiers
+    pub fn parse_hotkey_string(hotkey: &str) -> Option<(u32, u32)> {
+        let parts: Vec<&str> = hotkey.split('+').map(|s| s.trim()).collect();
+        if parts.is_empty() {
+            return None;
+        }
+        
+        let mut modifiers = 0u32;
+        let mut key_part = "";
+        
+        for part in &parts {
+            match part.to_lowercase().as_str() {
+                "ctrl" | "control" => modifiers |= MOD_CONTROL.0,
+                "alt" | "menu" => modifiers |= MOD_ALT.0,
+                "shift" => modifiers |= MOD_SHIFT.0,
+                "win" | "windows" | "super" => modifiers |= MOD_WIN.0,
+                _ => key_part = part,
+            }
+        }
+        
+        // Parse the main key
+        let vk = match key_part.to_uppercase().as_str() {
+            "SPACE" => VK_SPACE.0 as u32,
+            "TAB" => VK_TAB.0 as u32,
+            "ENTER" | "RETURN" => VK_RETURN.0 as u32,
+            "ESC" | "ESCAPE" => VK_ESCAPE.0 as u32,
+            "BACK" | "BACKSPACE" => VK_BACK.0 as u32,
+            "DELETE" | "DEL" => VK_DELETE.0 as u32,
+            "INSERT" | "INS" => VK_INSERT.0 as u32,
+            "HOME" => VK_HOME.0 as u32,
+            "END" => VK_END.0 as u32,
+            "PAGEUP" | "PGUP" => VK_PRIOR.0 as u32,
+            "PAGEDOWN" | "PGDN" => VK_NEXT.0 as u32,
+            "LEFT" => VK_LEFT.0 as u32,
+            "RIGHT" => VK_RIGHT.0 as u32,
+            "UP" => VK_UP.0 as u32,
+            "DOWN" => VK_DOWN.0 as u32,
+            "F1" => VK_F1.0 as u32,
+            "F2" => VK_F2.0 as u32,
+            "F3" => VK_F3.0 as u32,
+            "F4" => VK_F4.0 as u32,
+            "F5" => VK_F5.0 as u32,
+            "F6" => VK_F6.0 as u32,
+            "F7" => VK_F7.0 as u32,
+            "F8" => VK_F8.0 as u32,
+            "F9" => VK_F9.0 as u32,
+            "F10" => VK_F10.0 as u32,
+            "F11" => VK_F11.0 as u32,
+            "F12" => VK_F12.0 as u32,
+            // Single letter keys
+            s if s.len() == 1 => {
+                let ch = s.chars().next().unwrap();
+                if ch.is_ascii_alphabetic() {
+                    ch.to_ascii_uppercase() as u32
+                } else if ch.is_ascii_digit() {
+                    ch as u32
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        };
+        
+        Some((vk, modifiers))
     }
 }
