@@ -6,6 +6,22 @@
 #include <msctf.h>
 #include <windows.h>
 
+// List of categories to register the text service under
+static const GUID* g_SupportedCategories[] = {
+    &GUID_TFCAT_TIP_KEYBOARD,                    // Register as keyboard
+    &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,        // Support for Metro/UWP apps
+    &GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,          // Support for system tray
+    // Add more categories as needed:
+    // &GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,  // For input mode switching
+    // &GUID_TFCAT_TIPCAP_COMLESS,               // For COM-less activation
+    // &GUID_TFCAT_TIPCAP_WOW16,                 // For 16-bit app support
+    // &GUID_TFCAT_TIPCAP_UIELEMENTENABLED,      // For UI elements
+    // &GUID_TFCAT_TIPCAP_SECUREMODE,            // For secure desktop
+    // &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,     // For display attributes
+};
+
+static const int g_SupportedCategoriesCount = ARRAYSIZE(g_SupportedCategories);
+
 BOOL CreateRegKey(HKEY hKeyParent, LPCWSTR lpszKeyName, LPCWSTR lpszValue)
 {
     HKEY hKey;
@@ -122,9 +138,46 @@ BOOL RegisterTextService()
                     (ULONG)(-IDI_KEYMAGIC),
                     0);
             }
+            
+            // Enable the profiles by default
+            if (SUCCEEDED(hr))
+            {
+                pInputProcessProfiles->EnableLanguageProfile(
+                    CLSID_KeyMagicTextService,
+                    TEXTSERVICE_LANGID,
+                    GUID_KeyMagicProfile,
+                    TRUE);
+                    
+                pInputProcessProfiles->EnableLanguageProfile(
+                    CLSID_KeyMagicTextService,
+                    MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
+                    GUID_KeyMagicProfile,
+                    TRUE);
+            }
         }
 
         pInputProcessProfiles->Release();
+    }
+
+    // Register the text service under all supported categories
+    if (SUCCEEDED(hr))
+    {
+        ITfCategoryMgr *pCategoryMgr;
+        hr = CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER,
+                             IID_ITfCategoryMgr, (void**)&pCategoryMgr);
+        
+        if (SUCCEEDED(hr))
+        {
+            // Register all supported categories
+            for (int i = 0; i < g_SupportedCategoriesCount && SUCCEEDED(hr); i++)
+            {
+                hr = pCategoryMgr->RegisterCategory(CLSID_KeyMagicTextService,
+                                                   *g_SupportedCategories[i],
+                                                   CLSID_KeyMagicTextService);
+            }
+            
+            pCategoryMgr->Release();
+        }
     }
 
     // Enable the profile by default
@@ -172,5 +225,23 @@ void UnregisterTextService()
         // Unregister the text service
         pInputProcessProfiles->Unregister(CLSID_KeyMagicTextService);
         pInputProcessProfiles->Release();
+    }
+
+    // Unregister from all categories
+    ITfCategoryMgr *pCategoryMgr;
+    hr = CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_ITfCategoryMgr, (void**)&pCategoryMgr);
+    
+    if (SUCCEEDED(hr))
+    {
+        // Unregister all supported categories
+        for (int i = 0; i < g_SupportedCategoriesCount; i++)
+        {
+            pCategoryMgr->UnregisterCategory(CLSID_KeyMagicTextService,
+                                            *g_SupportedCategories[i],
+                                            CLSID_KeyMagicTextService);
+        }
+        
+        pCategoryMgr->Release();
     }
 }
