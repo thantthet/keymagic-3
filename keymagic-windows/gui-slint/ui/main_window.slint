@@ -80,6 +80,10 @@ export component MainWindow inherits Window {
     in-out property <bool> minimize-to-tray: true;
     in-out property <bool> show-notifications: true;
     
+    // Hotkey dialog properties
+    in-out property <bool> show-hotkey-dialog: false;
+    in-out property <KeyboardInfo> dialog-keyboard;
+    
     callback page-changed(string);
     callback add-keyboard();
     callback remove-keyboard();
@@ -88,6 +92,7 @@ export component MainWindow inherits Window {
     callback save-settings();
     callback reset-settings();
     callback keyboard-hotkey-changed(string /* keyboard-id */, string /* hotkey */);
+    callback open-hotkey-dialog(string /* keyboard-id */);
     
     // Dialog control functions
     public function show-remove-confirmation(keyboard-id: string) {
@@ -326,10 +331,13 @@ export component MainWindow inherits Window {
                 show-in-tray <=> root.show-in-tray;
                 minimize-to-tray <=> root.minimize-to-tray;
                 show-notifications <=> root.show-notifications;
+                show-hotkey-dialog <=> root.show-hotkey-dialog;
+                dialog-keyboard <=> root.dialog-keyboard;
                 
                 save-settings => { root.save-settings(); }
                 reset-settings => { root.reset-settings(); }
                 keyboard-hotkey-changed(id, hotkey) => { root.keyboard-hotkey-changed(id, hotkey); }
+                open-hotkey-dialog(id) => { root.open-hotkey-dialog(id); }
             }
             
             if root.current-page == "about": VerticalLayout {

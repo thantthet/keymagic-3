@@ -269,6 +269,14 @@ impl App {
             let window = window_weak_hotkey.upgrade().unwrap();
             Self::handle_keyboard_hotkey_changed(&window, &manager_hotkey, &id, &hotkey);
         });
+        
+        // Open hotkey dialog callback
+        let window_weak_dialog = window.as_weak();
+        let manager_dialog = self.keyboard_manager.clone();
+        window.on_open_hotkey_dialog(move |id| {
+            let window = window_weak_dialog.upgrade().unwrap();
+            Self::handle_open_hotkey_dialog(&window, &manager_dialog, &id);
+        });
     }
     
     fn refresh_keyboards(&self, window: &MainWindow) -> Result<()> {
@@ -548,5 +556,25 @@ impl App {
         
         // Valid if at least 2 modifiers, or 1 modifier + a key
         modifier_count >= 2 || (modifier_count >= 1 && has_key)
+    }
+    
+    fn handle_open_hotkey_dialog(window: &MainWindow, manager: &Arc<Mutex<KeyboardManager>>, id: &str) {
+        println!("Opening hotkey dialog for keyboard: {}", id);
+        
+        // Find the keyboard in the current list
+        let mgr = manager.lock().unwrap();
+        let keyboards = mgr.get_keyboards();
+        let active_id = mgr.get_active_keyboard();
+        
+        if let Some(keyboard) = keyboards.iter().find(|kb| kb.id == id) {
+            // Convert to SlintKeyboardInfo
+            let dialog_keyboard = convert_keyboard_info(keyboard, active_id, &mgr);
+            
+            // Set the dialog keyboard and show the dialog
+            window.set_dialog_keyboard(dialog_keyboard);
+            window.set_show_hotkey_dialog(true);
+        } else {
+            eprintln!("Keyboard not found: {}", id);
+        }
     }
 }
