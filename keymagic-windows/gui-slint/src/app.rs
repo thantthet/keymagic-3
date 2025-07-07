@@ -1,14 +1,16 @@
 use std::sync::{Arc, Mutex};
 use anyhow::Result;
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel, Weak};
 
 use crate::{MainWindow, KeyboardInfo as SlintKeyboardInfo};
 use crate::keyboard_manager::KeyboardManager;
 use crate::models::convert_keyboard_info;
 use crate::file_dialog::show_open_file_dialog;
+use crate::tray::TrayManager;
 
 pub struct App {
     keyboard_manager: Arc<Mutex<KeyboardManager>>,
+    tray_manager: Arc<Mutex<Option<Arc<TrayManager>>>>,
 }
 
 impl App {
@@ -17,6 +19,7 @@ impl App {
         
         Ok(Self {
             keyboard_manager,
+            tray_manager: Arc::new(Mutex::new(None)),
         })
     }
     
@@ -30,6 +33,99 @@ impl App {
         
         // Load settings from registry
         self.load_settings(window)?;
+        
+        Ok(())
+    }
+    
+    pub fn setup_tray(&self, window_weak: Weak<MainWindow>) -> Result<()> {
+        let manager = self.keyboard_manager.clone();
+        
+        // Create tray manager with callbacks
+        let tray_manager = TrayManager::new(
+            // Show window callback
+            {
+                let window_weak = window_weak.clone();
+                move || {
+                    if let Some(window) = window_weak.upgrade() {
+                        window.show().ok();
+                    }
+                }
+            },
+            // Exit callback
+            {
+                let window_weak = window_weak.clone();
+                move || {
+                    if let Some(window) = window_weak.upgrade() {
+                        window.hide().ok();
+                        slint::quit_event_loop().ok();
+                    }
+                }
+            },
+            // Keyboard selected callback
+            {
+                let manager = manager.clone();
+                let window_weak = window_weak.clone();
+                move |id: &str| {
+                    let mut mgr = manager.lock().unwrap();
+                    if let Err(e) = mgr.set_active_keyboard(id) {
+                        eprintln!("Failed to activate keyboard from tray: {}", e);
+                    } else {
+                        drop(mgr);
+                        // Update UI if window is visible
+                        if let Some(window) = window_weak.upgrade() {
+                            // Refresh keyboard list
+                            let mgr = manager.lock().unwrap();
+                            let keyboards = mgr.get_keyboards();
+                            let active_id = mgr.get_active_keyboard();
+                            
+                            let slint_keyboards: Vec<SlintKeyboardInfo> = keyboards.iter()
+                                .map(|kb| convert_keyboard_info(kb, active_id, &mgr))
+                                .collect();
+                            
+                            let model = VecModel::from(slint_keyboards);
+                            window.set_keyboards(ModelRc::new(model));
+                        }
+                    }
+                }
+            }
+        )?;
+        
+        // Show tray if enabled in settings
+        if let Some(window) = window_weak.upgrade() {
+            if window.get_show_in_tray() {
+                tray_manager.show()?;
+                self.update_tray_menu(&tray_manager)?;
+            }
+        }
+        
+        *self.tray_manager.lock().unwrap() = Some(tray_manager);
+        Ok(())
+    }
+    
+    fn update_tray_menu(&self, tray: &TrayManager) -> Result<()> {
+        let mgr = self.keyboard_manager.lock().unwrap();
+        let keyboards = mgr.get_keyboards();
+        let active_id = mgr.get_active_keyboard();
+        
+        // Convert to tray menu format
+        let menu_items: Vec<(String, String, bool)> = keyboards.iter()
+            .map(|kb| (kb.id.clone(), kb.name.clone(), true))
+            .collect();
+        
+        tray.update_menu(&menu_items, active_id)?;
+        
+        // Update tooltip
+        let tooltip = if let Some(active_id) = active_id {
+            if let Some(kb) = keyboards.iter().find(|k| k.id == active_id) {
+                format!("KeyMagic - {}", kb.name)
+            } else {
+                "KeyMagic".to_string()
+            }
+        } else {
+            "KeyMagic".to_string()
+        };
+        
+        tray.update_tooltip(&tooltip)?;
         
         Ok(())
     }
@@ -152,9 +248,10 @@ impl App {
         // Save settings callback
         let window_weak_save = window.as_weak();
         let manager_save = self.keyboard_manager.clone();
+        let tray_save = self.tray_manager.clone();
         window.on_save_settings(move || {
             let window = window_weak_save.upgrade().unwrap();
-            Self::handle_save_settings(&window, &manager_save);
+            Self::handle_save_settings(&window, &manager_save, &tray_save);
         });
         
         // Reset settings callback
@@ -313,7 +410,7 @@ impl App {
         }
     }
     
-    fn handle_save_settings(window: &MainWindow, manager: &Arc<Mutex<KeyboardManager>>) {
+    fn handle_save_settings(window: &MainWindow, manager: &Arc<Mutex<KeyboardManager>>, tray_manager: &Arc<Mutex<Option<Arc<TrayManager>>>>) {
         println!("Saving settings...");
         
         // Save general settings
@@ -346,6 +443,38 @@ impl App {
                 mgr.write_registry_dword(hkey, w!("ShowNotifications"), if window.get_show_notifications() { 1 } else { 0 }).ok();
                 
                 RegCloseKey(hkey);
+            }
+        }
+        
+        // Update tray visibility based on settings
+        if let Some(tray) = tray_manager.lock().unwrap().as_ref() {
+            if window.get_show_in_tray() {
+                tray.show().ok();
+                // Update tray menu
+                let mgr = manager.lock().unwrap();
+                let keyboards = mgr.get_keyboards();
+                let active_id = mgr.get_active_keyboard();
+                
+                let menu_items: Vec<(String, String, bool)> = keyboards.iter()
+                    .map(|kb| (kb.id.clone(), kb.name.clone(), true))
+                    .collect();
+                
+                tray.update_menu(&menu_items, active_id).ok();
+                
+                // Update tooltip
+                let tooltip = if let Some(active_id) = active_id {
+                    if let Some(kb) = keyboards.iter().find(|k| k.id == active_id) {
+                        format!("KeyMagic - {}", kb.name)
+                    } else {
+                        "KeyMagic".to_string()
+                    }
+                } else {
+                    "KeyMagic".to_string()
+                };
+                
+                tray.update_tooltip(&tooltip).ok();
+            } else {
+                tray.hide().ok();
             }
         }
         
@@ -408,11 +537,13 @@ impl App {
             return false;
         }
         
-        let modifiers = ["Ctrl", "Alt", "Shift"];
-        let modifier_count = parts.iter().filter(|p| modifiers.contains(&p.trim())).count();
+        let modifiers = ["ctrl", "alt", "shift"];
+        let modifier_count = parts.iter().filter(|p| {
+            modifiers.contains(&p.trim().to_lowercase().as_str())
+        }).count();
         let has_key = parts.iter().any(|p| {
-            let trimmed = p.trim();
-            !modifiers.contains(&trimmed) && !trimmed.is_empty()
+            let trimmed = p.trim().to_lowercase();
+            !modifiers.contains(&trimmed.as_str()) && !trimmed.is_empty()
         });
         
         // Valid if at least 2 modifiers, or 1 modifier + a key

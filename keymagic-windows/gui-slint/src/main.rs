@@ -12,6 +12,7 @@ mod models;
 mod file_dialog;
 mod crash_handler;
 mod safe_slint;
+mod tray;
 
 use app::App;
 
@@ -80,6 +81,15 @@ fn run_app() -> Result<()> {
     
     // Connect callbacks
     app.connect_callbacks(&main_window);
+    
+    info!("Setting up system tray...");
+    
+    // Set up system tray
+    app.setup_tray(main_window.as_weak())
+        .map_err(|e| {
+            error!("Failed to setup tray: {}", e);
+            e
+        })?;
     
     info!("Showing window...");
     

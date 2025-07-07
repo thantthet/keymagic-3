@@ -16,7 +16,7 @@ export component KeyboardCard inherits TouchArea {
     callback activate-requested();
     callback configure-requested();
     
-    preferred-height: 100px;
+    min-height: 100px;
     
     states [
         hover when self.has-hover && !self.pressed: {
@@ -134,12 +134,18 @@ export component KeyboardCard inherits TouchArea {
                 }
                 
                 // Description
-                Text {
-                    text: root.description;
-                    font-size: Fonts.size-sm;
-                    color: Colors.text-secondary;
-                    overflow: elide;
-                    max-height: 40px;
+                Rectangle {
+                    vertical-stretch: 0;
+                    max-height: 60px;
+                    clip: true;
+                    
+                    Text {
+                        text: root.description;
+                        font-size: Fonts.size-sm;
+                        color: Colors.text-secondary;
+                        wrap: word-wrap;
+                        width: 100%;
+                    }
                 }
                 
                 // Hotkey

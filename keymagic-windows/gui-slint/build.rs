@@ -9,8 +9,12 @@ fn main() {
         let mut res = winres::WindowsResource::new();
         
         // Try to set icon if it exists
-        if std::path::Path::new("../../resources/keymagic.ico").exists() {
-            res.set_icon("../../resources/keymagic.ico");
+        let icon_path = "../resources/icons/keymagic.ico";
+        if std::path::Path::new(icon_path).exists() {
+            res.set_icon(icon_path);
+            println!("cargo:rerun-if-changed={}", icon_path);
+        } else {
+            println!("cargo:warning=Icon not found at: {}", icon_path);
         }
         
         // Set application manifest

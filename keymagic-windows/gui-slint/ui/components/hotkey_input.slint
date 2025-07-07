@@ -4,6 +4,12 @@ import { Styles } from "../theme/styles.slint";
 import { LineEdit, CheckBox } from "std-widgets.slint";
 
 export component HotkeyInput inherits Rectangle {
+    in property <string> initial-hotkey: "";
+    in property <bool> initial-ctrl: false;
+    in property <bool> initial-alt: false;
+    in property <bool> initial-shift: false;
+    in property <string> initial-key: "";
+    
     in-out property <string> hotkey: {
         // Build hotkey string declaratively
         if (ctrl-checked && alt-checked && shift-checked && key-text != "") {
@@ -24,10 +30,10 @@ export component HotkeyInput inherits Rectangle {
             ""
         }
     }
-    in-out property <bool> ctrl-checked: false;
-    in-out property <bool> alt-checked: false;
-    in-out property <bool> shift-checked: false;
-    in-out property <string> key-text: "";
+    in-out property <bool> ctrl-checked: initial-ctrl;
+    in-out property <bool> alt-checked: initial-alt;
+    in-out property <bool> shift-checked: initial-shift;
+    in-out property <string> key-text: initial-key;
     in-out property <bool> valid: {
         // Valid if at least two modifiers, or one modifier + a key
         if (ctrl-checked && alt-checked && shift-checked) {
@@ -47,82 +53,101 @@ export component HotkeyInput inherits Rectangle {
     border-radius: Styles.radius-md;
     border-width: 1px;
     border-color: Colors.border;
-    padding: Styles.spacing-lg;
+    padding: Styles.spacing-md;
+    min-height: 48px;
     
     VerticalLayout {
-        spacing: Styles.spacing-md;
+        alignment: center;
         
-        Text {
-            text: "Keyboard Shortcut";
-            font-size: Fonts.size-base;
-            font-weight: Fonts.weight-semibold;
-            color: Colors.text-primary;
-        }
-        
-        // Modifier checkboxes
         HorizontalLayout {
-            spacing: Styles.spacing-lg;
-            alignment: start;
-            
-            CheckBox {
-                text: "Ctrl";
-                checked <=> root.ctrl-checked;
-                toggled => { root.hotkey-changed(root.hotkey); }
-            }
-            
-            CheckBox {
-                text: "Alt";
-                checked <=> root.alt-checked;
-                toggled => { root.hotkey-changed(root.hotkey); }
-            }
-            
-            CheckBox {
-                text: "Shift";
-                checked <=> root.shift-checked;
-                toggled => { root.hotkey-changed(root.hotkey); }
-            }
-        }
+            spacing: Styles.spacing-sm;
+            alignment: center;
         
-        // Key input
-        VerticalLayout {
+        // Modifier checkboxes styled as toggle buttons
+        HorizontalLayout {
             spacing: Styles.spacing-xs;
             
-            Text {
-                text: "Key";
-                font-size: Fonts.size-sm;
-                color: Colors.text-secondary;
-            }
-            
-            HorizontalLayout {
-                spacing: Styles.spacing-md;
-                alignment: stretch;
+            // Ctrl button
+            TouchArea {
+                width: 60px;
+                height: 32px;
                 
-                LineEdit {
-                    placeholder-text: "Press a key or type a letter...";
-                    text <=> root.key-text;
-                    horizontal-stretch: 1;
-                    
-                    edited => {
-                        root.key-text = self.text;
-                        root.hotkey-changed(root.hotkey);
-                    }
-                    
-                    accepted => {
-                        root.hotkey-changed(root.hotkey);
-                    }
+                clicked => {
+                    root.ctrl-checked = !root.ctrl-checked;
+                    root.hotkey-changed(root.hotkey);
                 }
                 
                 Rectangle {
-                    width: 100px;
-                    background: Colors.background;
+                    width: parent.width;
+                    height: parent.height;
+                    background: root.ctrl-checked ? Colors.primary : Colors.background;
                     border-radius: Styles.radius-sm;
                     border-width: 1px;
-                    border-color: root.valid ? Colors.success : Colors.border;
+                    border-color: root.ctrl-checked ? Colors.primary : Colors.border;
                     
                     Text {
-                        text: root.valid ? "✓ Valid" : "Invalid";
-                        color: root.valid ? Colors.success : Colors.text-disabled;
+                        text: "Ctrl";
                         font-size: Fonts.size-sm;
+                        font-weight: root.ctrl-checked ? Fonts.weight-medium : Fonts.weight-normal;
+                        color: root.ctrl-checked ? Colors.text-on-primary : Colors.text-primary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            
+            // Alt button
+            TouchArea {
+                width: 60px;
+                height: 32px;
+                
+                clicked => {
+                    root.alt-checked = !root.alt-checked;
+                    root.hotkey-changed(root.hotkey);
+                }
+                
+                Rectangle {
+                    width: parent.width;
+                    height: parent.height;
+                    background: root.alt-checked ? Colors.primary : Colors.background;
+                    border-radius: Styles.radius-sm;
+                    border-width: 1px;
+                    border-color: root.alt-checked ? Colors.primary : Colors.border;
+                    
+                    Text {
+                        text: "Alt";
+                        font-size: Fonts.size-sm;
+                        font-weight: root.alt-checked ? Fonts.weight-medium : Fonts.weight-normal;
+                        color: root.alt-checked ? Colors.text-on-primary : Colors.text-primary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            
+            // Shift button
+            TouchArea {
+                width: 60px;
+                height: 32px;
+                
+                clicked => {
+                    root.shift-checked = !root.shift-checked;
+                    root.hotkey-changed(root.hotkey);
+                }
+                
+                Rectangle {
+                    width: parent.width;
+                    height: parent.height;
+                    background: root.shift-checked ? Colors.primary : Colors.background;
+                    border-radius: Styles.radius-sm;
+                    border-width: 1px;
+                    border-color: root.shift-checked ? Colors.primary : Colors.border;
+                    
+                    Text {
+                        text: "Shift";
+                        font-size: Fonts.size-sm;
+                        font-weight: root.shift-checked ? Fonts.weight-medium : Fonts.weight-normal;
+                        color: root.shift-checked ? Colors.text-on-primary : Colors.text-primary;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -130,48 +155,64 @@ export component HotkeyInput inherits Rectangle {
             }
         }
         
-        // Current hotkey display
-        if root.hotkey != "": Rectangle {
+        // Plus sign
+        Text {
+            text: "+";
+            font-size: Fonts.size-base;
+            color: Colors.text-secondary;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        
+        // Key input
+        Rectangle {
+            width: 120px;
+            height: 32px;
             background: Colors.background;
-            border-radius: Styles.radius-md;
-            padding: Styles.spacing-md;
+            border-radius: Styles.radius-sm;
+            border-width: 1px;
+            border-color: Colors.border;
             
-            HorizontalLayout {
-                spacing: Styles.spacing-sm;
-                alignment: center;
+            LineEdit {
+                placeholder-text: "Key (e.g., A)";
+                text <=> root.key-text;
+                horizontal-alignment: center;
+                font-size: Fonts.size-sm;
                 
-                Text {
-                    text: "Current:";
-                    font-size: Fonts.size-sm;
-                    color: Colors.text-secondary;
-                    vertical-alignment: center;
+                edited => {
+                    root.key-text = self.text;
+                    root.hotkey-changed(root.hotkey);
                 }
                 
-                Rectangle {
-                    background: root.valid ? Colors.primary_light : Colors.error_light;
-                    border-radius: Styles.radius-sm;
-                    padding-left: Styles.spacing-sm;
-                    padding-right: Styles.spacing-sm;
-                    padding-top: 4px;
-                    padding-bottom: 4px;
-                    
-                    Text {
-                        text: root.hotkey;
-                        font-size: Fonts.size-sm;
-                        font-weight: Fonts.weight-medium;
-                        color: root.valid ? Colors.primary : Colors.error;
-                        vertical-alignment: center;
-                    }
+                accepted => {
+                    root.hotkey-changed(root.hotkey);
                 }
             }
         }
         
-        // Help text
-        Text {
-            text: "Choose at least two modifier keys, or one modifier key plus a regular key";
-            font-size: Fonts.size-xs;
-            color: Colors.text-disabled;
-            wrap: word-wrap;
+        // Spacer
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        
+        // Valid indicator
+        Rectangle {
+            width: 80px;
+            height: 32px;
+            background: root.valid ? Colors.primary-light : Colors.background;
+            border-radius: Styles.radius-sm;
+            border-width: 1px;
+            border-color: root.valid ? Colors.primary : Colors.border;
+            
+            Text {
+                text: root.valid ? "✓ Valid" : "Invalid";
+                color: root.valid ? Colors.primary : Colors.text-disabled;
+                font-size: Fonts.size-sm;
+                font-weight: Fonts.weight-medium;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
         }
     }
 }

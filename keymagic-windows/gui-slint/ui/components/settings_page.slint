@@ -22,7 +22,7 @@ export component SettingsPage inherits Rectangle {
     ScrollView {
         VerticalLayout {
             padding: Styles.spacing-xl;
-            spacing: Styles.spacing-xl;
+            spacing: Styles.spacing-2xl;
             
             // Header
             Text {
@@ -32,215 +32,236 @@ export component SettingsPage inherits Rectangle {
                 color: Colors.text-primary;
             }
             
-            // General Settings
+            // Settings container with max width for better readability
             Rectangle {
-                background: Colors.surface;
-                border-radius: Styles.radius-lg;
-                padding: Styles.spacing-lg;
-                drop-shadow-color: Colors.shadow;
-                drop-shadow-offset-y: 2px;
-                drop-shadow-blur: 4px;
+                max-width: 800px;
                 
                 VerticalLayout {
-                    spacing: Styles.spacing-lg;
+                    spacing: Styles.spacing-xl;
                     
-                    Text {
-                        text: "General Settings";
-                        font-size: Fonts.size-lg;
-                        font-weight: Fonts.weight-semibold;
-                        color: Colors.text-primary;
-                    }
-                    
+                    // General Settings
                     Rectangle {
-                        height: 1px;
-                        background: Colors.border;
-                    }
-                    
-                    VerticalLayout {
-                        spacing: Styles.spacing-md;
-                        
-                        CheckBox {
-                            text: "Start KeyMagic with Windows";
-                            checked <=> root.start-with-windows;
-                        }
-                        
-                        CheckBox {
-                            text: "Show icon in system tray";
-                            checked <=> root.show-in-tray;
-                        }
-                        
-                        CheckBox {
-                            text: "Minimize to system tray";
-                            checked <=> root.minimize-to-tray;
-                            enabled: root.show-in-tray;
-                        }
-                        
-                        CheckBox {
-                            text: "Show notifications when switching keyboards";
-                            checked <=> root.show-notifications;
-                        }
-                    }
-                }
-            }
-            
-            // Keyboard Hotkeys
-            Rectangle {
-                background: Colors.surface;
-                border-radius: Styles.radius-lg;
-                padding: Styles.spacing-lg;
-                drop-shadow-color: Colors.shadow;
-                drop-shadow-offset-y: 2px;
-                drop-shadow-blur: 4px;
-                
-                VerticalLayout {
-                    spacing: Styles.spacing-lg;
-                    
-                    Text {
-                        text: "Keyboard Hotkeys";
-                        font-size: Fonts.size-lg;
-                        font-weight: Fonts.weight-semibold;
-                        color: Colors.text-primary;
-                    }
-                    
-                    Rectangle {
-                        height: 1px;
-                        background: Colors.border;
-                    }
-                    
-                    if root.keyboards.length == 0: Text {
-                        text: "No keyboards installed. Add keyboards to configure their hotkeys.";
-                        color: Colors.text-disabled;
-                        font-size: Fonts.size-sm;
-                        padding: Styles.spacing-md;
-                    }
-                    
-                    // List of keyboards with hotkey configuration
-                    for keyboard in root.keyboards: Rectangle {
-                        background: Colors.background;
-                        border-radius: Styles.radius-md;
-                        padding: Styles.spacing-md;
+                        background: Colors.surface;
+                        border-radius: Styles.radius-lg;
+                        drop-shadow-color: Colors.shadow;
+                        drop-shadow-offset-y: 2px;
+                        drop-shadow-blur: 4px;
                         
                         VerticalLayout {
-                            spacing: Styles.spacing-sm;
+                            padding: Styles.spacing-xl;
+                            spacing: Styles.spacing-lg;
                             
-                            HorizontalLayout {
+                            Text {
+                                text: "General Settings";
+                                font-size: Fonts.size-lg;
+                                font-weight: Fonts.weight-semibold;
+                                color: Colors.text-primary;
+                            }
+                            
+                            VerticalLayout {
                                 spacing: Styles.spacing-md;
-                                alignment: space-between;
+                                padding-left: Styles.spacing-md;
                                 
-                                VerticalLayout {
-                                    spacing: Styles.spacing-xs;
-                                    
-                                    Text {
-                                        text: keyboard.name;
-                                        font-size: Fonts.size-base;
-                                        font-weight: Fonts.weight-medium;
-                                        color: Colors.text-primary;
-                                    }
-                                    
-                                    if keyboard.description != "": Text {
-                                        text: keyboard.description;
-                                        font-size: Fonts.size-sm;
-                                        color: Colors.text-secondary;
-                                    }
+                                CheckBox {
+                                    text: "Start KeyMagic with Windows";
+                                    checked <=> root.start-with-windows;
                                 }
                                 
-                                VerticalLayout {
-                                    width: 400px;
-                                    spacing: Styles.spacing-xs;
+                                CheckBox {
+                                    text: "Show icon in system tray";
+                                    checked <=> root.show-in-tray;
+                                }
+                                
+                                CheckBox {
+                                    text: "Minimize to system tray";
+                                    checked <=> root.minimize-to-tray;
+                                    enabled: root.show-in-tray;
+                                }
+                                
+                                CheckBox {
+                                    text: "Show notifications when switching keyboards";
+                                    checked <=> root.show-notifications;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Keyboard Hotkeys
+                    Rectangle {
+                        background: Colors.surface;
+                        border-radius: Styles.radius-lg;
+                        drop-shadow-color: Colors.shadow;
+                        drop-shadow-offset-y: 2px;
+                        drop-shadow-blur: 4px;
+                        
+                        VerticalLayout {
+                            padding: Styles.spacing-xl;
+                            spacing: Styles.spacing-lg;
+                            
+                            Text {
+                                text: "Keyboard Hotkeys";
+                                font-size: Fonts.size-lg;
+                                font-weight: Fonts.weight-semibold;
+                                color: Colors.text-primary;
+                            }
+                            
+                            if root.keyboards.length == 0: Rectangle {
+                                background: Colors.background;
+                                border-radius: Styles.radius-md;
+                                padding: Styles.spacing-lg;
+                                
+                                Text {
+                                    text: "No keyboards installed. Add keyboards to configure their hotkeys.";
+                                    color: Colors.text-disabled;
+                                    font-size: Fonts.size-sm;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                            
+                            // Keyboard list
+                            if root.keyboards.length > 0: VerticalLayout {
+                                spacing: Styles.spacing-md;
+                                
+                                for keyboard in root.keyboards: Rectangle {
+                                    background: Colors.background;
+                                    border-radius: Styles.radius-md;
+                                    border-width: 1px;
+                                    border-color: Colors.border;
                                     
-                                    HotkeyInput {
-                                        hotkey: keyboard.hotkey;
+                                    VerticalLayout {
+                                        padding: Styles.spacing-lg;
+                                        spacing: Styles.spacing-md;
                                         
-                                        hotkey-changed(new-hotkey) => {
-                                            root.keyboard-hotkey-changed(keyboard.id, new-hotkey);
-                                        }
-                                    }
-                                    
-                                    HorizontalLayout {
-                                        spacing: Styles.spacing-sm;
-                                        alignment: space-between;
-                                        
-                                        Text {
-                                            text: {
-                                                if (keyboard.custom-hotkey != "") {
-                                                    if (keyboard.default-hotkey != "") {
-                                                        "Default: " + keyboard.default-hotkey
-                                                    } else {
-                                                        "No default hotkey"
-                                                    }
-                                                } else if (keyboard.default-hotkey != "") {
-                                                    "Using default hotkey"
-                                                } else {
-                                                    "No hotkey configured"
+                                        // Keyboard info and hotkey on same line
+                                        HorizontalLayout {
+                                            spacing: Styles.spacing-lg;
+                                            alignment: center;
+                                            
+                                            // Keyboard info
+                                            VerticalLayout {
+                                                spacing: 4px;
+                                                horizontal-stretch: 1;
+                                                
+                                                Text {
+                                                    text: keyboard.name;
+                                                    font-size: Fonts.size-base;
+                                                    font-weight: Fonts.weight-medium;
+                                                    color: Colors.text-primary;
+                                                }
+                                                
+                                                if keyboard.hotkey != "": Text {
+                                                    text: "Current: " + keyboard.hotkey;
+                                                    font-size: Fonts.size-sm;
+                                                    color: Colors.text-secondary;
                                                 }
                                             }
-                                            font-size: Fonts.size-xs;
-                                            color: Colors.text-secondary;
-                                            vertical-alignment: center;
+                                            
+                                            // Current hotkey display
+                                            Rectangle {
+                                                background: keyboard.hotkey != "" ? Colors.primary : Colors.background;
+                                                border-radius: Styles.radius-md;
+                                                border-width: 1px;
+                                                border-color: keyboard.hotkey != "" ? Colors.primary : Colors.border;
+                                                padding-left: Styles.spacing-lg;
+                                                padding-right: Styles.spacing-lg;
+                                                padding-top: Styles.spacing-sm;
+                                                padding-bottom: Styles.spacing-sm;
+                                                min-width: 160px;
+                                                
+                                                Text {
+                                                    text: keyboard.hotkey != "" ? keyboard.hotkey : "No hotkey set";
+                                                    font-size: Fonts.size-sm;
+                                                    font-weight: Fonts.weight-medium;
+                                                    color: keyboard.hotkey != "" ? Colors.text-on-primary : Colors.text-disabled;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
                                         }
                                         
-                                        if (keyboard.custom-hotkey != "" && keyboard.default-hotkey != ""): Button {
-                                            text: "Reset to Default";
-                                            clicked => {
-                                                // Clear custom hotkey to use default
-                                                root.keyboard-hotkey-changed(keyboard.id, "");
+                                        // Hotkey editor
+                                        Rectangle {
+                                            background: Colors.surface;
+                                            border-radius: Styles.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Colors.border;
+                                            padding: Styles.spacing-md;
+                                            
+                                            VerticalLayout {
+                                                spacing: Styles.spacing-sm;
+                                                
+                                                Text {
+                                                    text: "Change hotkey:";
+                                                    font-size: Fonts.size-sm;
+                                                    color: Colors.text-secondary;
+                                                }
+                                                
+                                                HotkeyInput {
+                                                    initial-hotkey: keyboard.hotkey;
+                                                    initial-ctrl: keyboard.hotkey-ctrl;
+                                                    initial-alt: keyboard.hotkey-alt;
+                                                    initial-shift: keyboard.hotkey-shift;
+                                                    initial-key: keyboard.hotkey-key;
+                                                    
+                                                    hotkey-changed(new-hotkey) => {
+                                                        root.keyboard-hotkey-changed(keyboard.id, new-hotkey);
+                                                    }
+                                                }
+                                                
+                                                // Default hotkey info and reset
+                                                if keyboard.default-hotkey != "": HorizontalLayout {
+                                                    spacing: Styles.spacing-md;
+                                                    alignment: space-between;
+                                                    padding-top: Styles.spacing-xs;
+                                                    
+                                                    Text {
+                                                        text: keyboard.custom-hotkey != "" ? 
+                                                            "Default: " + keyboard.default-hotkey : 
+                                                            "Using default hotkey";
+                                                        font-size: Fonts.size-xs;
+                                                        color: Colors.text-disabled;
+                                                        vertical-alignment: center;
+                                                    }
+                                                    
+                                                    if (keyboard.custom-hotkey != "" && keyboard.default-hotkey != ""): Button {
+                                                        text: "Use Default";
+                                                        clicked => {
+                                                            root.keyboard-hotkey-changed(keyboard.id, "");
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                            
+                            // Help text
+                            Text {
+                                text: "Tip: Use at least two modifier keys, or one modifier key plus a regular key.";
+                                font-size: Fonts.size-xs;
+                                color: Colors.text-disabled;
+                            }
                         }
                     }
-                }
-            }
-            
-            // Advanced Settings
-            Rectangle {
-                background: Colors.surface;
-                border-radius: Styles.radius-lg;
-                padding: Styles.spacing-lg;
-                drop-shadow-color: Colors.shadow;
-                drop-shadow-offset-y: 2px;
-                drop-shadow-blur: 4px;
-                
-                VerticalLayout {
-                    spacing: Styles.spacing-lg;
                     
-                    Text {
-                        text: "Advanced Settings";
-                        font-size: Fonts.size-lg;
-                        font-weight: Fonts.weight-semibold;
-                        color: Colors.text-primary;
+                    // Action buttons
+                    HorizontalLayout {
+                        spacing: Styles.spacing-md;
+                        alignment: end;
+                        padding-top: Styles.spacing-md;
+                        
+                        Button {
+                            text: "Reset to Defaults";
+                            clicked => { root.reset-settings(); }
+                        }
+                        
+                        Button {
+                            text: "Save Settings";
+                            primary: true;
+                            clicked => { root.save-settings(); }
+                        }
                     }
-                    
-                    Rectangle {
-                        height: 1px;
-                        background: Colors.border;
-                    }
-                    
-                    Text {
-                        text: "Advanced settings will be added here in future updates.";
-                        color: Colors.text-disabled;
-                        font-size: Fonts.size-sm;
-                        padding: Styles.spacing-md;
-                    }
-                }
-            }
-            
-            // Action buttons
-            HorizontalLayout {
-                spacing: Styles.spacing-md;
-                alignment: end;
-                
-                Button {
-                    text: "Reset to Defaults";
-                    clicked => { root.reset-settings(); }
-                }
-                
-                Button {
-                    text: "Save Settings";
-                    primary: true;
-                    clicked => { root.save-settings(); }
                 }
             }
             

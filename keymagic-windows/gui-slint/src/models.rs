@@ -33,6 +33,31 @@ fn image_data_to_slint_image(image_data: &[u8]) -> Option<Image> {
     }
 }
 
+/// Parse a hotkey string into its components
+fn parse_hotkey(hotkey: &str) -> (bool, bool, bool, String) {
+    let parts: Vec<&str> = hotkey.split('+').map(|s| s.trim()).collect();
+    
+    let mut ctrl = false;
+    let mut alt = false;
+    let mut shift = false;
+    let mut key = String::new();
+    
+    for part in parts {
+        match part.to_lowercase().as_str() {
+            "ctrl" => ctrl = true,
+            "alt" => alt = true,
+            "shift" => shift = true,
+            _ => {
+                if !part.is_empty() {
+                    key = part.to_string();
+                }
+            }
+        }
+    }
+    
+    (ctrl, alt, shift, key)
+}
+
 pub fn convert_keyboard_info(info: &KeyboardInfo, active_id: Option<&str>, manager: &KeyboardManager) -> SlintKeyboardInfo {
     // Convert icon data to Slint Image if available (supports BMP, PNG, JPG, ICO)
     let icon = if let Some(icon_data) = &info.icon_data {
@@ -43,6 +68,9 @@ pub fn convert_keyboard_info(info: &KeyboardInfo, active_id: Option<&str>, manag
     
     // Get effective hotkey (custom or default)
     let effective_hotkey = manager.get_effective_hotkey(info).unwrap_or_default();
+    
+    // Parse the hotkey
+    let (hotkey_ctrl, hotkey_alt, hotkey_shift, hotkey_key) = parse_hotkey(&effective_hotkey);
     
     SlintKeyboardInfo {
         id: SharedString::from(&info.id),
@@ -55,5 +83,9 @@ pub fn convert_keyboard_info(info: &KeyboardInfo, active_id: Option<&str>, manag
         enabled: info.enabled,
         has_icon: info.icon_data.is_some(),
         icon,
+        hotkey_ctrl,
+        hotkey_alt,
+        hotkey_shift,
+        hotkey_key: SharedString::from(&hotkey_key),
     }
 }
