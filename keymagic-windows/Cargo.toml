@@ -1,5 +1,5 @@
 [workspace]
-members = ["gui"]
+members = ["gui", "gui-slint"]
 resolver = "2"
 
 [workspace.dependencies]

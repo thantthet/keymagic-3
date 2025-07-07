@@ -1,0 +1,157 @@
+import { Colors } from "../theme/colors.slint";
+import { Fonts } from "../theme/fonts.slint";
+import { Styles } from "../theme/styles.slint";
+
+export component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <string> message;
+    in property <string> confirm-text: "OK";
+    in property <string> cancel-text: "Cancel";
+    in property <bool> show-cancel: true;
+    in property <bool> is-error: false;
+    in-out property <bool> show: false;
+    
+    callback confirmed();
+    callback cancelled();
+    
+    if show: Rectangle {
+        background: Colors.shadow.with-alpha(0.5);
+        
+        TouchArea {
+            // Clicking outside the dialog cancels it
+            clicked => {
+                if root.show-cancel {
+                    root.cancelled();
+                    root.show = false;
+                }
+            }
+        }
+        
+        dialog-container := Rectangle {
+            width: 400px;
+            height: 200px;
+            background: Colors.surface;
+            border-radius: Styles.radius-lg;
+            drop-shadow-color: Colors.shadow;
+            drop-shadow-offset-y: 4px;
+            drop-shadow-blur: 16px;
+            
+            // Center the dialog
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            
+            // Prevent clicks on dialog from closing it
+            TouchArea {
+                clicked => { }
+            }
+            
+            VerticalLayout {
+                padding: Styles.spacing-lg;
+                spacing: Styles.spacing-md;
+                
+                // Header
+                HorizontalLayout {
+                    spacing: Styles.spacing-sm;
+                    
+                    // Icon
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        
+                        Text {
+                            text: root.is-error ? "⚠" : "❓";
+                            font-size: 20px;
+                            color: root.is-error ? Colors.error : Colors.primary;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                    
+                    // Title
+                    Text {
+                        text: root.title;
+                        font-size: Fonts.size-lg;
+                        font-weight: Fonts.weight-semibold;
+                        color: Colors.text-primary;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                }
+                
+                // Message
+                Text {
+                    text: root.message;
+                    font-size: Fonts.size-base;
+                    color: Colors.text-secondary;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+                
+                // Spacer
+                Rectangle {
+                    vertical-stretch: 1;
+                }
+                
+                // Buttons
+                HorizontalLayout {
+                    spacing: Styles.spacing-sm;
+                    alignment: end;
+                    
+                    if root.show-cancel: TouchArea {
+                        width: 100px;
+                        height: 36px;
+                        
+                        clicked => {
+                            root.cancelled();
+                            root.show = false;
+                        }
+                        
+                        Rectangle {
+                            background: parent.has-hover ? Colors.background : transparent;
+                            border-width: 1px;
+                            border-color: Colors.border;
+                            border-radius: Styles.radius-sm;
+                            
+                            animate background { duration: Styles.transition-fast; }
+                            
+                            Text {
+                                text: root.cancel-text;
+                                font-size: Fonts.size-base;
+                                color: Colors.text-primary;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                    
+                    TouchArea {
+                        width: 100px;
+                        height: 36px;
+                        
+                        clicked => {
+                            root.confirmed();
+                            root.show = false;
+                        }
+                        
+                        Rectangle {
+                            background: parent.has-hover ? 
+                                (root.is-error ? Colors.error-dark : Colors.primary-dark) : 
+                                (root.is-error ? Colors.error : Colors.primary);
+                            border-radius: Styles.radius-sm;
+                            
+                            animate background { duration: Styles.transition-fast; }
+                            
+                            Text {
+                                text: root.confirm-text;
+                                font-size: Fonts.size-base;
+                                color: Colors.text-on-primary;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

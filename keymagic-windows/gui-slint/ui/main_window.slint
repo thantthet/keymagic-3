@@ -1,0 +1,413 @@
+import { Colors } from "theme/colors.slint";
+import { Fonts } from "theme/fonts.slint";
+import { Styles } from "theme/styles.slint";
+import { Button, StandardButton, LineEdit } from "std-widgets.slint";
+import { KeyboardList } from "components/keyboard_list.slint";
+import { KeyboardInfo } from "types.slint";
+import { Dialog } from "components/dialog.slint";
+import { SettingsPage } from "components/settings_page.slint";
+
+export { KeyboardInfo }
+
+component NavigationItem inherits TouchArea {
+    in property <string> icon;
+    in property <string> text;
+    in property <bool> active;
+    
+    height: 48px;
+    
+    states [
+        hover when self.has-hover && !self.active: {
+            rect.background: Colors.sidebar-hover;
+        }
+        active when self.active: {
+            rect.background: Colors.sidebar-active;
+            rect.border-width: 3px;
+        }
+    ]
+    
+    rect := Rectangle {
+        background: transparent;
+        border-radius: Styles.radius-md;
+        border-color: Colors.primary;
+        border-width: 0;
+        
+        animate background { duration: Styles.transition-fast; }
+        animate border-width { duration: Styles.transition-fast; }
+        
+        HorizontalLayout {
+            padding-left: Styles.spacing-md;
+            padding-right: Styles.spacing-md;
+            spacing: Styles.spacing-md;
+            alignment: start;
+            
+            Text {
+                text: root.icon;
+                font-size: Fonts.size-xl;
+                color: Colors.sidebar-text;
+                vertical-alignment: center;
+            }
+            
+            Text {
+                text: root.text;
+                font-size: Fonts.size-base;
+                font-weight: root.active ? Fonts.weight-semibold : Fonts.weight-normal;
+                color: Colors.sidebar-text;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "KeyMagic Configuration";
+    preferred-width: 1000px;
+    preferred-height: 700px;
+    min-width: 800px;
+    min-height: 600px;
+    background: Colors.background;
+    
+    in-out property <string> current-page: "keyboards";
+    in-out property <bool> keymagic-enabled: true;
+    in-out property <[KeyboardInfo]> keyboards: [
+        { id: "demo", name: "Demo Keyboard", description: "Demo keyboard for testing", hotkey: "", active: true, enabled: true, has-icon: false }
+    ];
+    in-out property <string> selected-keyboard-id: "";
+    
+    // Settings properties
+    in-out property <bool> start-with-windows: false;
+    in-out property <bool> show-in-tray: true;
+    in-out property <bool> minimize-to-tray: true;
+    in-out property <bool> show-notifications: true;
+    
+    callback page-changed(string);
+    callback add-keyboard();
+    callback remove-keyboard();
+    callback activate-keyboard(string);
+    callback toggle-keymagic();
+    callback save-settings();
+    callback reset-settings();
+    callback keyboard-hotkey-changed(string /* keyboard-id */, string /* hotkey */);
+    
+    // Dialog control functions
+    public function show-remove-confirmation(keyboard-id: string) {
+        self.keyboard-to-remove = keyboard-id;
+        remove-dialog.show = true;
+    }
+    
+    public function show-error(message: string) {
+        error-dialog.message = message;
+        error-dialog.show = true;
+    }
+    
+    HorizontalLayout {
+        spacing: 0;
+        
+        // Sidebar
+        Rectangle {
+            width: 280px;
+            background: Colors.sidebar-bg;
+            drop-shadow-color: Colors.shadow;
+            drop-shadow-offset-x: 2px;
+            drop-shadow-blur: 4px;
+            
+            VerticalLayout {
+                padding: Styles.spacing-lg;
+                spacing: Styles.spacing-md;
+                
+                // Logo/Title section
+                VerticalLayout {
+                    spacing: Styles.spacing-xs;
+                    
+                    Text {
+                        text: "KeyMagic";
+                        font-size: Fonts.size-2xl;
+                        font-weight: Fonts.weight-bold;
+                        color: Colors.sidebar-text;
+                    }
+                    
+                    Text {
+                        text: "Configuration Manager";
+                        font-size: Fonts.size-sm;
+                        color: Colors.text-disabled;
+                    }
+                }
+                
+                Rectangle { height: Styles.spacing-lg; }
+                
+                // Navigation
+                VerticalLayout {
+                    spacing: Styles.spacing-sm;
+                    
+                    NavigationItem {
+                        icon: "⌨";
+                        text: "Keyboards";
+                        active: root.current-page == "keyboards";
+                        clicked => {
+                            root.current-page = "keyboards";
+                            root.page-changed("keyboards");
+                        }
+                    }
+                    
+                    NavigationItem {
+                        icon: "⚙";
+                        text: "Settings";
+                        active: root.current-page == "settings";
+                        clicked => {
+                            root.current-page = "settings";
+                            root.page-changed("settings");
+                        }
+                    }
+                    
+                    NavigationItem {
+                        icon: "ℹ";
+                        text: "About";
+                        active: root.current-page == "about";
+                        clicked => {
+                            root.current-page = "about";
+                            root.page-changed("about");
+                        }
+                    }
+                }
+                
+                Rectangle { 
+                    vertical-stretch: 1;
+                }
+                
+                // Status section
+                Rectangle {
+                    background: Colors.sidebar-active;
+                    border-radius: Styles.radius-lg;
+                    padding: Styles.spacing-md;
+                    
+                    TouchArea {
+                        clicked => { root.toggle-keymagic(); }
+                        
+                        VerticalLayout {
+                            spacing: Styles.spacing-sm;
+                            
+                            HorizontalLayout {
+                                spacing: Styles.spacing-sm;
+                                alignment: space-between;
+                                
+                                Text {
+                                    text: "KeyMagic Status";
+                                    font-weight: Fonts.weight-semibold;
+                                    color: Colors.sidebar-text;
+                                    vertical-alignment: center;
+                                }
+                                
+                                HorizontalLayout {
+                                    spacing: Styles.spacing-xs;
+                                    
+                                    Rectangle {
+                                        width: 8px;
+                                        height: 8px;
+                                        border-radius: 4px;
+                                        background: root.keymagic-enabled ? Colors.success : Colors.error;
+                                    }
+                                    
+                                    Text {
+                                        text: root.keymagic-enabled ? "Enabled" : "Disabled";
+                                        font-size: Fonts.size-sm;
+                                        color: Colors.sidebar-text;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                            
+                            Text {
+                                text: "Click to toggle";
+                                font-size: Fonts.size-xs;
+                                color: Colors.text-disabled;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Main content area
+        Rectangle {
+            background: Colors.background;
+            horizontal-stretch: 1;
+            
+            if root.current-page == "keyboards": VerticalLayout {
+                padding: Styles.spacing-xl;
+                spacing: Styles.spacing-lg;
+                
+                // Header
+                HorizontalLayout {
+                    alignment: space-between;
+                    
+                    Text {
+                        text: "Installed Keyboards";
+                        font-size: Fonts.size-xl;
+                        font-weight: Fonts.weight-semibold;
+                        color: Colors.text-primary;
+                        vertical-alignment: center;
+                    }
+                    
+                    HorizontalLayout {
+                        spacing: Styles.spacing-md;
+                        
+                        Button {
+                            text: "Add Keyboard";
+                            primary: true;
+                            clicked => { root.add-keyboard(); }
+                        }
+                        
+                        Button {
+                            text: "Remove";
+                            enabled: root.selected-keyboard-id != "";
+                            clicked => { root.remove-keyboard(); }
+                        }
+                    }
+                }
+                
+                // Keyboard list
+                if root.keyboards.length == 0: Rectangle {
+                    background: Colors.surface;
+                    border-radius: Styles.radius-lg;
+                    drop-shadow-color: Colors.shadow;
+                    drop-shadow-offset-y: 2px;
+                    drop-shadow-blur: 4px;
+                    vertical-stretch: 1;
+                    
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: Styles.spacing-md;
+                        
+                        Text {
+                            text: "📁";
+                            font-size: 48px;
+                            horizontal-alignment: center;
+                        }
+                        
+                        Text {
+                            text: "No keyboards installed";
+                            font-size: Fonts.size-lg;
+                            color: Colors.text-secondary;
+                            horizontal-alignment: center;
+                        }
+                        
+                        Text {
+                            text: "Click 'Add Keyboard' to install a keyboard";
+                            font-size: Fonts.size-base;
+                            color: Colors.text-disabled;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+                
+                if root.keyboards.length > 0: KeyboardList {
+                    keyboards: root.keyboards;
+                    selected-keyboard-id <=> root.selected-keyboard-id;
+                    vertical-stretch: 1;
+                    
+                    keyboard-selected(id) => {
+                        // Handle keyboard selection
+                    }
+                    
+                    activate-keyboard(id) => {
+                        root.activate-keyboard(id);
+                    }
+                    
+                    configure-keyboard(id) => {
+                        // TODO: Implement keyboard configuration
+                    }
+                }
+            }
+            
+            if root.current-page == "settings": SettingsPage {
+                keyboards: root.keyboards;
+                selected-keyboard-id <=> root.selected-keyboard-id;
+                start-with-windows <=> root.start-with-windows;
+                show-in-tray <=> root.show-in-tray;
+                minimize-to-tray <=> root.minimize-to-tray;
+                show-notifications <=> root.show-notifications;
+                
+                save-settings => { root.save-settings(); }
+                reset-settings => { root.reset-settings(); }
+                keyboard-hotkey-changed(id, hotkey) => { root.keyboard-hotkey-changed(id, hotkey); }
+            }
+            
+            if root.current-page == "about": VerticalLayout {
+                padding: Styles.spacing-xl;
+                spacing: Styles.spacing-lg;
+                alignment: center;
+                
+                VerticalLayout {
+                    spacing: Styles.spacing-md;
+                    alignment: center;
+                    
+                    Text {
+                        text: "KeyMagic";
+                        font-size: Fonts.size-3xl;
+                        font-weight: Fonts.weight-bold;
+                        color: Colors.primary;
+                        horizontal-alignment: center;
+                    }
+                    
+                    Text {
+                        text: "Version 3.0.0";
+                        font-size: Fonts.size-lg;
+                        color: Colors.text-secondary;
+                        horizontal-alignment: center;
+                    }
+                    
+                    Rectangle { height: Styles.spacing-lg; }
+                    
+                    Text {
+                        text: "A powerful input method editor for Windows";
+                        font-size: Fonts.size-base;
+                        color: Colors.text-secondary;
+                        horizontal-alignment: center;
+                    }
+                    
+                    Text {
+                        text: "© 2024 KeyMagic Project";
+                        font-size: Fonts.size-sm;
+                        color: Colors.text-disabled;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Property to track which keyboard to remove
+    in-out property <string> keyboard-to-remove: "";
+    
+    // Confirmation dialog for keyboard removal
+    remove-dialog := Dialog {
+        title: "Remove Keyboard";
+        message: "Are you sure you want to remove this keyboard?";
+        confirm-text: "Remove";
+        cancel-text: "Cancel";
+        show-cancel: true;
+        is-error: false;
+        show: false;
+        
+        confirmed => {
+            // The actual removal will be handled by the remove-keyboard callback
+            // which is connected to perform_keyboard_removal in app.rs
+            root.remove-keyboard();
+        }
+        
+        cancelled => {
+            // Clear the keyboard-to-remove when cancelled
+            root.keyboard-to-remove = "";
+        }
+    }
+    
+    // Error dialog
+    error-dialog := Dialog {
+        title: "Error";
+        message: "An error occurred while processing your request.";
+        confirm-text: "OK";
+        show-cancel: false;
+        is-error: true;
+        show: false;
+    }
+}

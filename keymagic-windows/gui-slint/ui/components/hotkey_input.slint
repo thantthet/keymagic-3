@@ -1,0 +1,177 @@
+import { Colors } from "../theme/colors.slint";
+import { Fonts } from "../theme/fonts.slint";
+import { Styles } from "../theme/styles.slint";
+import { LineEdit, CheckBox } from "std-widgets.slint";
+
+export component HotkeyInput inherits Rectangle {
+    in-out property <string> hotkey: {
+        // Build hotkey string declaratively
+        if (ctrl-checked && alt-checked && shift-checked && key-text != "") {
+            "Ctrl+Alt+Shift+" + key-text
+        } else if (ctrl-checked && alt-checked && key-text != "") {
+            "Ctrl+Alt+" + key-text
+        } else if (ctrl-checked && shift-checked && key-text != "") {
+            "Ctrl+Shift+" + key-text
+        } else if (alt-checked && shift-checked && key-text != "") {
+            "Alt+Shift+" + key-text
+        } else if (ctrl-checked && key-text != "") {
+            "Ctrl+" + key-text
+        } else if (alt-checked && key-text != "") {
+            "Alt+" + key-text
+        } else if (shift-checked && key-text != "") {
+            "Shift+" + key-text
+        } else {
+            ""
+        }
+    }
+    in-out property <bool> ctrl-checked: false;
+    in-out property <bool> alt-checked: false;
+    in-out property <bool> shift-checked: false;
+    in-out property <string> key-text: "";
+    in-out property <bool> valid: {
+        // Valid if at least two modifiers, or one modifier + a key
+        if (ctrl-checked && alt-checked && shift-checked) {
+            true  // 3 modifiers
+        } else if ((ctrl-checked && alt-checked) || (ctrl-checked && shift-checked) || (alt-checked && shift-checked)) {
+            true  // 2 modifiers
+        } else if ((ctrl-checked || alt-checked || shift-checked) && key-text != "") {
+            true  // 1 modifier + key
+        } else {
+            false
+        }
+    }
+    
+    callback hotkey-changed(string);
+    
+    background: Colors.surface;
+    border-radius: Styles.radius-md;
+    border-width: 1px;
+    border-color: Colors.border;
+    padding: Styles.spacing-lg;
+    
+    VerticalLayout {
+        spacing: Styles.spacing-md;
+        
+        Text {
+            text: "Keyboard Shortcut";
+            font-size: Fonts.size-base;
+            font-weight: Fonts.weight-semibold;
+            color: Colors.text-primary;
+        }
+        
+        // Modifier checkboxes
+        HorizontalLayout {
+            spacing: Styles.spacing-lg;
+            alignment: start;
+            
+            CheckBox {
+                text: "Ctrl";
+                checked <=> root.ctrl-checked;
+                toggled => { root.hotkey-changed(root.hotkey); }
+            }
+            
+            CheckBox {
+                text: "Alt";
+                checked <=> root.alt-checked;
+                toggled => { root.hotkey-changed(root.hotkey); }
+            }
+            
+            CheckBox {
+                text: "Shift";
+                checked <=> root.shift-checked;
+                toggled => { root.hotkey-changed(root.hotkey); }
+            }
+        }
+        
+        // Key input
+        VerticalLayout {
+            spacing: Styles.spacing-xs;
+            
+            Text {
+                text: "Key";
+                font-size: Fonts.size-sm;
+                color: Colors.text-secondary;
+            }
+            
+            HorizontalLayout {
+                spacing: Styles.spacing-md;
+                alignment: stretch;
+                
+                LineEdit {
+                    placeholder-text: "Press a key or type a letter...";
+                    text <=> root.key-text;
+                    horizontal-stretch: 1;
+                    
+                    edited => {
+                        root.key-text = self.text;
+                        root.hotkey-changed(root.hotkey);
+                    }
+                    
+                    accepted => {
+                        root.hotkey-changed(root.hotkey);
+                    }
+                }
+                
+                Rectangle {
+                    width: 100px;
+                    background: Colors.background;
+                    border-radius: Styles.radius-sm;
+                    border-width: 1px;
+                    border-color: root.valid ? Colors.success : Colors.border;
+                    
+                    Text {
+                        text: root.valid ? "✓ Valid" : "Invalid";
+                        color: root.valid ? Colors.success : Colors.text-disabled;
+                        font-size: Fonts.size-sm;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+        
+        // Current hotkey display
+        if root.hotkey != "": Rectangle {
+            background: Colors.background;
+            border-radius: Styles.radius-md;
+            padding: Styles.spacing-md;
+            
+            HorizontalLayout {
+                spacing: Styles.spacing-sm;
+                alignment: center;
+                
+                Text {
+                    text: "Current:";
+                    font-size: Fonts.size-sm;
+                    color: Colors.text-secondary;
+                    vertical-alignment: center;
+                }
+                
+                Rectangle {
+                    background: root.valid ? Colors.primary_light : Colors.error_light;
+                    border-radius: Styles.radius-sm;
+                    padding-left: Styles.spacing-sm;
+                    padding-right: Styles.spacing-sm;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    
+                    Text {
+                        text: root.hotkey;
+                        font-size: Fonts.size-sm;
+                        font-weight: Fonts.weight-medium;
+                        color: root.valid ? Colors.primary : Colors.error;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+        
+        // Help text
+        Text {
+            text: "Choose at least two modifier keys, or one modifier key plus a regular key";
+            font-size: Fonts.size-xs;
+            color: Colors.text-disabled;
+            wrap: word-wrap;
+        }
+    }
+}

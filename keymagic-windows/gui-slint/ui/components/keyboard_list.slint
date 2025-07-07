@@ -1,0 +1,54 @@
+import { Colors } from "../theme/colors.slint";
+import { Fonts } from "../theme/fonts.slint";
+import { Styles } from "../theme/styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { KeyboardCard } from "keyboard_card.slint";
+import { KeyboardInfo } from "../types.slint";
+
+export component KeyboardList inherits Rectangle {
+    in property <[KeyboardInfo]> keyboards;
+    in-out property <string> selected-keyboard-id;
+    
+    callback keyboard-selected(string);
+    callback activate-keyboard(string);
+    callback configure-keyboard(string);
+    
+    background: transparent;
+    
+    ScrollView {
+        VerticalLayout {
+            padding: Styles.spacing-sm;
+            spacing: Styles.spacing-md;
+            
+            for keyboard in root.keyboards: KeyboardCard {
+                keyboard-id: keyboard.id;
+                name: keyboard.name;
+                description: keyboard.description;
+                hotkey: keyboard.hotkey;
+                active: keyboard.active;
+                is-enabled: keyboard.enabled;
+                has-icon: keyboard.has-icon;
+                icon: keyboard.icon;
+                selected: root.selected-keyboard-id == keyboard.id;
+                
+                clicked => {
+                    root.selected-keyboard-id = keyboard.id;
+                    root.keyboard-selected(keyboard.id);
+                }
+                
+                activate-requested => {
+                    root.activate-keyboard(keyboard.id);
+                }
+                
+                configure-requested => {
+                    root.configure-keyboard(keyboard.id);
+                }
+            }
+            
+            // Add some padding at the bottom
+            Rectangle {
+                height: Styles.spacing-lg;
+            }
+        }
+    }
+}
