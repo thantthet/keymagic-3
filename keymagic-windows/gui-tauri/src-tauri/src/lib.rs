@@ -4,11 +4,12 @@ mod tray;
 mod hotkey;
 mod hud;
 mod registry_notifier;
+mod updater;
 
 use std::sync::Mutex;
 use keyboard_manager::KeyboardManager;
 use hotkey::HotkeyManager;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,6 +35,9 @@ pub fn run() {
             commands::set_setting,
             commands::set_keyboard_hotkey,
             commands::update_tray_menu,
+            commands::set_on_off_hotkey,
+            commands::get_on_off_hotkey,
+            commands::check_for_update,
         ])
         .setup(|app| {
             // Initialize native HUD window
@@ -63,6 +67,11 @@ pub fn run() {
                     eprintln!("Failed to register hotkeys: {}", e);
                 }
                 
+                // Load and register on/off hotkey
+                if let Err(e) = hotkey_manager.load_on_off_hotkey(&app.app_handle()) {
+                    eprintln!("Failed to load on/off hotkey: {}", e);
+                }
+                
                 drop(manager);
                 
                 if minimize_to_tray {
@@ -79,6 +88,28 @@ pub fn run() {
                         }
                     });
                 }
+                
+                // Check for updates on startup (async)
+                let app_handle = app.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Wait a bit for the app to fully initialize
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    
+                    // Check for updates silently
+                    match crate::updater::check_for_updates_async().await {
+                        Ok(update_info) => {
+                            if update_info.update_available {
+                                // Emit event to notify UI about available update
+                                if let Some(window) = app_handle.get_webview_window("main") {
+                                    let _ = window.emit("update_available", update_info);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to check for updates on startup: {}", e);
+                        }
+                    }
+                });
             }
             Ok(())
         })

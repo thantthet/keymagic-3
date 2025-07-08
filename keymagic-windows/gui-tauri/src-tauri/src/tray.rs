@@ -79,9 +79,13 @@ pub fn create_tray_menu(app: &AppHandle, keyboard_manager: &KeyboardManager) -> 
     let settings_item = MenuItemBuilder::new("Settings")
         .id("settings")
         .build(app)?;
+    let check_update_item = MenuItemBuilder::new("Check for Updates...")
+        .id("check_update")
+        .build(app)?;
     
     menu = menu.item(&open_item);
     menu = menu.item(&settings_item);
+    menu = menu.item(&check_update_item);
     menu = menu.separator();
     
     let quit_item = MenuItemBuilder::new("Quit")
@@ -106,6 +110,15 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
                 let _ = window.set_focus();
                 // Emit event to navigate to settings
                 let _ = window.emit("navigate", "settings");
+            }
+        }
+        "check_update" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                // Emit event to navigate to settings and trigger update check
+                let _ = window.emit("navigate", "settings");
+                let _ = window.emit("check_for_updates", ());
             }
         }
         "toggle_enable" => {

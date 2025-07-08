@@ -1,5 +1,6 @@
 use crate::keyboard_manager::{KeyboardManager, KeyboardInfo};
 use crate::hotkey::HotkeyManager;
+use crate::updater::{UpdateInfo, check_for_updates_async};
 use std::sync::Mutex;
 use tauri::{State, Manager, AppHandle};
 use std::path::PathBuf;
@@ -201,4 +202,101 @@ pub fn update_tray_menu(app_handle: AppHandle) -> Result<(), String> {
     let manager = state.lock().map_err(|e| e.to_string())?;
     crate::tray::update_tray_menu(&app_handle, &manager);
     Ok(())
+}
+
+#[tauri::command]
+pub fn set_on_off_hotkey(
+    hotkey_manager: State<HotkeyManager>,
+    app_handle: AppHandle,
+    hotkey: Option<String>,
+) -> Result<(), String> {
+    // Set the hotkey
+    hotkey_manager.set_on_off_hotkey(&app_handle, hotkey.as_deref()).map_err(|e| e.to_string())?;
+    
+    // Save to registry
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::*;
+        use windows::Win32::System::Registry::*;
+        
+        unsafe {
+            let mut hkey = HKEY::default();
+            if RegCreateKeyW(
+                HKEY_CURRENT_USER,
+                w!("Software\\KeyMagic\\Settings"),
+                &mut hkey
+            ).is_ok() {
+                if let Some(hotkey_str) = hotkey {
+                    let value_w: Vec<u16> = hotkey_str.encode_utf16().chain(std::iter::once(0)).collect();
+                    let value_bytes = std::slice::from_raw_parts(
+                        value_w.as_ptr() as *const u8,
+                        value_w.len() * 2
+                    );
+                    
+                    let _ = RegSetValueExW(
+                        hkey,
+                        w!("OnOffHotkey"),
+                        0,
+                        REG_SZ,
+                        Some(value_bytes),
+                    );
+                } else {
+                    // Delete the value if hotkey is None
+                    let _ = RegDeleteValueW(hkey, w!("OnOffHotkey"));
+                }
+                
+                RegCloseKey(hkey);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_on_off_hotkey() -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::*;
+        use windows::Win32::System::Registry::*;
+        
+        unsafe {
+            let mut hkey = HKEY::default();
+            if RegOpenKeyExW(
+                HKEY_CURRENT_USER,
+                w!("Software\\KeyMagic\\Settings"),
+                0,
+                KEY_READ,
+                &mut hkey
+            ).is_ok() {
+                let mut buffer = vec![0u16; 256];
+                let mut size = buffer.len() as u32 * 2;
+                let mut data_type = REG_VALUE_TYPE::default();
+                
+                let result = RegQueryValueExW(
+                    hkey,
+                    w!("OnOffHotkey"),
+                    None,
+                    Some(&mut data_type),
+                    Some(buffer.as_mut_ptr() as *mut u8),
+                    Some(&mut size),
+                );
+                
+                RegCloseKey(hkey);
+                
+                if result.is_ok() {
+                    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+                    buffer.truncate(len);
+                    return Ok(Some(String::from_utf16_lossy(&buffer)));
+                }
+            }
+        }
+    }
+    
+    Ok(None)
+}
+
+#[tauri::command]
+pub async fn check_for_update() -> Result<UpdateInfo, String> {
+    check_for_updates_async().await.map_err(|e| e.to_string())
 }
