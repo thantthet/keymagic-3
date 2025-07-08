@@ -58,26 +58,9 @@ body {
 .sidebar-header h2 {
   font-size: 24px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin: 0;
 }
 
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--success-color);
-}
-
-.status-dot.disabled {
-  background-color: var(--error-color);
-}
 
 /* Navigation */
 .nav-list {
@@ -117,14 +100,29 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px;
-  background-color: transparent;
+  gap: 10px;
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--sidebar-text);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
+  font-weight: 500;
+}
+
+.toggle-button .status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--success-color);
+  transition: background-color 0.3s;
+  box-shadow: 0 0 4px var(--success-color);
+}
+
+.toggle-button .status-dot.disabled {
+  background-color: var(--error-color);
+  box-shadow: 0 0 4px var(--error-color);
 }
 
 .toggle-button:hover {
@@ -344,16 +342,13 @@ body {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
+  background-color: rgba(128, 128, 128, 0.1);
+  color: var(--text-secondary);
 }
 
 .keyboard-status.active {
   background-color: rgba(76, 175, 80, 0.1);
   color: var(--success-color);
-}
-
-.keyboard-status.disabled {
-  background-color: rgba(244, 67, 54, 0.1);
-  color: var(--error-color);
 }
 
 .keyboard-hotkey {

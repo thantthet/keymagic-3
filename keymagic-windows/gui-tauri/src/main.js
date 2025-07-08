@@ -1,5 +1,4 @@
 const { invoke } = window.__TAURI__.core;
-const { open } = window.__TAURI__.dialog;
 const { listen } = window.__TAURI__.event;
 
 // State management
@@ -9,13 +8,11 @@ let selectedKeyboardId = null;
 let keyProcessingEnabled = true;
 
 // DOM Elements
-const statusIndicator = document.getElementById('status-indicator');
-const statusDot = statusIndicator.querySelector('.status-dot');
-const statusText = statusIndicator.querySelector('.status-text');
-const toggleButton = document.getElementById('toggle-keymagic');
-const keyboardList = document.getElementById('keyboard-list');
-const addKeyboardBtn = document.getElementById('add-keyboard-btn');
-const modal = document.getElementById('modal');
+let toggleButton;
+let statusDot;
+let keyboardList;
+let addKeyboardBtn;
+let modal;
 
 // Navigation
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -86,8 +83,8 @@ function createKeyboardCard(keyboard) {
       </div>
     </div>
     <div class="keyboard-meta">
-      <span class="keyboard-status ${keyboard.enabled ? 'active' : 'disabled'}">
-        ${keyboard.enabled ? 'Active' : 'Disabled'}
+      <span class="keyboard-status ${isActive ? 'active' : ''}">
+        ${isActive ? 'Active' : 'Inactive'}
       </span>
       ${(() => {
         // Determine what hotkey to display
@@ -188,58 +185,106 @@ window.removeKeyboard = async function(keyboardId) {
   }
 }
 
-// Add keyboard
-addKeyboardBtn.addEventListener('click', async () => {
-  try {
-    const selected = await open({
-      multiple: false,
-      filters: [{
-        name: 'KeyMagic Keyboard',
-        extensions: ['km2']
-      }]
-    });
-    
-    if (selected) {
-      try {
-        const keyboardId = await invoke('add_keyboard', { path: selected });
-        await loadKeyboards();
-        await updateTrayMenu();
-        showSuccess('Keyboard added successfully');
-      } catch (error) {
-        console.error('Failed to add keyboard:', error);
-        showError('Failed to add keyboard: ' + error);
+// Event listener setup function
+function setupEventListeners() {
+  // Add keyboard
+  addKeyboardBtn.addEventListener('click', async () => {
+    try {
+      // Use the invoke command to call the dialog through Tauri
+      const selected = await invoke('plugin:dialog|open', {
+        options: {
+          multiple: false,
+          filters: [{
+            name: 'KeyMagic Keyboard',
+            extensions: ['km2']
+          }]
+        }
+      });
+      
+      if (selected) {
+        try {
+          const keyboardId = await invoke('add_keyboard', { path: selected });
+          await loadKeyboards();
+          await updateTrayMenu();
+          showSuccess('Keyboard added successfully');
+        } catch (error) {
+          console.error('Failed to add keyboard:', error);
+          showError('Failed to add keyboard: ' + error);
+        }
       }
+    } catch (error) {
+      console.error('Failed to open file dialog:', error);
+      showError('Failed to open file dialog');
     }
-  } catch (error) {
-    console.error('Failed to open file dialog:', error);
-    showError('Failed to open file dialog');
-  }
-});
+  });
 
-// Toggle KeyMagic
-toggleButton.addEventListener('click', async () => {
-  try {
-    const newState = !keyProcessingEnabled;
-    await invoke('set_key_processing_enabled', { enabled: newState });
-    keyProcessingEnabled = newState;
-    updateStatusIndicator();
-    await updateTrayMenu();
-    showSuccess(newState ? 'KeyMagic enabled' : 'KeyMagic disabled');
-  } catch (error) {
-    console.error('Failed to toggle KeyMagic:', error);
-    showError('Failed to toggle KeyMagic');
-  }
-});
+  // Toggle KeyMagic
+  toggleButton.addEventListener('click', async () => {
+    try {
+      const newState = !keyProcessingEnabled;
+      await invoke('set_key_processing_enabled', { enabled: newState });
+      keyProcessingEnabled = newState;
+      updateStatusIndicator();
+      await updateTrayMenu();
+      showSuccess(newState ? 'KeyMagic enabled' : 'KeyMagic disabled');
+    } catch (error) {
+      console.error('Failed to toggle KeyMagic:', error);
+      showError('Failed to toggle KeyMagic');
+    }
+  });
+  
+  // Setting change handlers
+  document.getElementById('start-with-windows').addEventListener('change', async (e) => {
+    try {
+      await invoke('set_setting', { key: 'StartWithWindows', value: e.target.checked ? '1' : '0' });
+      showSuccess('Setting saved');
+    } catch (error) {
+      console.error('Failed to save setting:', error);
+      showError('Failed to save setting');
+      e.target.checked = !e.target.checked;
+    }
+  });
+
+  document.getElementById('show-in-tray').addEventListener('change', async (e) => {
+    try {
+      await invoke('set_setting', { key: 'ShowInSystemTray', value: e.target.checked ? '1' : '0' });
+      showSuccess('Setting saved');
+    } catch (error) {
+      console.error('Failed to save setting:', error);
+      showError('Failed to save setting');
+      e.target.checked = !e.target.checked;
+    }
+  });
+
+  document.getElementById('minimize-to-tray').addEventListener('change', async (e) => {
+    try {
+      await invoke('set_setting', { key: 'MinimizeToTray', value: e.target.checked ? '1' : '0' });
+      showSuccess('Setting saved');
+    } catch (error) {
+      console.error('Failed to save setting:', error);
+      showError('Failed to save setting');
+      e.target.checked = !e.target.checked;
+    }
+  });
+  
+  // Modal event listeners
+  modal.querySelector('.modal-close').addEventListener('click', hideModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      hideModal();
+    }
+  });
+}
 
 function updateStatusIndicator() {
+  if (!statusDot || !toggleButton) return;
+  
   if (keyProcessingEnabled) {
     statusDot.classList.remove('disabled');
-    statusText.textContent = 'Enabled';
-    toggleButton.querySelector('span').textContent = 'Disable KeyMagic';
+    toggleButton.querySelector('span:last-child').textContent = 'Disable KeyMagic';
   } else {
     statusDot.classList.add('disabled');
-    statusText.textContent = 'Disabled';
-    toggleButton.querySelector('span').textContent = 'Enable KeyMagic';
+    toggleButton.querySelector('span:last-child').textContent = 'Enable KeyMagic';
   }
 }
 
@@ -258,39 +303,6 @@ async function loadSettings() {
   }
 }
 
-// Setting change handlers
-document.getElementById('start-with-windows').addEventListener('change', async (e) => {
-  try {
-    await invoke('set_setting', { key: 'StartWithWindows', value: e.target.checked ? '1' : '0' });
-    showSuccess('Setting saved');
-  } catch (error) {
-    console.error('Failed to save setting:', error);
-    showError('Failed to save setting');
-    e.target.checked = !e.target.checked;
-  }
-});
-
-document.getElementById('show-in-tray').addEventListener('change', async (e) => {
-  try {
-    await invoke('set_setting', { key: 'ShowInSystemTray', value: e.target.checked ? '1' : '0' });
-    showSuccess('Setting saved');
-  } catch (error) {
-    console.error('Failed to save setting:', error);
-    showError('Failed to save setting');
-    e.target.checked = !e.target.checked;
-  }
-});
-
-document.getElementById('minimize-to-tray').addEventListener('change', async (e) => {
-  try {
-    await invoke('set_setting', { key: 'MinimizeToTray', value: e.target.checked ? '1' : '0' });
-    showSuccess('Setting saved');
-  } catch (error) {
-    console.error('Failed to save setting:', error);
-    showError('Failed to save setting');
-    e.target.checked = !e.target.checked;
-  }
-});
 
 // Modal functions
 function showModal(title, content, footer) {
@@ -309,12 +321,6 @@ window.hideModal = function() {
   modal.classList.remove('show');
 }
 
-modal.querySelector('.modal-close').addEventListener('click', hideModal);
-modal.addEventListener('click', (e) => {
-  if (e.target === modal) {
-    hideModal();
-  }
-});
 
 async function showConfirmDialog(title, message) {
   return new Promise(resolve => {
@@ -532,6 +538,16 @@ window.saveHotkey = async function() {
 
 // Initialize
 async function init() {
+  // Initialize DOM elements
+  toggleButton = document.getElementById('toggle-keymagic');
+  statusDot = document.querySelector('.toggle-button .status-dot');
+  keyboardList = document.getElementById('keyboard-list');
+  addKeyboardBtn = document.getElementById('add-keyboard-btn');
+  modal = document.getElementById('modal');
+  
+  // Set up event listeners
+  setupEventListeners();
+  
   try {
     keyProcessingEnabled = await invoke('is_key_processing_enabled');
     updateStatusIndicator();

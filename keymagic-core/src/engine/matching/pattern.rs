@@ -1,6 +1,6 @@
 //! Pattern representation and preprocessing
 
-use crate::engine::types::{Element, Predefined};
+use crate::engine::types::Element;
 use crate::types::opcodes::{FLAG_ANYOF, FLAG_NANYOF};
 use crate::VirtualKey;
 
