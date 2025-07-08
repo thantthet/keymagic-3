@@ -345,14 +345,59 @@ async function showConfirmDialog(title, message) {
   });
 }
 
+// Toast notification functions
+let toastContainer = null;
+
+function ensureToastContainer() {
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container';
+    document.body.appendChild(toastContainer);
+  }
+  return toastContainer;
+}
+
+function showToast(message, type = 'info', duration = 3000) {
+  const container = ensureToastContainer();
+  
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  
+  // Add icon based on type
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${message}</span>
+    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+  `;
+  
+  container.appendChild(toast);
+  
+  // Trigger reflow to enable transition
+  toast.offsetHeight;
+  
+  // Add show class for animation
+  toast.classList.add('show');
+  
+  // Auto-remove after duration
+  const timeoutId = setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+  
+  // Clear timeout if manually closed
+  toast.querySelector('.toast-close').addEventListener('click', () => {
+    clearTimeout(timeoutId);
+  });
+}
+
 function showSuccess(message) {
-  // TODO: Implement toast notifications
-  console.log('Success:', message);
+  showToast(message, 'success');
 }
 
 function showError(message) {
-  // TODO: Implement toast notifications
-  console.error('Error:', message);
+  showToast(message, 'error');
 }
 
 // Hotkey configuration
