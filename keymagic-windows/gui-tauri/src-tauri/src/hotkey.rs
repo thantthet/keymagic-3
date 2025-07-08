@@ -24,13 +24,39 @@ impl HotkeyManager {
         // First unregister all existing hotkeys
         self.unregister_all_hotkeys(app)?;
 
-        // Register new hotkeys
+        let mut failed_hotkeys = Vec::new();
+
+        // Register new hotkeys, collecting failures
         for keyboard in keyboard_manager.get_keyboards() {
-            if let Some(hotkey) = &keyboard.hotkey {
+            // Determine which hotkey to use: custom hotkey takes precedence over default
+            let hotkey_to_register = match &keyboard.hotkey {
+                Some(custom_hotkey) if !custom_hotkey.is_empty() => {
+                    // Use custom hotkey if it's set and not empty
+                    Some(custom_hotkey.as_str())
+                }
+                _ => {
+                    // Otherwise, use default hotkey if available
+                    keyboard.default_hotkey.as_deref()
+                }
+            };
+            
+            if let Some(hotkey) = hotkey_to_register {
                 if !hotkey.is_empty() {
-                    self.register_hotkey(app, &keyboard.id, hotkey)?;
+                    if let Err(e) = self.register_hotkey(app, &keyboard.id, hotkey) {
+                        eprintln!("Failed to register hotkey '{}' for keyboard '{}': {}", 
+                                 hotkey, keyboard.name, e);
+                        failed_hotkeys.push(format!("{} ({})", keyboard.name, hotkey));
+                    }
                 }
             }
+        }
+
+        // If any hotkeys failed, return an error with details
+        if !failed_hotkeys.is_empty() {
+            return Err(anyhow!(
+                "Failed to register hotkeys for: {}. Note: Modifier-only hotkeys (e.g., 'Ctrl+Shift') may not be supported.",
+                failed_hotkeys.join(", ")
+            ));
         }
 
         Ok(())

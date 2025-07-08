@@ -188,10 +188,9 @@ pub fn set_keyboard_hotkey(
     };
     manager.set_keyboard_hotkey(&keyboard_id, hotkey_value).map_err(|e| e.to_string())?;
     
-    // Refresh hotkeys
-    if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
-        eprintln!("Failed to refresh hotkeys: {}", e);
-    }
+    // Refresh hotkeys and propagate any errors
+    hotkey_manager.refresh_hotkeys(&app_handle, &manager)
+        .map_err(|e| format!("Failed to register hotkey: {}", e))?;
     
     Ok(())
 }
