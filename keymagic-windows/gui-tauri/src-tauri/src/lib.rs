@@ -1,9 +1,12 @@
 mod commands;
 mod keyboard_manager;
 mod tray;
+mod hotkey;
+mod hud;
 
 use std::sync::Mutex;
 use keyboard_manager::KeyboardManager;
+use hotkey::HotkeyManager;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -15,7 +18,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Mutex::new(keyboard_manager))
+        .manage(HotkeyManager::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_keyboards,
             commands::get_active_keyboard,
@@ -30,6 +35,14 @@ pub fn run() {
             commands::update_tray_menu,
         ])
         .setup(|app| {
+            // Initialize native HUD window
+            #[cfg(target_os = "windows")]
+            {
+                if let Err(e) = hud::initialize_hud() {
+                    eprintln!("Failed to initialize HUD: {}", e);
+                }
+            }
+            
             // Setup system tray
             #[cfg(desktop)]
             {
@@ -42,6 +55,13 @@ pub fn run() {
                 let manager = keyboard_manager.lock().unwrap();
                 let minimize_to_tray = manager.get_setting("minimize_to_tray")
                     .unwrap_or_else(|_| "true".to_string()) == "true";
+                
+                // Register all keyboard hotkeys
+                let hotkey_manager = app.state::<HotkeyManager>();
+                if let Err(e) = hotkey_manager.register_all_hotkeys(&app.app_handle(), &manager) {
+                    eprintln!("Failed to register hotkeys: {}", e);
+                }
+                
                 drop(manager);
                 
                 if minimize_to_tray {

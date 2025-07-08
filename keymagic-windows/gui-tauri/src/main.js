@@ -116,7 +116,7 @@ function createKeyboardCard(keyboard) {
     <div class="keyboard-actions">
       ${!isActive ? 
         `<button class="btn btn-primary" onclick="activateKeyboard('${keyboard.id}')">Activate</button>` :
-        `<button class="btn btn-secondary" disabled>Active</button>`
+        `<button class="btn btn-disabled" disabled>Active</button>`
       }
       <button class="btn btn-secondary" onclick="removeKeyboard('${keyboard.id}')">Remove</button>
     </div>
@@ -580,6 +580,13 @@ async function setupTrayEventListeners() {
   await listen('active_keyboard_changed', async (event) => {
     activeKeyboardId = event.payload;
     renderKeyboardList();
+  });
+  
+  // Listen for keyboard switched events from hotkeys
+  await listen('keyboard-switched', async (event) => {
+    activeKeyboardId = event.payload;
+    await loadKeyboards(); // Reload to get latest state
+    // TODO: Show HUD notification when implemented
   });
 }
 

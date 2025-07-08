@@ -1,4 +1,5 @@
 use crate::keyboard_manager::{KeyboardManager, KeyboardInfo};
+use crate::hotkey::HotkeyManager;
 use std::sync::Mutex;
 use tauri::{State, Manager, AppHandle};
 use std::path::PathBuf;
@@ -29,19 +30,37 @@ pub fn set_active_keyboard(
 #[tauri::command]
 pub fn add_keyboard(
     state: State<KeyboardManagerState>,
+    hotkey_manager: State<HotkeyManager>,
+    app_handle: AppHandle,
     path: PathBuf,
 ) -> Result<String, String> {
     let mut manager = state.lock().map_err(|e| e.to_string())?;
-    manager.load_keyboard(&path).map_err(|e| e.to_string())
+    let result = manager.load_keyboard(&path).map_err(|e| e.to_string())?;
+    
+    // Refresh hotkeys
+    if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
+        eprintln!("Failed to refresh hotkeys: {}", e);
+    }
+    
+    Ok(result)
 }
 
 #[tauri::command]
 pub fn remove_keyboard(
     state: State<KeyboardManagerState>,
+    hotkey_manager: State<HotkeyManager>,
+    app_handle: AppHandle,
     keyboard_id: String,
 ) -> Result<(), String> {
     let mut manager = state.lock().map_err(|e| e.to_string())?;
-    manager.remove_keyboard(&keyboard_id).map_err(|e| e.to_string())
+    manager.remove_keyboard(&keyboard_id).map_err(|e| e.to_string())?;
+    
+    // Refresh hotkeys
+    if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
+        eprintln!("Failed to refresh hotkeys: {}", e);
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -154,6 +173,8 @@ pub fn set_setting(key: String, value: String) -> Result<(), String> {
 #[tauri::command]
 pub fn set_keyboard_hotkey(
     state: State<KeyboardManagerState>,
+    hotkey_manager: State<HotkeyManager>,
+    app_handle: AppHandle,
     keyboard_id: String,
     hotkey: Option<String>,
 ) -> Result<(), String> {
@@ -164,7 +185,14 @@ pub fn set_keyboard_hotkey(
         Some(s) => Some(s),         // Custom hotkey
         None => None,               // Use default
     };
-    manager.set_keyboard_hotkey(&keyboard_id, hotkey_value).map_err(|e| e.to_string())
+    manager.set_keyboard_hotkey(&keyboard_id, hotkey_value).map_err(|e| e.to_string())?;
+    
+    // Refresh hotkeys
+    if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
+        eprintln!("Failed to refresh hotkeys: {}", e);
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]

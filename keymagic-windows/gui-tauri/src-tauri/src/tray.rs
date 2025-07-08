@@ -132,12 +132,24 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
             let mut manager = keyboard_manager.lock().unwrap();
             
             if manager.set_active_keyboard(keyboard_id).is_ok() {
+                // Get the keyboard name for HUD
+                let keyboard_name = manager.get_keyboards()
+                    .iter()
+                    .find(|k| k.id == keyboard_id)
+                    .map(|k| k.name.clone())
+                    .unwrap_or_else(|| keyboard_id.to_string());
+                
                 // Update tray menu
                 update_tray_menu(app, &manager);
                 
                 // Emit event to update UI
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.emit("active_keyboard_changed", keyboard_id);
+                }
+                
+                // Show native HUD notification
+                if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
+                    eprintln!("Failed to show HUD: {}", e);
                 }
             }
         }

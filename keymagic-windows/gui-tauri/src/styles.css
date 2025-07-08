@@ -195,6 +195,20 @@ body {
   background-color: rgba(33, 150, 243, 0.1);
 }
 
+.btn-disabled {
+  background-color: #f5f5f5;
+  color: #9e9e9e;
+  border: 1px solid #e0e0e0;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-disabled:hover {
+  background-color: #f5f5f5;
+  box-shadow: none;
+  transform: none;
+}
+
 /* Keyboard List */
 .keyboard-hotkey {
   font-size: 13px;

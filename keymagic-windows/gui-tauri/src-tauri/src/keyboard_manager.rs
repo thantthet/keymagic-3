@@ -29,6 +29,132 @@ pub struct KeyboardManager {
     active_keyboard: Option<String>,
 }
 
+/// Normalize hotkey string to consistent format
+/// Examples: "ctrl+space" -> "Ctrl+Space", "CTRL + SHIFT + A" -> "Ctrl+Shift+A"
+fn normalize_hotkey(hotkey: &str) -> String {
+    // Split by common separators and filter out empty parts
+    let parts: Vec<&str> = hotkey
+        .split(|c| c == '+' || c == '-' || c == ' ')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    
+    if parts.is_empty() {
+        return String::new();
+    }
+    
+    // Sort modifiers in consistent order: Ctrl, Shift, Alt, Win
+    let mut modifiers = Vec::new();
+    let mut main_keys = Vec::new();
+    
+    for part in parts {
+        let normalized = normalize_key_part(part);
+        match normalized.as_str() {
+            "Ctrl" | "Shift" | "Alt" | "Win" => modifiers.push(normalized),
+            _ => main_keys.push(normalized),
+        }
+    }
+    
+    // Sort modifiers in canonical order
+    modifiers.sort_by_key(|m| match m.as_str() {
+        "Ctrl" => 0,
+        "Shift" => 1,
+        "Alt" => 2,
+        "Win" => 3,
+        _ => 4,
+    });
+    
+    // Combine modifiers and main keys
+    let mut result = modifiers;
+    result.extend(main_keys);
+    
+    result.join("+")
+}
+
+/// Normalize individual key part
+fn normalize_key_part(part: &str) -> String {
+    let lower = part.to_lowercase();
+    
+    // Common key mappings
+    match lower.as_str() {
+        // Modifiers
+        "ctrl" | "control" | "ctl" => "Ctrl".to_string(),
+        "shift" | "shft" => "Shift".to_string(),
+        "alt" | "option" | "opt" => "Alt".to_string(),
+        "cmd" | "command" | "win" | "windows" | "super" | "meta" => "Win".to_string(),
+        
+        // Special keys
+        "space" | "spacebar" | "spc" => "Space".to_string(),
+        "tab" => "Tab".to_string(),
+        "enter" | "return" | "ret" => "Enter".to_string(),
+        "esc" | "escape" => "Escape".to_string(),
+        "backspace" | "back" | "bksp" => "Backspace".to_string(),
+        "delete" | "del" => "Delete".to_string(),
+        "insert" | "ins" => "Insert".to_string(),
+        "home" => "Home".to_string(),
+        "end" => "End".to_string(),
+        "pageup" | "pgup" | "page_up" | "prior" => "PageUp".to_string(),
+        "pagedown" | "pgdown" | "pgdn" | "page_down" | "next" => "PageDown".to_string(),
+        
+        // Arrow keys
+        "left" | "arrowleft" | "arrow_left" | "leftarrow" => "Left".to_string(),
+        "right" | "arrowright" | "arrow_right" | "rightarrow" => "Right".to_string(),
+        "up" | "arrowup" | "arrow_up" | "uparrow" => "Up".to_string(),
+        "down" | "arrowdown" | "arrow_down" | "downarrow" => "Down".to_string(),
+        
+        // Numpad
+        "num0" | "numpad0" | "numpad_0" => "Numpad0".to_string(),
+        "num1" | "numpad1" | "numpad_1" => "Numpad1".to_string(),
+        "num2" | "numpad2" | "numpad_2" => "Numpad2".to_string(),
+        "num3" | "numpad3" | "numpad_3" => "Numpad3".to_string(),
+        "num4" | "numpad4" | "numpad_4" => "Numpad4".to_string(),
+        "num5" | "numpad5" | "numpad_5" => "Numpad5".to_string(),
+        "num6" | "numpad6" | "numpad_6" => "Numpad6".to_string(),
+        "num7" | "numpad7" | "numpad_7" => "Numpad7".to_string(),
+        "num8" | "numpad8" | "numpad_8" => "Numpad8".to_string(),
+        "num9" | "numpad9" | "numpad_9" => "Numpad9".to_string(),
+        
+        // Function keys with various formats
+        _ => {
+            // Check for function keys (F1-F24)
+            if let Some(num) = parse_function_key(&lower) {
+                format!("F{}", num)
+            }
+            // Single character - uppercase it
+            else if part.len() == 1 && part.chars().all(|c| c.is_alphabetic()) {
+                part.to_uppercase()
+            }
+            // Digit keys
+            else if part.len() == 1 && part.chars().all(|c| c.is_numeric()) {
+                part.to_string()
+            }
+            // For anything else, use title case
+            else {
+                // First letter uppercase, rest lowercase
+                let mut chars = part.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+                }
+            }
+        }
+    }
+}
+
+/// Parse function key from various formats (f1, F1, func1, function1, etc.)
+fn parse_function_key(s: &str) -> Option<u8> {
+    // Remove common prefixes
+    let num_part = s
+        .strip_prefix("f")
+        .or_else(|| s.strip_prefix("func"))
+        .or_else(|| s.strip_prefix("function"))
+        .or_else(|| s.strip_prefix("fn"))
+        .unwrap_or(s);
+    
+    // Try to parse the number
+    num_part.parse::<u8>().ok().filter(|&n| n >= 1 && n <= 24)
+}
+
 impl KeyboardManager {
     pub fn new() -> Result<Self> {
         let mut manager = Self {
@@ -82,7 +208,7 @@ impl KeyboardManager {
             .unwrap_or_else(|| String::new());
             
         let default_hotkey = metadata.hotkey()
-            .map(|s| s.to_string());
+            .map(|s| normalize_hotkey(&s));
             
         let icon_data = metadata.icon()
             .map(|data| data.to_vec());
@@ -265,7 +391,8 @@ impl KeyboardManager {
                         let path = self.read_registry_string(kb_hkey, w!("Path")).unwrap_or_default();
                         let name = self.read_registry_string(kb_hkey, w!("Name")).unwrap_or(keyboard_id.clone());
                         let description = self.read_registry_string(kb_hkey, w!("Description")).unwrap_or_default();
-                        let hotkey = self.read_registry_string(kb_hkey, w!("Hotkey"));
+                        let hotkey = self.read_registry_string(kb_hkey, w!("Hotkey"))
+                            .map(|h| normalize_hotkey(&h));
                         let enabled = self.read_registry_dword(kb_hkey, w!("Enabled")).unwrap_or(1) != 0;
                         
                         // Try to load default hotkey and icon from .km2 file
@@ -275,7 +402,7 @@ impl KeyboardManager {
                                 if let Ok(km2) = Km2Loader::load(&km2_data) {
                                     let metadata = km2.metadata();
                                     (
-                                        metadata.hotkey().map(|s| s.to_string()),
+                                        metadata.hotkey().map(|s| normalize_hotkey(&s)),
                                         metadata.icon().map(|data| data.to_vec())
                                     )
                                 } else {
@@ -474,7 +601,7 @@ impl KeyboardManager {
     
     pub fn set_keyboard_hotkey(&mut self, id: &str, hotkey: Option<&str>) -> Result<()> {
         if let Some(keyboard) = self.keyboards.get_mut(id) {
-            keyboard.hotkey = hotkey.map(|s| s.to_string());
+            keyboard.hotkey = hotkey.map(|s| normalize_hotkey(s));
             
             #[cfg(target_os = "windows")]
             self.save_to_registry(id)?;
