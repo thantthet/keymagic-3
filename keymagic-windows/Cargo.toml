@@ -1,5 +1,5 @@
 [workspace]
-members = ["gui", "gui-slint", "gui-tauri/src-tauri"]
+members = ["gui-tauri/src-tauri"]
 resolver = "2"
 
 [workspace.dependencies]
