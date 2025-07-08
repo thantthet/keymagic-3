@@ -40,8 +40,8 @@ impl HotkeyManager {
     pub fn register_hotkey(&self, app: &AppHandle, keyboard_id: &str, hotkey: &str) -> Result<()> {
         let shortcut = app.global_shortcut();
         
-        // Parse the hotkey string (currently unused but will be needed for validation)
-        let (_modifiers, _key) = parse_hotkey(hotkey)?;
+        // Parse the hotkey string for validation
+        let (_modifiers, _key_code) = parse_hotkey(hotkey)?;
         
         // Clone values for the closure and storage
         let keyboard_id_str = keyboard_id.to_string();
@@ -120,8 +120,8 @@ impl HotkeyManager {
     pub fn register_on_off_hotkey(&self, app: &AppHandle, hotkey: &str) -> Result<()> {
         let shortcut = app.global_shortcut();
         
-        // Parse the hotkey string (for validation)
-        let (_modifiers, _key) = parse_hotkey(hotkey)?;
+        // Parse the hotkey string for validation
+        let (_modifiers, _key_code) = parse_hotkey(hotkey)?;
         
         let app_handle = app.clone();
         
@@ -244,100 +244,114 @@ impl HotkeyManager {
     }
 }
 
-/// Parse a hotkey string like "Ctrl+Shift+M" into Tauri modifiers and key code
-fn parse_hotkey(hotkey: &str) -> Result<(Modifiers, Code)> {
+/// Parse a hotkey string like "Ctrl+Shift+M" or "Ctrl+Shift" into Tauri modifiers and optional key code
+fn parse_hotkey(hotkey: &str) -> Result<(Modifiers, Option<Code>)> {
     let parts: Vec<&str> = hotkey.split('+').collect();
     if parts.is_empty() {
         return Err(anyhow!("Invalid hotkey format"));
     }
 
     let mut modifiers = Modifiers::empty();
-    let mut key_part = "";
+    let mut key_code = None;
 
-    for (i, part) in parts.iter().enumerate() {
+    // Process all parts to identify modifiers and regular keys
+    for part in parts.iter() {
         let part = part.trim();
-        if i == parts.len() - 1 {
-            // Last part is the key
-            key_part = part;
-        } else {
-            // These are modifiers
-            match part.to_lowercase().as_str() {
-                "ctrl" | "control" => modifiers |= Modifiers::CONTROL,
-                "alt" => modifiers |= Modifiers::ALT,
-                "shift" => modifiers |= Modifiers::SHIFT,
-                "cmd" | "win" | "super" | "meta" => modifiers |= Modifiers::META,
-                _ => return Err(anyhow!("Unknown modifier: {}", part)),
+        
+        // Try to parse as modifier first
+        match part.to_lowercase().as_str() {
+            "ctrl" | "control" => modifiers |= Modifiers::CONTROL,
+            "alt" => modifiers |= Modifiers::ALT,
+            "shift" => modifiers |= Modifiers::SHIFT,
+            "cmd" | "win" | "super" | "meta" => modifiers |= Modifiers::META,
+            _ => {
+                // Not a modifier, try to parse as a regular key
+                if key_code.is_some() {
+                    return Err(anyhow!("Multiple non-modifier keys specified"));
+                }
+                
+                // Parse the key code
+                key_code = Some(match part.to_uppercase().as_str() {
+                    "A" => Code::KeyA,
+                    "B" => Code::KeyB,
+                    "C" => Code::KeyC,
+                    "D" => Code::KeyD,
+                    "E" => Code::KeyE,
+                    "F" => Code::KeyF,
+                    "G" => Code::KeyG,
+                    "H" => Code::KeyH,
+                    "I" => Code::KeyI,
+                    "J" => Code::KeyJ,
+                    "K" => Code::KeyK,
+                    "L" => Code::KeyL,
+                    "M" => Code::KeyM,
+                    "N" => Code::KeyN,
+                    "O" => Code::KeyO,
+                    "P" => Code::KeyP,
+                    "Q" => Code::KeyQ,
+                    "R" => Code::KeyR,
+                    "S" => Code::KeyS,
+                    "T" => Code::KeyT,
+                    "U" => Code::KeyU,
+                    "V" => Code::KeyV,
+                    "W" => Code::KeyW,
+                    "X" => Code::KeyX,
+                    "Y" => Code::KeyY,
+                    "Z" => Code::KeyZ,
+                    "0" => Code::Digit0,
+                    "1" => Code::Digit1,
+                    "2" => Code::Digit2,
+                    "3" => Code::Digit3,
+                    "4" => Code::Digit4,
+                    "5" => Code::Digit5,
+                    "6" => Code::Digit6,
+                    "7" => Code::Digit7,
+                    "8" => Code::Digit8,
+                    "9" => Code::Digit9,
+                    "F1" => Code::F1,
+                    "F2" => Code::F2,
+                    "F3" => Code::F3,
+                    "F4" => Code::F4,
+                    "F5" => Code::F5,
+                    "F6" => Code::F6,
+                    "F7" => Code::F7,
+                    "F8" => Code::F8,
+                    "F9" => Code::F9,
+                    "F10" => Code::F10,
+                    "F11" => Code::F11,
+                    "F12" => Code::F12,
+                    "SPACE" => Code::Space,
+                    "TAB" => Code::Tab,
+                    "ENTER" | "RETURN" => Code::Enter,
+                    "ESC" | "ESCAPE" => Code::Escape,
+                    "BACKSPACE" => Code::Backspace,
+                    "DELETE" => Code::Delete,
+                    "INSERT" => Code::Insert,
+                    "HOME" => Code::Home,
+                    "END" => Code::End,
+                    "PAGEUP" => Code::PageUp,
+                    "PAGEDOWN" => Code::PageDown,
+                    "LEFT" => Code::ArrowLeft,
+                    "RIGHT" => Code::ArrowRight,
+                    "UP" => Code::ArrowUp,
+                    "DOWN" => Code::ArrowDown,
+                    _ => return Err(anyhow!("Unknown key: {}", part)),
+                });
             }
         }
     }
 
-    // Parse the key code
-    let code = match key_part.to_uppercase().as_str() {
-        "A" => Code::KeyA,
-        "B" => Code::KeyB,
-        "C" => Code::KeyC,
-        "D" => Code::KeyD,
-        "E" => Code::KeyE,
-        "F" => Code::KeyF,
-        "G" => Code::KeyG,
-        "H" => Code::KeyH,
-        "I" => Code::KeyI,
-        "J" => Code::KeyJ,
-        "K" => Code::KeyK,
-        "L" => Code::KeyL,
-        "M" => Code::KeyM,
-        "N" => Code::KeyN,
-        "O" => Code::KeyO,
-        "P" => Code::KeyP,
-        "Q" => Code::KeyQ,
-        "R" => Code::KeyR,
-        "S" => Code::KeyS,
-        "T" => Code::KeyT,
-        "U" => Code::KeyU,
-        "V" => Code::KeyV,
-        "W" => Code::KeyW,
-        "X" => Code::KeyX,
-        "Y" => Code::KeyY,
-        "Z" => Code::KeyZ,
-        "0" => Code::Digit0,
-        "1" => Code::Digit1,
-        "2" => Code::Digit2,
-        "3" => Code::Digit3,
-        "4" => Code::Digit4,
-        "5" => Code::Digit5,
-        "6" => Code::Digit6,
-        "7" => Code::Digit7,
-        "8" => Code::Digit8,
-        "9" => Code::Digit9,
-        "F1" => Code::F1,
-        "F2" => Code::F2,
-        "F3" => Code::F3,
-        "F4" => Code::F4,
-        "F5" => Code::F5,
-        "F6" => Code::F6,
-        "F7" => Code::F7,
-        "F8" => Code::F8,
-        "F9" => Code::F9,
-        "F10" => Code::F10,
-        "F11" => Code::F11,
-        "F12" => Code::F12,
-        "SPACE" => Code::Space,
-        "TAB" => Code::Tab,
-        "ENTER" | "RETURN" => Code::Enter,
-        "ESC" | "ESCAPE" => Code::Escape,
-        "BACKSPACE" => Code::Backspace,
-        "DELETE" => Code::Delete,
-        "INSERT" => Code::Insert,
-        "HOME" => Code::Home,
-        "END" => Code::End,
-        "PAGEUP" => Code::PageUp,
-        "PAGEDOWN" => Code::PageDown,
-        "LEFT" => Code::ArrowLeft,
-        "RIGHT" => Code::ArrowRight,
-        "UP" => Code::ArrowUp,
-        "DOWN" => Code::ArrowDown,
-        _ => return Err(anyhow!("Unknown key: {}", key_part)),
-    };
+    // Validate: must have at least one modifier
+    if modifiers.is_empty() {
+        return Err(anyhow!("Hotkey must include at least one modifier (Ctrl, Alt, Shift, or Win/Cmd)"));
+    }
 
-    Ok((modifiers, code))
+    // Warn about potential issues with modifier-only hotkeys
+    if key_code.is_none() {
+        // Note: We still return Ok, but the caller should be aware this might not work
+        eprintln!("Warning: Modifier-only hotkey '{}' may not be supported by the system", hotkey);
+    }
+
+    // Both modifiers-only and modifiers+key are valid from parsing perspective
+    Ok((modifiers, key_code))
 }
