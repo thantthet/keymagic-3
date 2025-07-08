@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::ffi::CString;
 use anyhow::{Result, anyhow};
+use crate::registry_notifier::RegistryNotifier;
 
 #[cfg(target_os = "windows")]
 use windows::core::*;
@@ -260,7 +261,12 @@ impl KeyboardManager {
         if self.keyboards.contains_key(id) {
             self.active_keyboard = Some(id.to_string());
             #[cfg(target_os = "windows")]
-            self.save_active_keyboard()?;
+            {
+                self.save_active_keyboard()?;
+                // Notify TSF instances to reload
+                let notifier = RegistryNotifier::new()?;
+                notifier.notify_registry_changed()?;
+            }
         }
         Ok(())
     }
@@ -310,6 +316,11 @@ impl KeyboardManager {
                 ).is_ok() {
                     self.write_registry_dword(hkey, w!("KeyProcessingEnabled"), if enabled { 1 } else { 0 })?;
                     RegCloseKey(hkey);
+                    
+                    // Notify TSF instances to reload
+                    let notifier = RegistryNotifier::new()?;
+                    notifier.notify_registry_changed()?;
+                    
                     Ok(())
                 } else {
                     Err(anyhow!("Failed to open registry key"))

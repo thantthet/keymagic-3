@@ -3,6 +3,7 @@ mod keyboard_manager;
 mod tray;
 mod hotkey;
 mod hud;
+mod registry_notifier;
 
 use std::sync::Mutex;
 use keyboard_manager::KeyboardManager;

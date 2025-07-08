@@ -98,11 +98,8 @@ private:
     HRESULT UnregisterDisplayAttributeProvider();
     HRESULT CreateDisplayAttributeInfo();
     
-    // Registry monitoring
-    HRESULT StartRegistryMonitoring();
-    HRESULT StopRegistryMonitoring();
-    static DWORD WINAPI RegistryMonitorThread(LPVOID lpParam);
-    void RegistryMonitorLoop();
+    // Settings update notification
+    void UpdateSettings(bool enabled, const std::wstring& keyboardId);
     
     // Member variables
     LONG m_cRef;
@@ -123,11 +120,8 @@ private:
     // Critical section for thread safety
     CRITICAL_SECTION m_cs;
     
-    // Registry monitoring
-    HANDLE m_hRegistryThread;
-    HANDLE m_hRegistryStopEvent;
-    HKEY m_hRegistryKey;
-    HANDLE m_hRegistryChangeEvent;
+    // Registry reload monitor
+    class CRegistryReloadMonitor *m_pRegistryMonitor;
     
     // Composition manager
     CCompositionManager *m_pCompositionMgr;
@@ -151,6 +145,7 @@ private:
     friend class CDirectEditSession;
     friend class CCompositionEditSession;
     friend class CCompositionManager;
+    friend class CRegistryReloadMonitor;
 };
 
 // Edit session for direct text manipulation (no composition)
@@ -192,6 +187,26 @@ private:
     BOOL *m_pfEaten;
     int m_deleteCount;
     std::wstring m_insertText;
+};
+
+// Registry reload monitor - waits for global event to reload settings
+class CRegistryReloadMonitor
+{
+public:
+    CRegistryReloadMonitor(CKeyMagicTextService *pTextService);
+    ~CRegistryReloadMonitor();
+    
+    bool Initialize();
+    void Shutdown();
+    
+private:
+    static DWORD WINAPI MonitorThreadProc(LPVOID lpParam);
+    void ReloadRegistrySettings();
+    
+    CKeyMagicTextService *m_pTextService;
+    HANDLE m_hReloadEvent;
+    HANDLE m_hMonitorThread;
+    HANDLE m_hStopEvent;
 };
 
 #endif // KEYMAGIC_TEXT_SERVICE_H
