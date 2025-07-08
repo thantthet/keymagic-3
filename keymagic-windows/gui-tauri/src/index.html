@@ -101,6 +101,41 @@
               </div>
             </section>
             
+            <section class="settings-section">
+              <h2>Hotkey Settings</h2>
+              <div class="setting-item">
+                <div class="hotkey-setting">
+                  <label for="on-off-hotkey">On/Off Toggle Hotkey</label>
+                  <div class="hotkey-input-group">
+                    <input type="text" id="on-off-hotkey" class="hotkey-input-field" 
+                           placeholder="Press key combination..." readonly>
+                    <button class="btn btn-secondary" onclick="configureOnOffHotkey()">Configure</button>
+                  </div>
+                  <p class="setting-hint">Global hotkey to enable/disable KeyMagic</p>
+                </div>
+              </div>
+            </section>
+            
+            <section class="settings-section">
+              <h2>Updates</h2>
+              <div class="setting-item">
+                <div class="update-settings">
+                  <div class="update-info" id="update-info">
+                    <p class="current-version">Current version: <span id="current-version">Loading...</span></p>
+                    <p class="update-status" id="update-status"></p>
+                  </div>
+                  <div class="update-actions">
+                    <button class="btn btn-primary" onclick="checkForUpdates()">Check for Updates</button>
+                    <button class="btn btn-secondary" id="download-update-btn" style="display: none;" onclick="downloadUpdate()">Download Update</button>
+                  </div>
+                  <div class="update-notes" id="update-notes" style="display: none;">
+                    <h4>Release Notes:</h4>
+                    <div id="release-notes-content"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            
           </div>
         </div>
         

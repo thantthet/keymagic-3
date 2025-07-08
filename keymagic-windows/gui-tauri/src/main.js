@@ -298,6 +298,15 @@ async function loadSettings() {
     document.getElementById('start-with-windows').checked = startWithWindows === '1';
     document.getElementById('show-in-tray').checked = showInTray !== '0';
     document.getElementById('minimize-to-tray').checked = minimizeToTray === '1';
+    
+    // Load on/off hotkey
+    const onOffHotkey = await invoke('get_on_off_hotkey');
+    if (onOffHotkey) {
+      document.getElementById('on-off-hotkey').value = onOffHotkey;
+    }
+    
+    // Load current version
+    await loadCurrentVersion();
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
@@ -536,6 +545,200 @@ window.saveHotkey = async function() {
   hideModal();
 }
 
+// On/Off hotkey configuration
+let currentOnOffHotkey = null;
+
+window.configureOnOffHotkey = function() {
+  recordedKeys = [];
+  
+  // Get current hotkey
+  const currentValue = document.getElementById('on-off-hotkey').value;
+  if (currentValue) {
+    recordedKeys = currentValue.split('+');
+  }
+  
+  showModal(
+    'Configure On/Off Hotkey',
+    `
+      <p>Configure global hotkey to enable/disable KeyMagic</p>
+      <div class="hotkey-input-container">
+        <input type="text" id="hotkey-input" class="hotkey-input" 
+               placeholder="Press key combination or leave empty..." 
+               value="${currentValue}"
+               readonly>
+        <button class="btn btn-secondary" onclick="clearHotkey()">Clear</button>
+      </div>
+      <p class="hotkey-hint">Press the desired key combination (e.g., Ctrl+Shift+Space) or click Clear to remove hotkey</p>
+    `,
+    `
+      <button class="btn btn-secondary" onclick="cancelOnOffHotkeyConfig()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveOnOffHotkey()">Save</button>
+    `
+  );
+  
+  // Focus on the input and set up key listeners
+  setTimeout(() => {
+    const input = document.getElementById('hotkey-input');
+    input.focus();
+    input.addEventListener('keydown', recordHotkey);
+  }, 100);
+}
+
+window.cancelOnOffHotkeyConfig = function() {
+  const input = document.getElementById('hotkey-input');
+  if (input) {
+    input.removeEventListener('keydown', recordHotkey);
+  }
+  recordedKeys = [];
+  hideModal();
+}
+
+window.saveOnOffHotkey = async function() {
+  const input = document.getElementById('hotkey-input');
+  if (input) {
+    input.removeEventListener('keydown', recordHotkey);
+  }
+  
+  try {
+    let hotkeyValue;
+    let successMessage;
+    
+    if (recordedKeys.length === 0) {
+      // User cleared the hotkey - send null to remove it
+      hotkeyValue = null;
+      successMessage = 'On/Off hotkey removed';
+    } else {
+      // User set a hotkey
+      hotkeyValue = recordedKeys.join('+');
+      successMessage = 'On/Off hotkey configured';
+    }
+    
+    await invoke('set_on_off_hotkey', {
+      hotkey: hotkeyValue
+    });
+    
+    // Update the display
+    document.getElementById('on-off-hotkey').value = hotkeyValue || '';
+    
+    showSuccess(successMessage);
+  } catch (error) {
+    console.error('Failed to save on/off hotkey:', error);
+    showError('Failed to save on/off hotkey');
+  }
+  
+  recordedKeys = [];
+  hideModal();
+}
+
+// Update checking functionality
+let updateInfo = null;
+
+window.checkForUpdates = async function() {
+  const button = document.querySelector('button[onclick="checkForUpdates()"]');
+  const statusElement = document.getElementById('update-status');
+  const downloadBtn = document.getElementById('download-update-btn');
+  const updateNotes = document.getElementById('update-notes');
+  const releaseNotesContent = document.getElementById('release-notes-content');
+  
+  // Show loading state
+  button.disabled = true;
+  button.textContent = 'Checking...';
+  statusElement.textContent = 'Checking for updates...';
+  statusElement.className = 'update-status checking';
+  
+  try {
+    updateInfo = await invoke('check_for_update');
+    
+    // Update current version display
+    document.getElementById('current-version').textContent = updateInfo.current_version;
+    
+    if (updateInfo.update_available) {
+      statusElement.textContent = `New version ${updateInfo.latest_version} is available!`;
+      statusElement.className = 'update-status available';
+      
+      // Show download button if download URL is available
+      if (updateInfo.download_url) {
+        downloadBtn.style.display = 'inline-block';
+      }
+      
+      // Show release notes if available
+      if (updateInfo.release_notes) {
+        updateNotes.style.display = 'block';
+        // Simple text rendering without markdown parsing
+        releaseNotesContent.textContent = updateInfo.release_notes;
+      }
+    } else {
+      statusElement.textContent = 'You are using the latest version.';
+      statusElement.className = 'update-status up-to-date';
+      downloadBtn.style.display = 'none';
+      updateNotes.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+    statusElement.textContent = 'Failed to check for updates. Please try again later.';
+    statusElement.className = 'update-status error';
+    downloadBtn.style.display = 'none';
+    updateNotes.style.display = 'none';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Check for Updates';
+  }
+}
+
+window.downloadUpdate = async function() {
+  if (updateInfo && updateInfo.download_url) {
+    try {
+      const { open } = window.__TAURI__.shell;
+      await open(updateInfo.download_url);
+    } catch (error) {
+      console.error('Failed to open download URL:', error);
+      showError('Failed to open download page');
+    }
+  }
+}
+
+// Load current version on settings page
+async function loadCurrentVersion() {
+  try {
+    // Get the current version from the Rust backend
+    const currentVersionElement = document.getElementById('current-version');
+    if (currentVersionElement) {
+      // For now, use the version from package.json or hardcode it
+      currentVersionElement.textContent = '0.1.0';
+    }
+  } catch (error) {
+    console.error('Failed to load current version:', error);
+  }
+}
+
+// Show update notification
+function showUpdateNotification(updateInfo) {
+  // Create a subtle notification banner
+  const banner = document.createElement('div');
+  banner.className = 'update-notification-banner';
+  banner.innerHTML = `
+    <div class="update-notification-content">
+      <span>New version ${updateInfo.latest_version} is available!</span>
+      <button class="btn-link" onclick="switchPage('settings'); checkForUpdates(); this.parentElement.parentElement.remove();">
+        View Details
+      </button>
+      <button class="btn-link" onclick="this.parentElement.parentElement.remove();">
+        Dismiss
+      </button>
+    </div>
+  `;
+  
+  // Add to the body
+  document.body.appendChild(banner);
+  
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => {
+    if (banner.parentElement) {
+      banner.remove();
+    }
+  }, 10000);
+}
+
 // Initialize
 async function init() {
   // Initialize DOM elements
@@ -587,6 +790,21 @@ async function setupTrayEventListeners() {
     activeKeyboardId = event.payload;
     await loadKeyboards(); // Reload to get latest state
     // TODO: Show HUD notification when implemented
+  });
+  
+  // Listen for check for updates event from tray
+  await listen('check_for_updates', async () => {
+    // Delay slightly to ensure settings page is loaded
+    setTimeout(() => {
+      checkForUpdates();
+    }, 100);
+  });
+  
+  // Listen for update available notification
+  await listen('update_available', async (event) => {
+    const updateInfo = event.payload;
+    // Show a subtle notification in the UI
+    showUpdateNotification(updateInfo);
   });
 }
 
