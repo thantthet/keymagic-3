@@ -33,9 +33,13 @@ ArchitecturesAllowed=x64
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 MinVersion=10.0
+UninstallRestartComputer=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Messages]
+UninstallStatusLabel=Uninstalling %1. Please wait...%n%nNote: A logout will be required to complete the removal of the Text Services Framework components.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
