@@ -62,8 +62,8 @@ Write-Host ""
 
 # Check registry
 Write-Host "Registry:" -ForegroundColor White
-Test-Item "Registry::HKEY_CLASSES_ROOT\CLSID\{12345678-1234-1234-1234-123456789ABC}" "COM registration" "Registry"
-Test-Item "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{12345678-1234-1234-1234-123456789ABC}" "TSF registration" "Registry"
+Test-Item "Registry::HKEY_CLASSES_ROOT\CLSID\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}" "COM registration" "Registry"
+Test-Item "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}" "TSF registration" "Registry"
 Test-Item "Registry::HKEY_CURRENT_USER\Software\KeyMagic" "KeyMagic settings" "Registry"
 
 Write-Host ""
@@ -116,7 +116,7 @@ $issues = @()
 if (!$ctfmon) { $issues += "Start ctfmon.exe for Text Services Framework" }
 if (!(Test-Path "tsf\build\Release\KeyMagicTSF.dll")) { $issues += "Build TSF: make.bat build tsf" }
 if (!(Test-Path "target\release\keymagic-config.exe")) { $issues += "Build GUI: make.bat build gui" }
-if (!(Test-Path "Registry::HKEY_CLASSES_ROOT\CLSID\{12345678-1234-1234-1234-123456789ABC}")) { $issues += "Register TSF: make.bat register (as admin)" }
+if (!(Test-Path "Registry::HKEY_CLASSES_ROOT\CLSID\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}")) { $issues += "Register TSF: make.bat register (as admin)" }
 
 if ($issues.Count -gt 0) {
     Write-Host "Recommendations:" -ForegroundColor Yellow

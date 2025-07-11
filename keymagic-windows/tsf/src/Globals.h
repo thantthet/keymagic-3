@@ -15,8 +15,8 @@ inline void DllAddRef() { g_cRefDll++; }
 inline void DllRelease() { g_cRefDll--; }
 
 // Registry key paths
-#define TEXTSERVICE_CLSID L"{12345678-1234-1234-1234-123456789ABC}"
-#define TEXTSERVICE_DESC L"KeyMagic Text Service"
+#define TEXTSERVICE_CLSID L"{094A562B-D08B-4CAF-8E95-8F8031CFD24C}"
+#define TEXTSERVICE_DESC L"KeyMagic 3"
 #define TEXTSERVICE_MODEL L"Apartment"
 #define TEXTSERVICE_ICON_INDEX 0
 
