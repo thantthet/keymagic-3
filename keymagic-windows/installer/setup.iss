@@ -124,8 +124,12 @@ end;
 
 // Check if a file exists (for conditional file installation)
 function FileExists(FileName: String): Boolean;
+var
+  FindRec: TFindRec;
 begin
-  Result := FileExists(FileName);
+  Result := FindFirst(FileName, FindRec);
+  if Result then
+    FindClose(FindRec);
 end;
 
 // Check if Windows 10 or later
