@@ -1,0 +1,30 @@
+{
+  "name": "KeyMagic",
+  "platforms": {
+    "windows": {
+      "aarch64": {
+        "version": "0.0.1",
+        "releaseDate": "2025-07-11T17:15:21Z",
+        "minimumSystemVersion": "10.0.17763",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.1/KeyMagic3-Setup-0.0.1-arm64.exe",
+        "signature": "",
+        "size": 4710765,
+        "sha256": "197384c9dea0044b65296f85de2be2cb2d19aad4259f48f128d6170928b02402"
+      },
+      "x86_64": {
+        "version": "0.0.1",
+        "releaseDate": "2025-07-11T17:15:21Z",
+        "minimumSystemVersion": "10.0.17763",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.1/KeyMagic3-Setup-0.0.1-x64.exe",
+        "signature": "",
+        "size": 4668346,
+        "sha256": "46ee4e917c42022c308bd8fdc50357b871c96aea604f21c7a6723569e32b60c7"
+      }
+    }
+  },
+  "releaseNotes": {
+    "0.0.1": {
+      "en": "### KeyMagic 0.0.1\n\n- Hello Typers!\n"
+    }
+  }
+}
