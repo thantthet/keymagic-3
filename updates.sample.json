@@ -6,7 +6,7 @@
         "version": "0.3.0",
         "releaseDate": "2024-01-15T00:00:00Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic-Setup-0.3.0-x64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic3-Setup-0.3.0-x64.exe",
         "signature": "",
         "size": 15728640,
         "sha256": ""
@@ -15,7 +15,7 @@
         "version": "0.3.0",
         "releaseDate": "2024-01-15T00:00:00Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic-Setup-0.3.0-arm64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic3-Setup-0.3.0-arm64.exe",
         "signature": "",
         "size": 14680064,
         "sha256": ""
@@ -26,7 +26,7 @@
         "version": "0.3.0",
         "releaseDate": "2024-01-15T00:00:00Z",
         "minimumSystemVersion": "10.15",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic-0.3.0-x64.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic3-0.3.0-x64.dmg",
         "signature": "",
         "size": 12582912,
         "sha256": ""
@@ -35,7 +35,7 @@
         "version": "0.3.0",
         "releaseDate": "2024-01-15T00:00:00Z",
         "minimumSystemVersion": "11.0",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic-0.3.0-arm64.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/KeyMagic3-0.3.0-arm64.dmg",
         "signature": "",
         "size": 11534336,
         "sha256": ""
@@ -46,7 +46,7 @@
         "version": "0.3.0",
         "releaseDate": "2024-01-15T00:00:00Z",
         "minimumSystemVersion": "",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/keymagic-0.3.0-amd64.deb",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.3.0/keymagic3-0.3.0-amd64.deb",
         "signature": "",
         "size": 10485760,
         "sha256": ""
