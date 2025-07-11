@@ -8,7 +8,7 @@
 
 // List of categories to register the text service under
 static const GUID* g_SupportedCategories[] = {
-    &GUID_TFCAT_TIP_KEYBOARD,                    // Register as keyboard
+    // &GUID_TFCAT_TIP_KEYBOARD,                    // Register as keyboard
     &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,        // Support for Metro/UWP apps
     &GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,          // Support for system tray
     // Add more categories as needed:
