@@ -45,13 +45,13 @@ Source: "..\target\x86_64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app
 
 ; TSF DLLs - Install both architectures
 Source: "..\tsf\build-x64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF\x64"; Flags: ignoreversion
-Source: "..\tsf\build-ARM64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF\ARM64"; Flags: ignoreversion; Check: FileExists(ExpandConstant('{#SourcePath}..\tsf\build-ARM64\Release\KeyMagicTSF.dll'))
+Source: "..\tsf\build-ARM64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF\ARM64"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Resources
 Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Production keyboards (included with installer)
-Source: "keyboards\*.km2"; DestDir: "{app}\keyboards"; Flags: ignoreversion
+Source: "keyboards\*.km2"; DestDir: "{app}\keyboards"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; License and documentation
 Source: "..\..\LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -122,15 +122,6 @@ begin
   Result := Is64BitInstallMode;
 end;
 
-// Check if a file exists (for conditional file installation)
-function FileExists(FileName: String): Boolean;
-var
-  FindRec: TFindRec;
-begin
-  Result := FindFirst(FileName, FindRec);
-  if Result then
-    FindClose(FindRec);
-end;
 
 // Check if Windows 10 or later
 function IsWindows10OrLater: Boolean;
@@ -177,19 +168,3 @@ begin
   end;
 end;
 
-// Show architecture info during installation
-procedure InitializeWizard();
-var
-  ArchLabel: TLabel;
-begin
-  ArchLabel := TLabel.Create(WizardForm);
-  ArchLabel.Parent := WizardForm.WelcomePage;
-  ArchLabel.Left := WizardForm.WelcomeLabel2.Left;
-  ArchLabel.Top := WizardForm.WelcomeLabel2.Top + WizardForm.WelcomeLabel2.Height + 20;
-  ArchLabel.Caption := 'System Architecture: ';
-  if IsARM64 then
-    ArchLabel.Caption := ArchLabel.Caption + 'ARM64'
-  else
-    ArchLabel.Caption := ArchLabel.Caption + 'x64';
-  ArchLabel.Font.Style := [fsBold];
-end;
