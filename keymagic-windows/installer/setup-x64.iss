@@ -89,48 +89,4 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 ; Unregister TSF DLL before uninstall
 Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\KeyMagicTSF.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
-[Code]
-// Check if Windows 10 or later
-function IsWindows10OrLater: Boolean;
-var
-  Version: TWindowsVersion;
-begin
-  GetWindowsVersionEx(Version);
-  Result := (Version.Major >= 10);
-end;
-
-// Custom initialization
-function InitializeSetup(): Boolean;
-begin
-  Result := True;
-  
-  // Check for Windows 10 or later
-  if not IsWindows10OrLater then
-  begin
-    MsgBox('KeyMagic requires Windows 10 or later.', mbError, MB_OK);
-    Result := False;
-  end;
-end;
-
-// Clean up any temporary TSF registrations
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  TempPath: String;
-  FindRec: TFindRec;
-begin
-  if CurUninstallStep = usUninstall then
-  begin
-    // Clean up any temporary TSF directories
-    TempPath := ExpandConstant('{tmp}');
-    if FindFirst(TempPath + '\KeyMagicTSF_*', FindRec) then
-    begin
-      try
-        repeat
-          DelTree(TempPath + '\' + FindRec.Name, True, True, True);
-        until not FindNext(FindRec);
-      finally
-        FindClose(FindRec);
-      end;
-    end;
-  end;
-end;
+#include "common.iss"
