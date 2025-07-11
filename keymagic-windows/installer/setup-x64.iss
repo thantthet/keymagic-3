@@ -68,6 +68,12 @@ Root: HKCU; Subkey: "Software\KeyMagic"; Flags: uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\KeyMagic\Settings"; Flags: uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\KeyMagic\Keyboards"; Flags: uninsdeletekeyifempty
 
+; Set StartWithWindows to 1 on install
+Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: string; ValueName: "StartWithWindows"; ValueData: "1"; Flags: uninsdeletevalue
+
+; Add to Windows Run registry for auto-start
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue
+
 [Run]
 ; Register TSF DLL
 Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\KeyMagicTSF.dll"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden
