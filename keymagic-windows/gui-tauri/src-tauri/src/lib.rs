@@ -6,7 +6,8 @@ mod hud;
 mod registry_notifier;
 mod updater;
 
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
+use std::sync::atomic::{AtomicBool, Ordering};
 use keyboard_manager::KeyboardManager;
 use hotkey::HotkeyManager;
 use tauri::{Manager, Emitter};
@@ -55,11 +56,8 @@ pub fn run() {
                 
                 let window = app.get_webview_window("main").unwrap();
                 
-                // Check if should minimize to tray
                 let keyboard_manager = app.state::<Mutex<KeyboardManager>>();
                 let manager = keyboard_manager.lock().unwrap();
-                let minimize_to_tray = manager.get_setting("minimize_to_tray")
-                    .unwrap_or_else(|_| "true".to_string()) == "true";
                 
                 // Register all keyboard hotkeys
                 let hotkey_manager = app.state::<HotkeyManager>();
@@ -74,20 +72,31 @@ pub fn run() {
                 
                 drop(manager);
                 
-                if minimize_to_tray {
-                    // Hide window instead of closing when close button is clicked
-                    let window_clone = window.clone();
-                    window.on_window_event(move |event| {
-                        match event {
-                            tauri::WindowEvent::CloseRequested { api, .. } => {
-                                // Hide window instead of closing
-                                api.prevent_close();
-                                let _ = window_clone.hide();
+                // Track if this is the first minimize in this session
+                let first_minimize = Arc::new(AtomicBool::new(true));
+                
+                // Always hide window instead of closing when close button is clicked
+                let window_clone = window.clone();
+                window.on_window_event(move |event| {
+                    match event {
+                        tauri::WindowEvent::CloseRequested { api, .. } => {
+                            // Hide window instead of closing
+                            api.prevent_close();
+                            let _ = window_clone.hide();
+                            
+                            // Show notification on first minimize of this session
+                            if first_minimize.load(Ordering::Relaxed) {
+                                first_minimize.store(false, Ordering::Relaxed);
+                                
+                                // Show the notification using HUD
+                                if let Err(e) = crate::hud::show_tray_minimize_notification() {
+                                    eprintln!("Failed to show minimize notification: {}", e);
+                                }
                             }
-                            _ => {}
                         }
-                    });
-                }
+                        _ => {}
+                    }
+                });
                 
                 // Check for updates on startup (async)
                 let app_handle = app.app_handle().clone();

@@ -110,6 +110,11 @@ pub fn show_status_hud(status: &str) -> Result<()> {
     show_keyboard_hud(status)
 }
 
+/// Show tray minimize notification
+pub fn show_tray_minimize_notification() -> Result<()> {
+    show_keyboard_hud("KeyMagic is running in the system tray")
+}
+
 /// Window procedure for HUD
 extern "system" fn hud_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
