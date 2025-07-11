@@ -32,6 +32,11 @@ function switchPage(pageName) {
   document.querySelectorAll('.page').forEach(page => {
     page.classList.toggle('active', page.id === `${pageName}-page`);
   });
+  
+  // Load version for about page
+  if (pageName === 'about') {
+    loadAboutVersion();
+  }
 }
 
 // Keyboard Management
@@ -719,15 +724,28 @@ window.downloadUpdate = async function() {
 
 // Load current version on settings page
 async function loadCurrentVersion() {
+  // Don't load version here - it will be loaded when checking for updates
+  // Just ensure the element shows "-" initially
+  const currentVersionElement = document.getElementById('current-version');
+  if (currentVersionElement) {
+    currentVersionElement.textContent = '-';
+  }
+}
+
+// Load version on about page
+async function loadAboutVersion() {
   try {
-    // Get the current version from the Rust backend
-    const currentVersionElement = document.getElementById('current-version');
-    if (currentVersionElement) {
-      // For now, use the version from package.json or hardcode it
-      currentVersionElement.textContent = '0.1.0';
+    const aboutVersionElement = document.getElementById('about-version');
+    if (aboutVersionElement) {
+      const version = await invoke('get_app_version');
+      aboutVersionElement.textContent = version;
     }
   } catch (error) {
-    console.error('Failed to load current version:', error);
+    console.error('Failed to load about version:', error);
+    const aboutVersionElement = document.getElementById('about-version');
+    if (aboutVersionElement) {
+      aboutVersionElement.textContent = '-';
+    }
   }
 }
 
@@ -776,6 +794,12 @@ async function init() {
     updateStatusIndicator();
     await loadKeyboards();
     await loadSettings();
+    
+    // Load version for about page if it's the active page
+    const activeNavItem = document.querySelector('.nav-item.active');
+    if (activeNavItem && activeNavItem.dataset.page === 'about') {
+      await loadAboutVersion();
+    }
     
     // Set up event listeners for system tray interactions
     await setupTrayEventListeners();
