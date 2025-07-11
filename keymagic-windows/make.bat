@@ -207,7 +207,7 @@ if exist "%GUI_EXE%" (
 )
 
 :: Check if TSF is registered
-reg query "HKEY_CLASSES_ROOT\CLSID\{12345678-1234-1234-1234-123456789ABC}" >nul 2>&1
+reg query "HKEY_CLASSES_ROOT\CLSID\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}" >nul 2>&1
 if %errorlevel% equ 0 (
     echo [OK] TSF registered
 ) else (
