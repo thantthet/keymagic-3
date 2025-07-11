@@ -7,7 +7,7 @@ KeyMagic TSF Text Service registration can be verified in the following registry
 ### 1. COM Server Registration
 Check if the COM server is registered:
 ```
-HKEY_CLASSES_ROOT\CLSID\{12345678-1234-1234-1234-123456789ABC}
+HKEY_CLASSES_ROOT\CLSID\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}
 ```
 Should contain:
 - Default value: "KeyMagic Text Service"
@@ -17,7 +17,7 @@ Should contain:
 ### 2. TSF Text Input Processor Registration
 Check the CTF (Common Text Framework) registry:
 ```
-HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{12345678-1234-1234-1234-123456789ABC}
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}
 ```
 Should contain:
 - LanguageProfile\0x0455\{87654321-4321-4321-4321-CBA987654321}
@@ -26,7 +26,7 @@ Should contain:
 
 On 64-bit systems, also check:
 ```
-HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\CTF\TIP\{12345678-1234-1234-1234-123456789ABC}
+HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\CTF\TIP\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}
 ```
 
 ## How to Verify Registration
@@ -39,12 +39,12 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\CTF\TIP\{12345678-1234-1234-12
 ### 2. Using Command Line
 Check COM registration:
 ```cmd
-reg query "HKEY_CLASSES_ROOT\CLSID\{12345678-1234-1234-1234-123456789ABC}"
+reg query "HKEY_CLASSES_ROOT\CLSID\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}"
 ```
 
 Check TSF registration:
 ```cmd
-reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{12345678-1234-1234-1234-123456789ABC}" /s
+reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}" /s
 ```
 
 ### 3. Check if TSF is Running
@@ -108,10 +108,10 @@ You can also verify registration programmatically using PowerShell:
 
 ```powershell
 # Check COM registration
-Get-ItemProperty "HKLM:\SOFTWARE\Classes\CLSID\{12345678-1234-1234-1234-123456789ABC}" -ErrorAction SilentlyContinue
+Get-ItemProperty "HKLM:\SOFTWARE\Classes\CLSID\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}" -ErrorAction SilentlyContinue
 
 # Check TSF registration
-Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\CTF\TIP\{12345678-1234-1234-1234-123456789ABC}" -ErrorAction SilentlyContinue
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\CTF\TIP\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}" -ErrorAction SilentlyContinue
 
 # List all registered TIPs
 Get-ChildItem "HKLM:\SOFTWARE\Microsoft\CTF\TIP"
@@ -122,7 +122,7 @@ Get-ChildItem "HKLM:\SOFTWARE\Microsoft\CTF\TIP"
 When properly registered, you should see:
 
 ```
-HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{12345678-1234-1234-1234-123456789ABC}
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\CTF\TIP\{094A562B-D08B-4CAF-8E95-8F8031CFD24C}
     └── LanguageProfile
         └── 0x00000455  (Myanmar Language ID)
             └── {87654321-4321-4321-4321-CBA987654321}

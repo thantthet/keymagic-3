@@ -55,7 +55,7 @@ keymagic-windows/
 
 - **Supporting Files**:
   - `KeyMagicGuids.h` - GUID definitions:
-    - CLSID: `{12345678-1234-1234-1234-123456789ABC}`
+    - CLSID: `{094A562B-D08B-4CAF-8E95-8F8031CFD24C}`
     - Profile GUID: `{87654321-4321-4321-4321-CBA987654321}`
   - `Globals.cpp/h` - Global state management
   - `Registry.cpp/h` - COM and TSF registration helpers
