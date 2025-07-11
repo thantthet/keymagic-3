@@ -126,7 +126,7 @@ make.bat unregister
 
 ### Windows Installation
 
-For Windows users, download the installer from the releases page:
+For Windows users, download the installer from the [releases page](https://github.com/thantthet/keymagic-3/releases):
 - `KeyMagic3-Setup-x.x.x-x64.exe` for 64-bit Windows
 - `KeyMagic3-Setup-x.x.x-arm64.exe` for ARM64 Windows
 
