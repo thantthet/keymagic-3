@@ -11,4 +11,4 @@
 
 ## Engine Logic
 
-- How keymagic engine works @ENGINE_LOGIC.md
+- How keymagic engine works @keymagic-core/ENGINE_LOGIC.md
