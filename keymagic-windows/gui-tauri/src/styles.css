@@ -32,6 +32,11 @@ body {
   background-color: var(--background-color);
   color: var(--text-primary);
   overflow: hidden;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  cursor: default;
 }
 
 /* App Container */
@@ -718,6 +723,47 @@ body {
   text-decoration: underline;
   background-color: rgba(33, 150, 243, 0.1);
   border-radius: 4px;
+}
+
+/* Allow text selection for specific elements */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+textarea,
+.keyboard-description,
+#release-notes-content,
+.about-content p,
+.version-info,
+.toast-message {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+/* Ensure buttons and interactive elements have pointer cursor */
+button,
+.btn,
+.nav-item,
+.keyboard-card,
+.keyboard-hotkey.clickable,
+.modal-close,
+.toast-close,
+.about-links a,
+input[type="checkbox"],
+label {
+  cursor: pointer;
+}
+
+/* Links should be selectable and have pointer cursor */
+a {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  cursor: pointer;
 }
 
 /* Toast Notifications */
