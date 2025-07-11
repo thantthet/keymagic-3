@@ -22,10 +22,16 @@ pub fn get_active_keyboard(state: State<KeyboardManagerState>) -> Result<Option<
 #[tauri::command]
 pub fn set_active_keyboard(
     state: State<KeyboardManagerState>,
+    app_handle: AppHandle,
     keyboard_id: String,
 ) -> Result<(), String> {
     let mut manager = state.lock().map_err(|e| e.to_string())?;
-    manager.set_active_keyboard(&keyboard_id).map_err(|e| e.to_string())
+    let result = manager.set_active_keyboard(&keyboard_id).map_err(|e| e.to_string())?;
+    
+    // Update tray icon
+    crate::tray::update_tray_icon(&app_handle, &manager);
+    
+    Ok(result)
 }
 
 #[tauri::command]
@@ -73,10 +79,16 @@ pub fn is_key_processing_enabled(state: State<KeyboardManagerState>) -> Result<b
 #[tauri::command]
 pub fn set_key_processing_enabled(
     state: State<KeyboardManagerState>,
+    app_handle: AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
     let mut manager = state.lock().map_err(|e| e.to_string())?;
-    manager.set_key_processing_enabled(enabled).map_err(|e| e.to_string())
+    let result = manager.set_key_processing_enabled(enabled).map_err(|e| e.to_string())?;
+    
+    // Update tray icon
+    crate::tray::update_tray_icon(&app_handle, &manager);
+    
+    Ok(result)
 }
 
 // Settings commands

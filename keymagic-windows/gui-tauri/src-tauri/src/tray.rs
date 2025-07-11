@@ -2,6 +2,7 @@ use tauri::{
     AppHandle, Manager, Emitter, 
     menu::{Menu, MenuBuilder, MenuItemBuilder},
     tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
+    image::Image,
 };
 use std::sync::Mutex;
 use crate::keyboard_manager::KeyboardManager;
@@ -12,7 +13,7 @@ pub fn create_system_tray(app: &AppHandle) -> tauri::Result<()> {
     
     let menu = create_tray_menu(app, &manager)?;
     
-    let _ = TrayIconBuilder::with_id("main")
+    let _tray = TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
         .tooltip("KeyMagic")
         .menu(&menu)
@@ -30,6 +31,9 @@ pub fn create_system_tray(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    
+    // Set initial icon based on current state
+    update_tray_icon(app, &manager);
     
     Ok(())
 }
@@ -127,8 +131,9 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
             let current_state = manager.is_key_processing_enabled();
             let _ = manager.set_key_processing_enabled(!current_state);
             
-            // Update tray menu
+            // Update tray menu and icon
             update_tray_menu(app, &manager);
+            update_tray_icon(app, &manager);
             
             // Emit event to update UI
             if let Some(window) = app.get_webview_window("main") {
@@ -152,8 +157,9 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
                     .map(|k| k.name.clone())
                     .unwrap_or_else(|| keyboard_id.to_string());
                 
-                // Update tray menu
+                // Update tray menu and icon
                 update_tray_menu(app, &manager);
+                update_tray_icon(app, &manager);
                 
                 // Emit event to update UI
                 if let Some(window) = app.get_webview_window("main") {
@@ -176,4 +182,73 @@ pub fn update_tray_menu(app: &AppHandle, keyboard_manager: &KeyboardManager) {
             let _ = tray.set_menu(Some(menu));
         }
     }
+}
+
+/// Updates the tray icon and tooltip based on key processing state
+/// - When disabled: Shows default app icon with "KeyMagic" tooltip
+/// - When enabled: Shows active keyboard icon with "KeyMagic - {KEYBOARD-NAME}" tooltip
+pub fn update_tray_icon(app: &AppHandle, keyboard_manager: &KeyboardManager) {
+    if let Some(tray) = app.tray_by_id("main") {
+        let (icon, tooltip) = if keyboard_manager.is_key_processing_enabled() {
+            // Key processing enabled - try to use active keyboard icon and name
+            if let Some(keyboard_id) = keyboard_manager.get_active_keyboard() {
+                if let Some(keyboard) = keyboard_manager.get_keyboards()
+                    .iter()
+                    .find(|k| k.id == keyboard_id) 
+                {
+                    let icon = if let Some(icon_data) = &keyboard.icon_data {
+                        // Try to create icon from keyboard data
+                        if let Ok(icon) = create_icon_from_data(icon_data) {
+                            icon
+                        } else {
+                            // Fall back to default icon
+                            app.default_window_icon().unwrap().clone()
+                        }
+                    } else {
+                        // No icon data, use default
+                        app.default_window_icon().unwrap().clone()
+                    };
+                    
+                    let tooltip = format!("KeyMagic - {}", keyboard.name);
+                    (icon, tooltip)
+                } else {
+                    // Keyboard not found, use default
+                    (app.default_window_icon().unwrap().clone(), "KeyMagic".to_string())
+                }
+            } else {
+                // No active keyboard, use default
+                (app.default_window_icon().unwrap().clone(), "KeyMagic".to_string())
+            }
+        } else {
+            // Key processing disabled - use default app icon and simple tooltip
+            (app.default_window_icon().unwrap().clone(), "KeyMagic".to_string())
+        };
+        
+        let _ = tray.set_icon(Some(icon));
+        let _ = tray.set_tooltip(Some(tooltip));
+    }
+}
+
+/// Creates a Tauri Icon from raw image data (supports PNG, JPG, BMP)
+fn create_icon_from_data(data: &[u8]) -> Result<Image<'static>, Box<dyn std::error::Error>> {
+    use image::io::Reader as ImageReader;
+    use std::io::Cursor;
+    
+    // First try to detect the image format
+    if data.len() < 8 {
+        return Err("Image data too small".into());
+    }
+    
+    // Load the image using the image crate
+    let img = ImageReader::new(Cursor::new(data))
+        .with_guessed_format()?
+        .decode()?;
+    
+    // Convert to RGBA8
+    let rgba_image = img.to_rgba8();
+    let (width, height) = rgba_image.dimensions();
+    let rgba_data = rgba_image.into_raw();
+    
+    // Create Tauri Image
+    Ok(Image::new_owned(rgba_data, width, height))
 }

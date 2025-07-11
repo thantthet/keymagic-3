@@ -80,29 +80,52 @@ impl HotkeyManager {
                 if event.state == ShortcutState::Pressed {
                     // Switch to this keyboard
                     let state = app_handle.state::<Mutex<KeyboardManager>>();
-                    if let Ok(mut manager) = state.lock() {
-                        if let Err(e) = manager.set_active_keyboard(&keyboard_id_clone) {
-                            eprintln!("Failed to switch keyboard: {}", e);
-                        } else {
-                            // Get the keyboard info for the name
-                            let keyboard_name = manager.get_keyboards()
+                    let (switch_result, keyboard_name, was_enabled) = if let Ok(mut manager) = state.lock() {
+                        let was_enabled = manager.is_key_processing_enabled();
+                        let result = manager.set_active_keyboard(&keyboard_id_clone);
+                        
+                        // Enable key processing when switching keyboards via hotkey
+                        if result.is_ok() && !was_enabled {
+                            let _ = manager.set_key_processing_enabled(true);
+                        }
+                        
+                        let name = if result.is_ok() {
+                            manager.get_keyboards()
                                 .iter()
                                 .find(|k| k.id == keyboard_id_clone)
                                 .map(|k| k.name.clone())
-                                .unwrap_or_else(|| keyboard_id_clone.clone());
-                            
-                            // Update tray menu
-                            crate::tray::update_tray_menu(&app_handle, &manager);
-                            
-                            // Emit event to update UI
-                            let _ = app_handle.emit("keyboard-switched", &keyboard_id_clone);
-                            
-                            // Show native HUD notification
-                            if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
-                                eprintln!("Failed to show HUD: {}", e);
-                            }
-                        }
+                                .unwrap_or_else(|| keyboard_id_clone.clone())
+                        } else {
+                            keyboard_id_clone.clone()
+                        };
+                        (result, name, was_enabled)
+                    } else {
+                        (Err(anyhow::anyhow!("Failed to lock keyboard manager")), keyboard_id_clone.clone(), false)
                     };
+                    
+                    if let Err(e) = switch_result {
+                        eprintln!("Failed to switch keyboard: {}", e);
+                    } else {
+                        // Re-acquire lock for tray updates
+                        if let Ok(manager) = state.lock() {
+                            // Update tray menu and icon
+                            crate::tray::update_tray_menu(&app_handle, &manager);
+                            crate::tray::update_tray_icon(&app_handle, &manager);
+                        }
+                        
+                        // Emit event to update UI
+                        let _ = app_handle.emit("keyboard-switched", &keyboard_id_clone);
+                        
+                        // If key processing was just enabled, emit that event too
+                        if !was_enabled {
+                            let _ = app_handle.emit("key_processing_changed", true);
+                        }
+                        
+                        // Show native HUD notification
+                        if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
+                            eprintln!("Failed to show HUD: {}", e);
+                        }
+                    }
                 }
             })
             .map_err(|e| anyhow!("Failed to register hotkey {}: {}", hotkey, e))?;
@@ -164,8 +187,9 @@ impl HotkeyManager {
                         if let Err(e) = manager.set_key_processing_enabled(new_state) {
                             eprintln!("Failed to toggle key processing: {}", e);
                         } else {
-                            // Update tray menu
+                            // Update tray menu and icon
                             crate::tray::update_tray_menu(&app_handle, &manager);
+                            crate::tray::update_tray_icon(&app_handle, &manager);
                             
                             // Emit event to update UI
                             let _ = app_handle.emit("key_processing_changed", new_state);
