@@ -5,6 +5,7 @@ mod hotkey;
 mod hud;
 mod registry_notifier;
 mod updater;
+mod autostart;
 
 use std::sync::{Mutex, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -63,6 +64,14 @@ pub fn run() {
             {
                 if let Err(e) = hud::initialize_hud() {
                     eprintln!("Failed to initialize HUD: {}", e);
+                }
+            }
+            
+            // Sync autostart setting with actual Windows Run registry
+            #[cfg(target_os = "windows")]
+            {
+                if let Err(e) = autostart::sync_autostart_with_preference() {
+                    eprintln!("Failed to sync autostart setting: {}", e);
                 }
             }
             

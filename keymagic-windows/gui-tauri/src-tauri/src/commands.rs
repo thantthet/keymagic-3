@@ -1,6 +1,7 @@
 use crate::keyboard_manager::{KeyboardManager, KeyboardInfo};
 use crate::hotkey::HotkeyManager;
 use crate::updater::{UpdateInfo, check_for_updates_async};
+use crate::autostart;
 use std::sync::Mutex;
 use tauri::{State, Manager, AppHandle};
 use std::path::PathBuf;
@@ -140,6 +141,7 @@ pub fn get_setting(key: String) -> Result<Option<String>, String> {
 
 #[tauri::command]
 pub fn set_setting(key: String, value: String) -> Result<(), String> {
+    // First save the setting to registry
     #[cfg(target_os = "windows")]
     {
         use windows::core::*;
@@ -178,6 +180,12 @@ pub fn set_setting(key: String, value: String) -> Result<(), String> {
                 return Err("Failed to create registry key".to_string());
             }
         }
+    }
+    
+    // Handle special settings
+    if key == "StartWithWindows" {
+        let enabled = value == "1";
+        autostart::set_autostart(enabled)?;
     }
     
     Ok(())
