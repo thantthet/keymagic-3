@@ -63,13 +63,7 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
-; Registry entries for TSF
-Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}"; ValueType: string; ValueName: ""; ValueData: "KeyMagic Text Service"
-Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "{app}\TSF\KeyMagicTSF.dll"
-Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
-
-; KeyMagic application settings
+; KeyMagic application settings only (TSF registration handled by regsvr32)
 Root: HKCU; Subkey: "Software\KeyMagic"; Flags: uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\KeyMagic\Settings"; Flags: uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\KeyMagic\Keyboards"; Flags: uninsdeletekeyifempty
