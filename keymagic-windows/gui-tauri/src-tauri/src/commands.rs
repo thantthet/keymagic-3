@@ -101,24 +101,22 @@ pub fn get_setting(key: String) -> Result<Option<String>, String> {
         use windows::Win32::System::Registry::*;
         
         unsafe {
-            let settings_path = format!("Software\\KeyMagic\\Settings\\{}", key);
-            let wide_path: Vec<u16> = settings_path.encode_utf16().chain(std::iter::once(0)).collect();
-            
             let mut hkey = HKEY::default();
             if RegOpenKeyExW(
                 HKEY_CURRENT_USER,
-                PCWSTR(wide_path.as_ptr()),
+                w!("Software\\KeyMagic\\Settings"),
                 0,
                 KEY_READ,
                 &mut hkey
             ).is_ok() {
+                let key_w: Vec<u16> = key.encode_utf16().chain(std::iter::once(0)).collect();
                 let mut buffer = vec![0u16; 256];
                 let mut size = buffer.len() as u32 * 2;
                 let mut data_type = REG_VALUE_TYPE::default();
                 
                 let result = RegQueryValueExW(
                     hkey,
-                    w!(""),
+                    PCWSTR(key_w.as_ptr()),
                     None,
                     Some(&mut data_type),
                     Some(buffer.as_mut_ptr() as *mut u8),
@@ -148,15 +146,13 @@ pub fn set_setting(key: String, value: String) -> Result<(), String> {
         use windows::Win32::System::Registry::*;
         
         unsafe {
-            let settings_path = format!("Software\\KeyMagic\\Settings\\{}", key);
-            let wide_path: Vec<u16> = settings_path.encode_utf16().chain(std::iter::once(0)).collect();
-            
             let mut hkey = HKEY::default();
             if RegCreateKeyW(
                 HKEY_CURRENT_USER,
-                PCWSTR(wide_path.as_ptr()),
+                w!("Software\\KeyMagic\\Settings"),
                 &mut hkey
             ).is_ok() {
+                let key_w: Vec<u16> = key.encode_utf16().chain(std::iter::once(0)).collect();
                 let value_w: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
                 let value_bytes = std::slice::from_raw_parts(
                     value_w.as_ptr() as *const u8,
@@ -165,7 +161,7 @@ pub fn set_setting(key: String, value: String) -> Result<(), String> {
                 
                 let result = RegSetValueExW(
                     hkey,
-                    w!(""),
+                    PCWSTR(key_w.as_ptr()),
                     0,
                     REG_SZ,
                     Some(value_bytes),
