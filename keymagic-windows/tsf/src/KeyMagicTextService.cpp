@@ -341,11 +341,54 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
             
             InitTextEditSink();
             InitMouseSink();
+            
+            // Sync engine with document content instead of resetting
+            if (m_pEngine && pContext)
+            {
+                DEBUG_LOG(L"Syncing engine with document on focus change");
+                
+                // Create edit session to read document and sync engine
+                CDirectEditSession *pEditSession = new CDirectEditSession(this, pContext, 
+                                                                          CDirectEditSession::EditAction::SyncEngine);
+                if (pEditSession)
+                {
+                    HRESULT hr;
+                    pContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                    pEditSession->Release();
+                    
+                    if (SUCCEEDED(hr))
+                    {
+                        DEBUG_LOG(L"Successfully synced engine with document");
+                    }
+                    else
+                    {
+                        DEBUG_LOG(L"Failed to sync engine with document, falling back to reset");
+                        ResetEngine();
+                    }
+                }
+                else
+                {
+                    DEBUG_LOG(L"Failed to create edit session, falling back to reset");
+                    ResetEngine();
+                }
+            }
+            else
+            {
+                // No context or engine, just reset
+                ResetEngine();
+            }
+        }
+        else
+        {
+            // No valid context, reset engine
+            ResetEngine();
         }
     }
-
-    // Reset engine when focus changes
-    ResetEngine();
+    else
+    {
+        // Lost focus entirely, reset engine
+        ResetEngine();
+    }
     
     // Check and reload keyboard for new context
     CheckAndReloadKeyboard();
@@ -511,8 +554,19 @@ STDAPI CKeyMagicTextService::OnEndEdit(ITfContext *pic, TfEditCookie ecReadOnly,
         }
         
         // If we get here, it's a genuine user-initiated selection change
-        DEBUG_LOG(L"Selection changed by user - resetting engine");
-        ResetEngine();
+        DEBUG_LOG(L"Selection changed by user - syncing engine with document");
+        
+        // Sync engine with document at new cursor position
+        if (pic && m_pEngine)
+        {
+            // We can use the existing edit cookie since we're in OnEndEdit
+            SyncEngineWithDocument(pic, ecReadOnly);
+        }
+        else
+        {
+            // No context available, fall back to reset
+            ResetEngine();
+        }
     }
 
     return S_OK;
@@ -526,11 +580,37 @@ STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dw
 
     *pfEaten = FALSE;
 
-    // Reset engine on mouse click
+    // Sync engine on mouse click instead of resetting
     if (dwBtnStatus & MK_LBUTTON)
     {
-        DEBUG_LOG(L"Mouse click detected - resetting engine");
-        ResetEngine();
+        DEBUG_LOG(L"Mouse click detected - syncing engine with document");
+        
+        if (m_pTextEditContext && m_pEngine)
+        {
+            // Create edit session to sync engine
+            CDirectEditSession *pEditSession = new CDirectEditSession(this, m_pTextEditContext, 
+                                                                      CDirectEditSession::EditAction::SyncEngine);
+            if (pEditSession)
+            {
+                HRESULT hr;
+                m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                pEditSession->Release();
+                
+                if (FAILED(hr))
+                {
+                    DEBUG_LOG(L"Failed to sync on mouse click, falling back to reset");
+                    ResetEngine();
+                }
+            }
+            else
+            {
+                ResetEngine();
+            }
+        }
+        else
+        {
+            ResetEngine();
+        }
     }
 
     return S_OK;
@@ -756,6 +836,41 @@ void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wPara
         *pfEaten = FALSE;
         LeaveCriticalSection(&m_cs);
         return;
+    }
+    
+    // Check if we need to sync engine before processing
+    // This handles cases where the engine has composing text but we suspect it's out of sync
+    char* currentComposing = keymagic_engine_get_composition(m_pEngine);
+    if (currentComposing && strlen(currentComposing) > 0)
+    {
+        // Engine has composing text - let's verify it's still in sync
+        // This is especially important after app switches or unexpected focus changes
+        std::string composingUtf8(currentComposing);
+        keymagic_free_string(currentComposing);
+        
+        // For certain keys that typically start new input, sync first
+        if (wParam == VK_RETURN || wParam == VK_TAB || 
+            (wParam >= VK_F1 && wParam <= VK_F12) ||
+            wParam == VK_HOME || wParam == VK_END ||
+            wParam == VK_PRIOR || wParam == VK_NEXT)
+        {
+            DEBUG_LOG(L"Special key pressed with existing composition - syncing first");
+            if (pic)
+            {
+                CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
+                                                                          CDirectEditSession::EditAction::SyncEngine);
+                if (pEditSession)
+                {
+                    HRESULT hr;
+                    pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                    pEditSession->Release();
+                }
+            }
+        }
+    }
+    else if (currentComposing)
+    {
+        keymagic_free_string(currentComposing);
     }
 
     // Get modifiers
@@ -1038,18 +1153,83 @@ void CKeyMagicTextService::SyncEngineWithDocument(ITfContext *pic, TfEditCookie 
     if (!m_pEngine)
         return;
 
-    // Read up to 30 characters from document
+    // Try to read text from document to sync with engine
+    // We'll try to find a reasonable amount of text that could be composing
     std::wstring documentText;
-    if (SUCCEEDED(ReadDocumentSuffix(pic, ec, 30, documentText)))
+    const int MAX_COMPOSE_LENGTH = 50; // Maximum reasonable compose length
+    
+    if (SUCCEEDED(ReadDocumentSuffix(pic, ec, MAX_COMPOSE_LENGTH, documentText)))
     {
-        // Convert to UTF-8 and set as engine composition
-        std::string utf8Text = ConvertUtf16ToUtf8(documentText);
-        DEBUG_LOG(L"Syncing engine with document text: \"" + documentText + L"\"");
-        keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());
+        if (!documentText.empty())
+        {
+            // Look for a reasonable break point (space, punctuation, etc.)
+            // Start from the end and work backwards to find potential compose text
+            size_t composeStart = documentText.length();
+            
+            // Find the last space or punctuation mark
+            for (size_t i = documentText.length(); i > 0; --i)
+            {
+                wchar_t ch = documentText[i - 1];
+                // Check for word boundaries
+                if (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' ||
+                    ch == L'.' || ch == L',' || ch == L'!' || ch == L'?' ||
+                    ch == L';' || ch == L':' || ch == L'"' || ch == L'\'' ||
+                    ch == L'(' || ch == L')' || ch == L'[' || ch == L']' ||
+                    ch == L'{' || ch == L'}' || ch == L'<' || ch == L'>')
+                {
+                    composeStart = i;
+                    break;
+                }
+            }
+            
+            // Extract potential compose text
+            std::wstring composeText;
+            if (composeStart < documentText.length())
+            {
+                composeText = documentText.substr(composeStart);
+            }
+            else
+            {
+                // No break found, take the last few characters as potential compose text
+                // Limit to a reasonable length (e.g., 10 characters)
+                const size_t REASONABLE_COMPOSE_LENGTH = 10;
+                if (documentText.length() > REASONABLE_COMPOSE_LENGTH)
+                {
+                    composeText = documentText.substr(documentText.length() - REASONABLE_COMPOSE_LENGTH);
+                }
+                else
+                {
+                    composeText = documentText;
+                }
+            }
+            
+            // Convert to UTF-8 and set as engine composition
+            std::string utf8Text = ConvertUtf16ToUtf8(composeText);
+            DEBUG_LOG(L"Syncing engine with document text: \"" + composeText + L"\" (from document suffix: \"" + documentText + L"\")");
+            
+            KeyMagicResult result = keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());
+            if (result == KeyMagicResult_Success)
+            {
+                DEBUG_LOG(L"Successfully set engine composition");
+            }
+            else
+            {
+                DEBUG_LOG(L"Failed to set engine composition, error: " + std::to_wstring(result));
+                // Fall back to reset on error
+                keymagic_engine_reset(m_pEngine);
+            }
+        }
+        else
+        {
+            // Empty document, reset engine
+            DEBUG_LOG(L"Document is empty, resetting engine");
+            keymagic_engine_reset(m_pEngine);
+        }
     }
     else
     {
-        DEBUG_LOG(L"Failed to read document text for sync");
+        DEBUG_LOG(L"Failed to read document text for sync, resetting engine");
+        keymagic_engine_reset(m_pEngine);
     }
 }
 
