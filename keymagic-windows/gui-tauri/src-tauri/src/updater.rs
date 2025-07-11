@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use semver::Version;
+use std::collections::HashMap;
 
-const GITHUB_API_URL: &str = "https://api.github.com/repos/thantthet/keymagic/releases/latest";
+const UPDATE_JSON_URL: &str = "https://thantthet.github.io/keymagic-3/updates.json";
 const USER_AGENT: &str = "KeyMagic-Updater/0.1.0";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -16,18 +17,44 @@ pub struct UpdateInfo {
 }
 
 #[derive(Debug, Deserialize)]
-struct GithubRelease {
-    tag_name: String,
-    name: Option<String>,
-    body: Option<String>,
-    published_at: Option<String>,
-    assets: Vec<GithubAsset>,
+struct UpdateManifest {
+    name: String,
+    platforms: HashMap<String, HashMap<String, PlatformRelease>>,
+    #[serde(rename = "releaseNotes")]
+    release_notes: HashMap<String, HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GithubAsset {
-    name: String,
-    browser_download_url: String,
+struct PlatformRelease {
+    version: String,
+    #[serde(rename = "releaseDate")]
+    release_date: Option<String>,
+    #[serde(rename = "minimumSystemVersion")]
+    minimum_system_version: Option<String>,
+    url: String,
+    signature: Option<String>,
+    size: Option<u64>,
+    sha256: Option<String>,
+}
+
+fn get_platform_info() -> (&'static str, &'static str) {
+    #[cfg(target_os = "windows")]
+    let os = "windows";
+    #[cfg(target_os = "macos")]
+    let os = "macos";
+    #[cfg(target_os = "linux")]
+    let os = "linux";
+    
+    #[cfg(target_arch = "x86_64")]
+    let arch = "x86_64";
+    #[cfg(target_arch = "aarch64")]
+    let arch = "aarch64";
+    #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
+    let arch = "armv7";
+    #[cfg(target_arch = "x86")]
+    let arch = "x86";
+    
+    (os, arch)
 }
 
 pub fn check_for_updates() -> Result<UpdateInfo> {
@@ -37,48 +64,54 @@ pub fn check_for_updates() -> Result<UpdateInfo> {
     
     // Create a blocking runtime for the HTTP request
     let runtime = tokio::runtime::Runtime::new()?;
-    let github_release = runtime.block_on(fetch_latest_release())?;
+    let update_manifest = runtime.block_on(fetch_update_manifest())?;
     
-    // Parse version from tag (remove 'v' prefix if present)
-    let latest_version_str = github_release.tag_name.trim_start_matches('v');
-    let latest_version = Version::parse(latest_version_str)?;
+    // Get platform-specific release info
+    let (os, arch) = get_platform_info();
     
+    let platform_releases = update_manifest.platforms
+        .get(os)
+        .ok_or_else(|| anyhow!("No releases found for {}", os))?;
+    
+    let release_info = platform_releases
+        .get(arch)
+        .ok_or_else(|| anyhow!("No releases found for {} {}", os, arch))?;
+    
+    let latest_version = Version::parse(&release_info.version)?;
     let update_available = latest_version > current_version;
     
-    // Find the Windows installer asset
-    let download_url = github_release.assets.iter()
-        .find(|asset| {
-            let name = asset.name.to_lowercase();
-            name.ends_with(".exe") || name.ends_with(".msi")
-        })
-        .map(|asset| asset.browser_download_url.clone());
+    // Get release notes for the latest version
+    let release_notes = update_manifest.release_notes
+        .get(&release_info.version)
+        .and_then(|notes| notes.get("en"))
+        .cloned();
     
     Ok(UpdateInfo {
         current_version: current_version_str.to_string(),
-        latest_version: latest_version_str.to_string(),
+        latest_version: release_info.version.clone(),
         update_available,
-        download_url,
-        release_notes: github_release.body,
-        published_at: github_release.published_at,
+        download_url: Some(release_info.url.clone()),
+        release_notes,
+        published_at: release_info.release_date.clone(),
     })
 }
 
-async fn fetch_latest_release() -> Result<GithubRelease> {
+async fn fetch_update_manifest() -> Result<UpdateManifest> {
     let client = reqwest::Client::builder()
         .user_agent(USER_AGENT)
         .build()?;
     
     let response = client
-        .get(GITHUB_API_URL)
+        .get(UPDATE_JSON_URL)
         .send()
         .await?;
     
     if !response.status().is_success() {
-        return Err(anyhow!("Failed to fetch release info: {}", response.status()));
+        return Err(anyhow!("Failed to fetch update manifest: {}", response.status()));
     }
     
-    let release = response.json::<GithubRelease>().await?;
-    Ok(release)
+    let manifest = response.json::<UpdateManifest>().await?;
+    Ok(manifest)
 }
 
 pub async fn check_for_updates_async() -> Result<UpdateInfo> {
@@ -86,29 +119,35 @@ pub async fn check_for_updates_async() -> Result<UpdateInfo> {
     let current_version_str = env!("CARGO_PKG_VERSION");
     let current_version = Version::parse(current_version_str)?;
     
-    let github_release = fetch_latest_release().await?;
+    let update_manifest = fetch_update_manifest().await?;
     
-    // Parse version from tag (remove 'v' prefix if present)
-    let latest_version_str = github_release.tag_name.trim_start_matches('v');
-    let latest_version = Version::parse(latest_version_str)?;
+    // Get platform-specific release info
+    let (os, arch) = get_platform_info();
     
+    let platform_releases = update_manifest.platforms
+        .get(os)
+        .ok_or_else(|| anyhow!("No releases found for {}", os))?;
+    
+    let release_info = platform_releases
+        .get(arch)
+        .ok_or_else(|| anyhow!("No releases found for {} {}", os, arch))?;
+    
+    let latest_version = Version::parse(&release_info.version)?;
     let update_available = latest_version > current_version;
     
-    // Find the Windows installer asset
-    let download_url = github_release.assets.iter()
-        .find(|asset| {
-            let name = asset.name.to_lowercase();
-            name.ends_with(".exe") || name.ends_with(".msi")
-        })
-        .map(|asset| asset.browser_download_url.clone());
+    // Get release notes for the latest version
+    let release_notes = update_manifest.release_notes
+        .get(&release_info.version)
+        .and_then(|notes| notes.get("en"))
+        .cloned();
     
     Ok(UpdateInfo {
         current_version: current_version_str.to_string(),
-        latest_version: latest_version_str.to_string(),
+        latest_version: release_info.version.clone(),
         update_available,
-        download_url,
-        release_notes: github_release.body,
-        published_at: github_release.published_at,
+        download_url: Some(release_info.url.clone()),
+        release_notes,
+        published_at: release_info.release_date.clone(),
     })
 }
 
