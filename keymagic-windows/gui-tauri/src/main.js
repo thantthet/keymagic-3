@@ -245,27 +245,6 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('show-in-tray').addEventListener('change', async (e) => {
-    try {
-      await invoke('set_setting', { key: 'ShowInSystemTray', value: e.target.checked ? '1' : '0' });
-      showSuccess('Setting saved');
-    } catch (error) {
-      console.error('Failed to save setting:', error);
-      showError('Failed to save setting');
-      e.target.checked = !e.target.checked;
-    }
-  });
-
-  document.getElementById('minimize-to-tray').addEventListener('change', async (e) => {
-    try {
-      await invoke('set_setting', { key: 'MinimizeToTray', value: e.target.checked ? '1' : '0' });
-      showSuccess('Setting saved');
-    } catch (error) {
-      console.error('Failed to save setting:', error);
-      showError('Failed to save setting');
-      e.target.checked = !e.target.checked;
-    }
-  });
   
   // Modal event listeners
   modal.querySelector('.modal-close').addEventListener('click', hideModal);
@@ -292,12 +271,8 @@ function updateStatusIndicator() {
 async function loadSettings() {
   try {
     const startWithWindows = await invoke('get_setting', { key: 'StartWithWindows' });
-    const showInTray = await invoke('get_setting', { key: 'ShowInSystemTray' });
-    const minimizeToTray = await invoke('get_setting', { key: 'MinimizeToTray' });
     
     document.getElementById('start-with-windows').checked = startWithWindows === '1';
-    document.getElementById('show-in-tray').checked = showInTray !== '0';
-    document.getElementById('minimize-to-tray').checked = minimizeToTray === '1';
     
     // Load on/off hotkey
     const onOffHotkey = await invoke('get_on_off_hotkey');
