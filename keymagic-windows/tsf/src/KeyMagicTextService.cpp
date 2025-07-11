@@ -436,6 +436,21 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
         return S_OK;
     }
     
+    // Also check time-based filtering for VK_BACK as GetMessageExtraInfo is not reliable
+    // Skip VK_BACK if we recently sent input (within 50ms)
+    if (wParam == VK_BACK)
+    {
+        DWORD currentTime = GetTickCount();
+        DWORD timeSinceLastInput = currentTime - m_lastSendInputTime;
+        const DWORD IGNORE_KEY_TIMEOUT = 20; // milliseconds
+        
+        if (m_lastSendInputTime > 0 && timeSinceLastInput < IGNORE_KEY_TIMEOUT)
+        {
+            DEBUG_LOG(L"VK_BACK event within " + std::to_wstring(timeSinceLastInput) + L"ms of SendInput - ignoring");
+            return S_OK;
+        }
+    }
+    
     // Mark that we're processing a key to help OnEndEdit
     m_isProcessingKey = true;
 
@@ -484,6 +499,21 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         DEBUG_LOG(L"Registry reload notification received via SendInput");
         ReloadRegistrySettings();
         return S_OK;
+    }
+    
+    // Also check time-based filtering for VK_BACK as GetMessageExtraInfo is not reliable
+    // Skip VK_BACK if we recently sent input (within 50ms)
+    if (wParam == VK_BACK)
+    {
+        DWORD currentTime = GetTickCount();
+        DWORD timeSinceLastInput = currentTime - m_lastSendInputTime;
+        const DWORD IGNORE_KEY_TIMEOUT = 20; // milliseconds
+        
+        if (m_lastSendInputTime > 0 && timeSinceLastInput < IGNORE_KEY_TIMEOUT)
+        {
+            DEBUG_LOG(L"VK_BACK event within " + std::to_wstring(timeSinceLastInput) + L"ms of SendInput - ignoring");
+            return S_OK;
+        }
     }
     
     char character = MapVirtualKeyToChar(wParam, lParam);
