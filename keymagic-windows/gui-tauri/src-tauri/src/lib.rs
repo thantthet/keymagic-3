@@ -12,6 +12,23 @@ use keyboard_manager::KeyboardManager;
 use hotkey::HotkeyManager;
 use tauri::{Manager, Emitter};
 
+// Cleanup handler that disables key processing on drop
+struct CleanupHandler {
+    app_handle: tauri::AppHandle,
+}
+
+impl Drop for CleanupHandler {
+    fn drop(&mut self) {
+        eprintln!("KeyMagic GUI exiting - disabling key processing");
+        if let Some(keyboard_manager) = self.app_handle.try_state::<Mutex<KeyboardManager>>() {
+            if let Ok(mut manager) = keyboard_manager.lock() {
+                let _ = manager.set_key_processing_enabled(false);
+                eprintln!("Key processing disabled on exit");
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize keyboard manager
@@ -48,6 +65,12 @@ pub fn run() {
                     eprintln!("Failed to initialize HUD: {}", e);
                 }
             }
+            
+            // Setup cleanup handler
+            let cleanup_handler = CleanupHandler {
+                app_handle: app.app_handle().clone(),
+            };
+            app.manage(cleanup_handler);
             
             // Setup system tray
             #[cfg(desktop)]

@@ -141,6 +141,11 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
             }
         }
         "quit" => {
+            // Disable key processing before exiting
+            let keyboard_manager = app.state::<Mutex<KeyboardManager>>();
+            if let Ok(mut manager) = keyboard_manager.lock() {
+                let _ = manager.set_key_processing_enabled(false);
+            }
             app.exit(0);
         }
         id if id.starts_with("keyboard_") => {
