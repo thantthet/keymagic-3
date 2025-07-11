@@ -1,4 +1,4 @@
-; KeyMagic Windows Installer Script
+; KeyMagic Windows Installer Script - x64 Version
 ; Inno Setup 6.x
 
 #define MyAppName "KeyMagic 3"
@@ -6,6 +6,7 @@
 #define MyAppPublisher "KeyMagic"
 #define MyAppURL "https://github.com/thantthet/keymagic-v3"
 #define MyAppExeName "keymagic.exe"
+#define MyAppArch "x64"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -21,14 +22,14 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\..\LICENSE.md
 OutputDir=.\output
-OutputBaseFilename=KeyMagic3-{#MyAppVersion}-Setup
+OutputBaseFilename=KeyMagic3-{#MyAppVersion}-x64-Setup
 SetupIconFile=..\resources\icons\keymagic.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesInstallIn64BitMode=x64os
-ArchitecturesAllowed=x64os arm64
+ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 MinVersion=10.0
@@ -40,12 +41,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; GUI Application (x64 built, but runs on all platforms)
+; GUI Application (x64)
 Source: "..\target\x86_64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
 
-; TSF DLLs - Install both architectures
-Source: "..\tsf\build-x64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF\x64"; Flags: ignoreversion
-Source: "..\tsf\build-ARM64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF\ARM64"; Flags: ignoreversion skipifsourcedoesntexist
+; TSF DLL - x64 only
+Source: "..\tsf\build-x64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF"; Flags: ignoreversion
 
 ; Resources
 Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -66,7 +66,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 ; Registry entries for TSF
 Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}"; Flags: uninsdeletekey
 Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}"; ValueType: string; ValueName: ""; ValueData: "KeyMagic Text Service"
-Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "{code:GetTSFDllPath}"
+Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "{app}\TSF\KeyMagicTSF.dll"
 Root: HKCR; Subkey: "CLSID\{{094A562B-D08B-4CAF-8E95-8F8031CFD24C}}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
 
 ; KeyMagic application settings
@@ -76,53 +76,16 @@ Root: HKCU; Subkey: "Software\KeyMagic\Keyboards"; Flags: uninsdeletekeyifempty
 
 [Run]
 ; Register TSF DLL
-Filename: "regsvr32.exe"; Parameters: "/s ""{code:GetTSFDllPath}"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden
+Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\KeyMagicTSF.dll"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden
 
 ; Launch application after installation
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Unregister TSF DLL before uninstall
-Filename: "regsvr32.exe"; Parameters: "/s /u ""{code:GetTSFDllPath}"""; RunOnceId: "UnregTSF"; Flags: runhidden
+Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\KeyMagicTSF.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
 [Code]
-var
-  TSFDllPath: String;
-
-// Function to detect system architecture
-function IsARM64: Boolean;
-var
-  ProcessorArchitecture: String;
-begin
-  Result := False;
-  if RegQueryStringValue(HKEY_LOCAL_MACHINE, 
-    'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
-    'PROCESSOR_ARCHITECTURE', ProcessorArchitecture) then
-  begin
-    Result := (ProcessorArchitecture = 'ARM64');
-  end;
-end;
-
-// Get the appropriate TSF DLL path based on architecture
-function GetTSFDllPath(Param: String): String;
-begin
-  if TSFDllPath = '' then
-  begin
-    if IsARM64 then
-      TSFDllPath := ExpandConstant('{app}\TSF\ARM64\KeyMagicTSF.dll')
-    else
-      TSFDllPath := ExpandConstant('{app}\TSF\x64\KeyMagicTSF.dll');
-  end;
-  Result := TSFDllPath;
-end;
-
-// Check if we're installing on 64-bit Windows
-function Is64BitInstallMode: Boolean;
-begin
-  Result := Is64BitInstallMode;
-end;
-
-
 // Check if Windows 10 or later
 function IsWindows10OrLater: Boolean;
 var
@@ -167,4 +130,3 @@ begin
     end;
   end;
 end;
-

@@ -17,19 +17,38 @@ Production keyboards should be placed in the `keyboards` directory before buildi
 
 ## Building the Installer
 
-### Quick Build
+### Architecture-Specific Installers
 
-Run the build script from this directory:
+Due to Windows registry redirection, we now build separate installers for each architecture:
+
+#### Build x64 Installer Only
 ```cmd
-build-installer.bat
+build-installer-x64.bat
 ```
 
-This script will:
-1. Build x64 TSF DLL
-2. Build ARM64 TSF DLL
-3. Build GUI application (x64 only)
-4. Verify all build artifacts
-5. Create the installer executable
+#### Build ARM64 Installer Only
+```cmd
+build-installer-arm64.bat
+```
+
+#### Build All Installers
+```cmd
+build-installer-all.bat
+```
+
+### What Each Script Does
+
+**x64 Installer** (`build-installer-x64.bat`):
+1. Builds x64 TSF DLL
+2. Builds GUI application (x64)
+3. Creates x64-specific installer
+4. Output: `KeyMagic3-0.0.1-x64-Setup.exe`
+
+**ARM64 Installer** (`build-installer-arm64.bat`):
+1. Builds ARM64 TSF DLL
+2. Builds GUI application (x64 - runs via emulation)
+3. Creates ARM64-specific installer
+4. Output: `KeyMagic3-0.0.1-ARM64-Setup.exe`
 
 ### Manual Build Steps
 
@@ -47,30 +66,34 @@ cd ..\gui-tauri
 build.bat
 cd ..\installer
 
-# Create installer
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+# Create x64 installer
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup-x64.iss
+
+# Create ARM64 installer
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup-arm64.iss
 ```
 
 ## Installer Features
 
-- **Multi-architecture support**: Detects system architecture and installs appropriate TSF DLL
-- **x64 and ARM64 TSF DLLs**: Both architectures included in installer
-- **x64 GUI only**: GUI application is x64 only as requested
-- **Automatic TSF registration**: Registers the correct TSF DLL based on system architecture
+- **Architecture-specific installers**: Separate installers for x64 and ARM64 to avoid registry redirection issues
+- **Correct TSF registration**: Each installer registers the appropriate architecture DLL
+- **x64 GUI**: GUI application is x64 (runs natively on x64, via emulation on ARM64)
+- **Automatic TSF registration**: Registers TSF DLL during installation
 - **Clean uninstall**: Properly unregisters TSF and cleans up all files
 
 ## Output
 
-The installer executable will be created in the `output` subdirectory:
+The installer executables will be created in the `output` subdirectory:
 ```
-output\KeyMagic3-0.0.1-Setup.exe
+output\KeyMagic3-0.0.1-x64-Setup.exe    # For x64 Windows
+output\KeyMagic3-0.0.1-ARM64-Setup.exe  # For ARM64 Windows
 ```
 
-## Architecture Detection
+## Architecture Notes
 
-The installer automatically detects the system architecture:
-- On ARM64 Windows: Installs ARM64 TSF DLL + x64 GUI
-- On x64 Windows: Installs x64 TSF DLL + x64 GUI
+- **x64 Installer**: Contains x64 TSF DLL + x64 GUI
+- **ARM64 Installer**: Contains ARM64 TSF DLL + x64 GUI (runs via emulation)
+- Users should download the installer matching their Windows architecture
 
 ## Testing
 

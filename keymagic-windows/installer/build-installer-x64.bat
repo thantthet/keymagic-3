@@ -1,27 +1,19 @@
 @echo off
-:: build-installer.bat - Build KeyMagic installer
-:: This script builds all components and creates the installer
+:: build-installer-x64.bat - Build KeyMagic x64 installer
+:: This script builds x64 components and creates the x64 installer
 
 setlocal enabledelayedexpansion
 
 echo ===============================================
-echo KeyMagic Installer Build Script
+echo KeyMagic x64 Installer Build Script
 echo ===============================================
 echo.
 
 :: Navigate to keymagic-windows directory
 cd /d "%~dp0\.."
 
-:: Check if running as admin (needed for TSF registration tests)
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [WARNING] Not running as administrator.
-    echo Some post-build tests may be skipped.
-    echo.
-)
-
-:: Build all components
-echo [1/5] Building x64 TSF DLL...
+:: Build components
+echo [1/4] Building x64 TSF DLL...
 call make.bat build x64 Release
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build x64 TSF DLL
@@ -29,15 +21,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/5] Building ARM64 TSF DLL...
-call make.bat build arm64 Release
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to build ARM64 TSF DLL
-    exit /b 1
-)
-
-echo.
-echo [3/5] Building GUI (x64 only)...
+echo [2/4] Building GUI (x64)...
 pushd gui-tauri
 call build.bat
 if %errorlevel% neq 0 (
@@ -48,7 +32,7 @@ if %errorlevel% neq 0 (
 popd
 
 echo.
-echo [4/5] Verifying build artifacts...
+echo [3/4] Verifying build artifacts...
 
 :: Check x64 TSF
 if not exist "tsf\build-x64\Release\KeyMagicTSF.dll" (
@@ -56,13 +40,6 @@ if not exist "tsf\build-x64\Release\KeyMagicTSF.dll" (
     exit /b 1
 )
 echo [OK] x64 TSF DLL found
-
-:: Check ARM64 TSF
-if not exist "tsf\build-ARM64\Release\KeyMagicTSF.dll" (
-    echo [ERROR] ARM64 TSF DLL not found
-    exit /b 1
-)
-echo [OK] ARM64 TSF DLL found
 
 :: Check GUI
 if not exist "target\x86_64-pc-windows-msvc\release\gui-tauri.exe" (
@@ -77,7 +54,7 @@ if not exist "resources\icons\keymagic.ico" (
 )
 
 echo.
-echo [5/5] Building installer...
+echo [4/4] Building x64 installer...
 
 cd installer
 
@@ -100,7 +77,7 @@ echo Using Inno Setup: %INNO_PATH%
 echo.
 
 :: Build installer
-"%INNO_PATH%" /Q "setup.iss"
+"%INNO_PATH%" /Q "setup-x64.iss"
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build installer
     exit /b 1
@@ -108,7 +85,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo ===============================================
-echo [SUCCESS] Installer built successfully!
+echo [SUCCESS] x64 Installer built successfully!
 echo ===============================================
 echo.
 echo Output location: output\
@@ -116,7 +93,7 @@ echo.
 
 :: List output files
 echo Installer files:
-dir /b "output\*.exe"
+dir /b "output\*x64*.exe"
 echo.
 
 endlocal
