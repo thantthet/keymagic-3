@@ -9,6 +9,11 @@ use std::path::PathBuf;
 type KeyboardManagerState = Mutex<KeyboardManager>;
 
 #[tauri::command]
+pub fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 pub fn get_keyboards(state: State<KeyboardManagerState>) -> Result<Vec<KeyboardInfo>, String> {
     let manager = state.lock().map_err(|e| e.to_string())?;
     Ok(manager.get_keyboards().into_iter().cloned().collect())

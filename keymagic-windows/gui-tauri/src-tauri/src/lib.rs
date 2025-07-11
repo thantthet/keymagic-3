@@ -43,6 +43,7 @@ pub fn run() {
         .manage(Mutex::new(keyboard_manager))
         .manage(HotkeyManager::new())
         .invoke_handler(tauri::generate_handler![
+            commands::get_app_version,
             commands::get_keyboards,
             commands::get_active_keyboard,
             commands::set_active_keyboard,
