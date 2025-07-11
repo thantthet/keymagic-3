@@ -120,8 +120,8 @@ private:
     // Critical section for thread safety
     CRITICAL_SECTION m_cs;
     
-    // Registry reload monitor
-    class CRegistryReloadMonitor *m_pRegistryMonitor;
+    // Registry settings
+    void ReloadRegistrySettings();
     
     // Composition manager
     CCompositionManager *m_pCompositionMgr;
@@ -134,8 +134,9 @@ private:
     ULONG m_displayAttributeInfoCount;
     TfGuidAtom m_inputDisplayAttributeAtom;
     
-    // SendInput signature
+    // SendInput signatures
     static const ULONG_PTR KEYMAGIC_EXTRAINFO_SIGNATURE = 0x4B4D5453; // "KMTS" in hex
+    static const ULONG_PTR KEYMAGIC_REGISTRY_RELOAD_SIGNATURE = 0x4B4D5252; // "KMRR" in hex
     
     // Processing state
     bool m_isProcessingKey;
@@ -145,7 +146,6 @@ private:
     friend class CDirectEditSession;
     friend class CCompositionEditSession;
     friend class CCompositionManager;
-    friend class CRegistryReloadMonitor;
 };
 
 // Edit session for direct text manipulation (no composition)
@@ -189,24 +189,5 @@ private:
     std::wstring m_insertText;
 };
 
-// Registry reload monitor - waits for global event to reload settings
-class CRegistryReloadMonitor
-{
-public:
-    CRegistryReloadMonitor(CKeyMagicTextService *pTextService);
-    ~CRegistryReloadMonitor();
-    
-    bool Initialize();
-    void Shutdown();
-    
-private:
-    static DWORD WINAPI MonitorThreadProc(LPVOID lpParam);
-    void ReloadRegistrySettings();
-    
-    CKeyMagicTextService *m_pTextService;
-    HANDLE m_hReloadEvent;
-    HANDLE m_hMonitorThread;
-    HANDLE m_hStopEvent;
-};
 
 #endif // KEYMAGIC_TEXT_SERVICE_H

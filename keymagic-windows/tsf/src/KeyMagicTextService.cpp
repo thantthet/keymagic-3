@@ -123,8 +123,6 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_isProcessingKey = false;
     m_lastSendInputTime = 0;
     
-    // Initialize registry monitor
-    m_pRegistryMonitor = nullptr;
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -132,12 +130,6 @@ CKeyMagicTextService::CKeyMagicTextService()
 
 CKeyMagicTextService::~CKeyMagicTextService()
 {
-    // Clean up registry monitor
-    if (m_pRegistryMonitor)
-    {
-        delete m_pRegistryMonitor;
-        m_pRegistryMonitor = nullptr;
-    }
     
     if (m_pCompositionMgr)
     {
@@ -263,14 +255,6 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
     // Load initial keyboard
     CheckAndReloadKeyboard();
     
-    // Start registry reload monitoring
-    m_pRegistryMonitor = new CRegistryReloadMonitor(this);
-    if (!m_pRegistryMonitor->Initialize())
-    {
-        DEBUG_LOG(L"Failed to initialize registry monitor");
-        delete m_pRegistryMonitor;
-        m_pRegistryMonitor = nullptr;
-    }
 
     LeaveCriticalSection(&m_cs);
     return S_OK;
@@ -383,6 +367,15 @@ STDAPI CKeyMagicTextService::OnPopContext(ITfContext *pic)
 // ITfKeyEventSink
 STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
 {
+    DEBUG_LOG_FUNC();
+    
+    // Reload registry settings when window gains focus
+    if (fForeground)
+    {
+        DEBUG_LOG(L"Window gained focus, reloading registry settings");
+        ReloadRegistrySettings();
+    }
+    
     return S_OK;
 }
 
@@ -438,6 +431,15 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
     if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
     {
         DEBUG_LOG(L"Skipping key event from our SendInput");
+        return S_OK;
+    }
+    
+    // Check if this is a registry reload notification
+    if (extraInfo == KEYMAGIC_REGISTRY_RELOAD_SIGNATURE)
+    {
+        *pfEaten = TRUE;
+        DEBUG_LOG(L"Registry reload notification received via SendInput");
+        ReloadRegistrySettings();
         return S_OK;
     }
     
@@ -1568,114 +1570,13 @@ void CKeyMagicTextService::UpdateSettings(bool enabled, const std::wstring& keyb
     LeaveCriticalSection(&m_cs);
 }
 
-// CRegistryReloadMonitor implementation
-CRegistryReloadMonitor::CRegistryReloadMonitor(CKeyMagicTextService *pTextService)
+// Registry reload implementation
+void CKeyMagicTextService::ReloadRegistrySettings()
 {
-    m_pTextService = pTextService;
-    m_hReloadEvent = nullptr;
-    m_hMonitorThread = nullptr;
-    m_hStopEvent = nullptr;
-}
-
-CRegistryReloadMonitor::~CRegistryReloadMonitor()
-{
-    Shutdown();
-}
-
-bool CRegistryReloadMonitor::Initialize()
-{
-    DEBUG_LOG_FUNC();
+    DEBUG_LOG(L"Reloading registry settings");
     
-    // Create/Open the global event for registry reload notification
-    m_hReloadEvent = CreateEventW(NULL, FALSE, FALSE, L"Global\\KeyMagicReloadRegistry");
-    if (!m_hReloadEvent)
-    {
-        DEBUG_LOG(L"Failed to create/open reload event. Error: " + std::to_wstring(GetLastError()));
-        return false;
-    }
-    
-    // Create stop event
-    m_hStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (!m_hStopEvent)
-    {
-        CloseHandle(m_hReloadEvent);
-        m_hReloadEvent = nullptr;
-        return false;
-    }
-    
-    // Start monitor thread
-    m_hMonitorThread = CreateThread(NULL, 0, MonitorThreadProc, this, 0, NULL);
-    if (!m_hMonitorThread)
-    {
-        CloseHandle(m_hStopEvent);
-        CloseHandle(m_hReloadEvent);
-        m_hStopEvent = nullptr;
-        m_hReloadEvent = nullptr;
-        return false;
-    }
-    
-    DEBUG_LOG(L"Registry reload monitor initialized successfully");
-    return true;
-}
-
-void CRegistryReloadMonitor::Shutdown()
-{
-    if (m_hStopEvent)
-    {
-        // Signal stop
-        SetEvent(m_hStopEvent);
-        
-        // Wait for thread to exit
-        if (m_hMonitorThread)
-        {
-            WaitForSingleObject(m_hMonitorThread, 1000);
-            CloseHandle(m_hMonitorThread);
-            m_hMonitorThread = nullptr;
-        }
-        
-        CloseHandle(m_hStopEvent);
-        m_hStopEvent = nullptr;
-    }
-    
-    if (m_hReloadEvent)
-    {
-        CloseHandle(m_hReloadEvent);
-        m_hReloadEvent = nullptr;
-    }
-    
-    DEBUG_LOG(L"Registry reload monitor shut down");
-}
-
-DWORD WINAPI CRegistryReloadMonitor::MonitorThreadProc(LPVOID lpParam)
-{
-    auto pThis = static_cast<CRegistryReloadMonitor*>(lpParam);
-    HANDLE handles[2] = { pThis->m_hStopEvent, pThis->m_hReloadEvent };
-    
-    while (true)
-    {
-        DWORD result = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-        
-        if (result == WAIT_OBJECT_0)
-        {
-            // Stop event - exit thread
-            DEBUG_LOG(L"Registry monitor thread stopping");
-            break;
-        }
-        else if (result == WAIT_OBJECT_0 + 1)
-        {
-            // Reload event fired - read registry
-            DEBUG_LOG(L"Registry reload event received");
-            pThis->ReloadRegistrySettings();
-        }
-    }
-    
-    return 0;
-}
-
-void CRegistryReloadMonitor::ReloadRegistrySettings()
-{
     // Read from registry
-    HKEY hKey = m_pTextService->OpenSettingsKey(KEY_READ);
+    HKEY hKey = OpenSettingsKey(KEY_READ);
     if (hKey)
     {
         // Read KeyProcessingEnabled
@@ -1703,7 +1604,7 @@ void CRegistryReloadMonitor::ReloadRegistrySettings()
         RegCloseKey(hKey);
         
         // Apply settings
-        m_pTextService->UpdateSettings(keyProcessingEnabled != 0, defaultKeyboard);
+        UpdateSettings(keyProcessingEnabled != 0, defaultKeyboard);
     }
     else
     {

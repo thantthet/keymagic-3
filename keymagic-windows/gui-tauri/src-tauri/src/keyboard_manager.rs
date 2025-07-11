@@ -262,10 +262,13 @@ impl KeyboardManager {
             self.active_keyboard = Some(id.to_string());
             #[cfg(target_os = "windows")]
             {
+                println!("[KeyboardManager] Setting active keyboard to: {}", id);
                 self.save_active_keyboard()?;
-                // Notify TSF instances to reload
-                let notifier = RegistryNotifier::new()?;
-                notifier.notify_registry_changed()?;
+                println!("[KeyboardManager] Active keyboard saved to registry");
+                
+                // Notify TSF instances to reload via SendInput
+                println!("[KeyboardManager] Notifying TSF instances of keyboard change");
+                RegistryNotifier::notify_registry_changed()?;
             }
         }
         Ok(())
@@ -314,12 +317,14 @@ impl KeyboardManager {
                     w!("Software\\KeyMagic\\Settings"),
                     &mut hkey
                 ).is_ok() {
+                    println!("[KeyboardManager] Setting key processing enabled: {}", enabled);
                     self.write_registry_dword(hkey, w!("KeyProcessingEnabled"), if enabled { 1 } else { 0 })?;
                     RegCloseKey(hkey);
+                    println!("[KeyboardManager] Key processing enabled setting saved to registry");
                     
-                    // Notify TSF instances to reload
-                    let notifier = RegistryNotifier::new()?;
-                    notifier.notify_registry_changed()?;
+                    // Notify TSF instances to reload via SendInput
+                    println!("[KeyboardManager] Notifying TSF instances of enabled state change");
+                    RegistryNotifier::notify_registry_changed()?;
                     
                     Ok(())
                 } else {
