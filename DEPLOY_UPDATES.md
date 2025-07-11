@@ -6,6 +6,26 @@
 
 ## Option 1: Using the Deploy Script (Recommended)
 
+### Automatic Generation (if you have built installers)
+
+```bash
+# 1. Generate updates.json from installer files
+# On macOS/Linux:
+./scripts/generate-updates-json.py
+
+# On Windows:
+powershell -ExecutionPolicy Bypass -File scripts\generate-updates-json.ps1
+
+# 2. Review and edit the generated updates.json
+# - Add meaningful release notes
+# - Verify version numbers and URLs
+
+# 3. Deploy to GitHub Pages
+./scripts/deploy-updates.sh
+```
+
+### Manual Creation
+
 ```bash
 # 1. Create updates.json from the sample
 cp updates.sample.json updates.json
