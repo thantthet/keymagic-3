@@ -2,8 +2,8 @@
 
 This directory contains the Windows-specific implementation of KeyMagic, including:
 
-- **TSF Text Service** - Windows Text Services Framework IME implementation
-- **Configuration Manager** - Native Win32 GUI for managing keyboards and settings
+- **TSF Text Service** - Windows Text Services Framework IME implementation (C++)
+- **Configuration Manager** - Tauri 2.0-based GUI for managing keyboards and settings
 
 ## Project Structure
 
@@ -17,18 +17,25 @@ keymagic-windows/
 │       ├── DllMain.cpp   # DLL entry points
 │       ├── ClassFactory.* # COM class factory
 │       ├── KeyMagicTextService.* # Main TSF implementation
+│       ├── CompositionManager.* # TSF composition handling
+│       ├── DisplayAttribute.* # Text formatting (underline)
+│       ├── EditSession.* # TSF edit session handlers
 │       ├── Registry.*    # Registration helpers
 │       └── Globals.*     # Global state
 │
-├── gui/                   # Configuration Manager (Rust)
-│   ├── Cargo.toml        # Rust package configuration
-│   ├── build.rs          # Build script for resources
-│   ├── src/              # Rust source files
-│   │   ├── main.rs       # Application entry point
-│   │   ├── app.rs        # Application state
-│   │   └── window.rs     # Main window implementation
-│   └── resources/        # Application resources
-│       └── app.manifest  # Windows manifest
+├── gui-tauri/             # Configuration Manager (Tauri 2.0)
+│   ├── src-tauri/        # Rust backend
+│   │   ├── Cargo.toml    # Rust package configuration
+│   │   └── src/          # Rust source files
+│   │       ├── main.rs   # Tauri application entry
+│   │       ├── registry.rs # Windows registry operations
+│   │       ├── keyboard_manager.rs # Keyboard management
+│   │       └── hud.rs    # Native Windows HUD
+│   ├── src/              # Frontend (HTML/CSS/JS)
+│   │   ├── index.html    # Main UI
+│   │   ├── styles.css    # Styling
+│   │   └── main.js       # Frontend logic
+│   └── tauri.conf.json   # Tauri configuration
 │
 └── installer/            # Installation package (future)
 
@@ -59,8 +66,9 @@ keymagic-windows/
 
 3. Build Configuration Manager:
    ```cmd
-   cd keymagic-windows/gui
-   cargo build --release
+   cd keymagic-windows/gui-tauri
+   npm install
+   npm run tauri build
    ```
 
 ## Installation
@@ -72,7 +80,7 @@ keymagic-windows/
 
 2. Run the Configuration Manager:
    ```cmd
-   keymagic-config.exe
+   keymagic.exe
    ```
 
 ## Development Status
@@ -81,18 +89,25 @@ keymagic-windows/
 - [x] Create project structure
 - [x] Set up build systems
 - [x] Implement basic COM server
-- [x] Create basic Win32 window
+- [x] Create basic Win32 window (replaced with Tauri)
 
-### Phase 5.2: Core Functionality (Next)
-- [ ] Implement key processing pipeline
-- [ ] Basic keyboard management
-- [ ] Initial TSF-GUI integration
+### Phase 5.2: Core Functionality ✅
+- [x] Implement key processing pipeline (SendInput-based)
+- [x] Basic keyboard management
+- [x] Initial TSF-GUI integration via registry
+- [x] Engine integration via FFI
+- [x] Registry monitoring for real-time updates
+- [x] Thread-safe operations with CRITICAL_SECTION
+- [x] Debug logging system
 
-### Phase 5.3: Advanced Features
-- [ ] Smart backspace support
-- [ ] Language bar integration
-- [ ] System tray functionality
-- [ ] Hotkey configuration
+### Phase 5.3: Advanced Features (In Progress)
+- [x] System tray functionality (Tauri GUI)
+- [x] Hotkey configuration (Tauri GUI)
+- [x] Language bar integration (TSF)
+- [x] Auto-update functionality (Tauri)
+- [x] Native Windows HUD for notifications
+- [ ] Smart backspace support (partially implemented)
+- [ ] Full composition support (currently using SendInput approach)
 
 ### Phase 5.4: Testing and Polish
 - [ ] Unit tests
@@ -106,10 +121,29 @@ keymagic-windows/
 
 ## Architecture Notes
 
-The implementation follows a simplified text handling strategy:
-- The TSF always displays the engine's composing text as the composition string
-- Text is committed on space, enter, tab, or focus loss
-- The engine is reset after each commit
-- Action types from the engine are ignored in favor of this simpler model
+### TSF Implementation
+The TSF text service uses two processing approaches:
+1. **SendInput-based (Primary)**: Uses Windows SendInput API for direct text manipulation
+   - Processes keys through the engine
+   - Sends backspaces and text directly to applications
+   - Handles special keys (Space/Enter/Tab for commit, Escape for cancel)
+   - Uses extra info signatures to prevent recursive processing
 
-This approach significantly reduces TSF complexity while maintaining full compatibility with KeyMagic's rule-based engine.
+2. **TSF Edit Sessions (Fallback)**: Traditional TSF approach for compatibility
+   - Uses TSF context manipulation
+   - Better support for TSF-aware applications
+
+### GUI Implementation
+The Configuration Manager uses Tauri 2.0 (instead of native Win32):
+- **Frontend**: HTML/CSS/JavaScript for modern UI
+- **Backend**: Rust with Tauri framework
+- **Features**: System tray, hotkey management, auto-updates, native HUD
+- **Integration**: Direct FFI to keymagic-core, Windows Registry for persistence
+
+### Registry Integration
+Both components share configuration via Windows Registry:
+- Location: `HKEY_CURRENT_USER\Software\KeyMagic\Settings`
+- TSF monitors registry for real-time updates
+- GUI manages keyboard registration and settings
+
+This architecture provides a modern, maintainable solution while ensuring compatibility with Windows applications.
