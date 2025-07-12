@@ -312,7 +312,27 @@ body {
 }
 
 .keyboard-card.active .keyboard-icon {
+  position: relative;
+  outline: 3px solid var(--success-color);
+  outline-offset: 2px;
+}
+
+.keyboard-card.active .keyboard-icon::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
   background-color: var(--success-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .keyboard-header {
@@ -331,6 +351,10 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.2s;
+  position: relative;
 }
 
 .keyboard-info {
