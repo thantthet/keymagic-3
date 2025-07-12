@@ -1,6 +1,8 @@
 use crate::parser::{KmsFile, ValueElement, PatternElement, OutputElement, VariableDecl};
 use keymagic_core::*;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::fs;
 
 pub struct Compiler {
     strings: Vec<StringEntry>,
@@ -9,6 +11,7 @@ pub struct Compiler {
     states: HashMap<String, usize>,
     vk_map: HashMap<&'static str, VirtualKey>,
     next_state_index: usize,
+    base_dir: Option<PathBuf>,
 }
 
 impl Compiler {
@@ -20,7 +23,13 @@ impl Compiler {
             states: HashMap::new(),
             vk_map: create_vk_map(),
             next_state_index: 0,
+            base_dir: None,
         }
+    }
+
+    pub fn with_base_dir<P: AsRef<Path>>(mut self, base_dir: P) -> Self {
+        self.base_dir = Some(base_dir.as_ref().to_path_buf());
+        self
     }
 
     pub fn compile(mut self, ast: KmsFile) -> std::result::Result<Km2File, KmsError> {
@@ -50,7 +59,7 @@ impl Compiler {
         self.set_layout_options(&mut header.layout_options, &ast.options);
 
         // Create info entries
-        let info = self.create_info_entries(&ast.options);
+        let info = self.create_info_entries(&ast.options)?;
         header.info_count = info.len() as u16;
 
         Ok(Km2File {
@@ -322,7 +331,7 @@ impl Compiler {
         }
     }
 
-    fn create_info_entries(&self, options: &HashMap<String, String>) -> Vec<InfoEntry> {
+    fn create_info_entries(&self, options: &HashMap<String, String>) -> std::result::Result<Vec<InfoEntry>, KmsError> {
         let mut entries = Vec::new();
         
         if let Some(name) = options.get("NAME") {
@@ -354,13 +363,33 @@ impl Compiler {
             });
         }
         
-        // TODO: Handle ICON
+        // Handle ICON
+        if let Some(icon_path) = options.get("ICON") {
+            let icon_data = self.load_icon_file(icon_path)?;
+            entries.push(InfoEntry {
+                id: *INFO_ICON,
+                data: icon_data,
+            });
+        }
         
-        entries
+        Ok(entries)
     }
 
     fn string_to_utf8(&self, s: &str) -> Vec<u8> {
         s.as_bytes().to_vec()
+    }
+
+    fn load_icon_file(&self, icon_path: &str) -> std::result::Result<Vec<u8>, KmsError> {
+        // Resolve the icon path relative to the base directory
+        let full_path = if let Some(ref base_dir) = self.base_dir {
+            base_dir.join(icon_path)
+        } else {
+            // If no base directory is set, try as-is
+            PathBuf::from(icon_path)
+        };
+
+        // Read the icon file
+        fs::read(&full_path).map_err(|e| KmsError::from(e))
     }
 
     fn scan_for_states(&mut self, pattern: &[PatternElement]) -> std::result::Result<(), KmsError> {
