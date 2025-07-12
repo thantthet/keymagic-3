@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::ffi::CString;
 use anyhow::{Result, anyhow};
 use crate::registry_notifier::RegistryNotifier;
+use crate::app_paths::AppPaths;
 
 #[cfg(target_os = "windows")]
 use windows::core::*;
@@ -28,6 +29,7 @@ pub struct KeyboardInfo {
 pub struct KeyboardManager {
     keyboards: HashMap<String, KeyboardInfo>,
     active_keyboard: Option<String>,
+    app_paths: AppPaths,
 }
 
 /// Normalize hotkey string to consistent format
@@ -158,9 +160,12 @@ fn parse_function_key(s: &str) -> Option<u8> {
 
 impl KeyboardManager {
     pub fn new() -> Result<Self> {
+        let app_paths = AppPaths::new()?;
+        
         let mut manager = Self {
             keyboards: HashMap::new(),
             active_keyboard: None,
+            app_paths,
         };
         
         // Load keyboards from registry on Windows
@@ -178,27 +183,32 @@ impl KeyboardManager {
         let km2 = Km2Loader::load(&km2_data)?;
         let metadata = km2.metadata();
         
-        // Also validate that it can be loaded by the engine
+        // Extract metadata from km2 file
+        let base_keyboard_id = path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+            
+        // Copy the keyboard file to app data directory
+        let (managed_path, keyboard_id) = self.app_paths.install_keyboard(path, &base_keyboard_id)?;
+        
+        // Validate that it can be loaded by the engine using the managed path
         let engine = keymagic_engine_new();
         if engine.is_null() {
             return Err(anyhow!("Failed to create engine"));
         }
         
-        let c_path = CString::new(path.to_str().unwrap())?;
+        let c_path = CString::new(managed_path.to_str().unwrap())?;
         let result = keymagic_engine_load_keyboard(engine, c_path.as_ptr());
         
         // Clean up engine
         keymagic_engine_free(engine);
         
         if result != KeyMagicResult::Success {
+            // Clean up the copied file on failure
+            let _ = self.app_paths.uninstall_keyboard(&keyboard_id);
             return Err(anyhow!("Failed to load keyboard"));
         }
-        
-        // Extract metadata from km2 file
-        let keyboard_id = path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown")
-            .to_string();
             
         let name = metadata.name()
             .map(|s| s.to_string())
@@ -216,7 +226,7 @@ impl KeyboardManager {
             
         let info = KeyboardInfo {
             id: keyboard_id.clone(),
-            path: path.to_path_buf(),
+            path: managed_path,  // Use the managed path, not the original
             name,
             description,
             icon_data,
@@ -235,6 +245,9 @@ impl KeyboardManager {
     
     pub fn remove_keyboard(&mut self, id: &str) -> Result<()> {
         if self.keyboards.remove(id).is_some() {
+            // Remove the keyboard file from app data directory
+            self.app_paths.uninstall_keyboard(id)?;
+            
             #[cfg(target_os = "windows")]
             self.remove_from_registry(id)?;
             

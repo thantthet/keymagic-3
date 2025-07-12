@@ -6,6 +6,7 @@ mod hud;
 mod registry_notifier;
 mod updater;
 mod autostart;
+mod app_paths;
 
 use std::sync::{Mutex, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
