@@ -172,6 +172,9 @@ impl KeyboardManager {
         #[cfg(target_os = "windows")]
         manager.load_from_registry()?;
         
+        // Validate and clean up any missing keyboard files
+        manager.validate_and_cleanup()?;
+        
         Ok(manager)
     }
     
@@ -426,17 +429,22 @@ impl KeyboardManager {
                         
                         // Try to load default hotkey and icon from .km2 file
                         let path_buf = PathBuf::from(&path);
-                        let (default_hotkey, icon_data) = if path_buf.exists() {
-                            if let Ok(km2_data) = std::fs::read(&path_buf) {
-                                if let Ok(km2) = Km2Loader::load(&km2_data) {
-                                    let metadata = km2.metadata();
-                                    (
-                                        metadata.hotkey().map(|s| normalize_hotkey(&s)),
-                                        metadata.icon().map(|data| data.to_vec())
-                                    )
-                                } else {
-                                    (None, None)
-                                }
+                        
+                        // Skip keyboards with missing files
+                        if !path_buf.exists() {
+                            println!("[KeyboardManager] Skipping keyboard {} - file not found: {}", keyboard_id, path);
+                            RegCloseKey(kb_hkey);
+                            index += 1;
+                            continue;
+                        }
+                        
+                        let (default_hotkey, icon_data) = if let Ok(km2_data) = std::fs::read(&path_buf) {
+                            if let Ok(km2) = Km2Loader::load(&km2_data) {
+                                let metadata = km2.metadata();
+                                (
+                                    metadata.hotkey().map(|s| normalize_hotkey(&s)),
+                                    metadata.icon().map(|data| data.to_vec())
+                                )
                             } else {
                                 (None, None)
                             }
@@ -636,6 +644,45 @@ impl KeyboardManager {
             self.save_to_registry(id)?;
         } else {
             return Err(anyhow!("Keyboard not found"));
+        }
+        
+        Ok(())
+    }
+    
+    /// Validates that all registered keyboards have their files present
+    /// and removes any keyboards whose files are missing
+    pub fn validate_and_cleanup(&mut self) -> Result<()> {
+        let mut missing_keyboards = Vec::new();
+        
+        // Check each keyboard for missing files
+        for (id, info) in &self.keyboards {
+            if !info.path.exists() {
+                println!("[KeyboardManager] Keyboard file missing: {} at {}", id, info.path.display());
+                missing_keyboards.push(id.clone());
+            }
+        }
+        
+        // Store count before consuming the vector
+        let removed_count = missing_keyboards.len();
+        
+        // Remove missing keyboards
+        for id in missing_keyboards {
+            println!("[KeyboardManager] Removing missing keyboard from registry: {}", id);
+            self.keyboards.remove(&id);
+            
+            #[cfg(target_os = "windows")]
+            self.remove_from_registry(&id)?;
+            
+            // If this was the active keyboard, clear it
+            if self.active_keyboard.as_ref() == Some(&id) {
+                self.active_keyboard = None;
+                #[cfg(target_os = "windows")]
+                self.save_active_keyboard()?;
+            }
+        }
+        
+        if removed_count > 0 {
+            println!("[KeyboardManager] Cleaned up {} missing keyboards", removed_count);
         }
         
         Ok(())

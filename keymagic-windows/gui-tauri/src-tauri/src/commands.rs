@@ -41,6 +41,31 @@ pub fn set_active_keyboard(
 }
 
 #[tauri::command]
+pub fn validate_keyboards(
+    state: State<KeyboardManagerState>,
+    app_handle: AppHandle,
+) -> Result<usize, String> {
+    let mut manager = state.lock().map_err(|e| e.to_string())?;
+    
+    // Get initial count for reporting
+    let initial_count = manager.get_keyboards().len();
+    
+    // Run validation and cleanup
+    manager.validate_and_cleanup().map_err(|e| e.to_string())?;
+    
+    // Get final count
+    let final_count = manager.get_keyboards().len();
+    let removed_count = initial_count.saturating_sub(final_count);
+    
+    // Update tray icon if keyboards were removed
+    if removed_count > 0 {
+        crate::tray::update_tray_icon(&app_handle, &manager);
+    }
+    
+    Ok(removed_count)
+}
+
+#[tauri::command]
 pub fn add_keyboard(
     state: State<KeyboardManagerState>,
     hotkey_manager: State<HotkeyManager>,

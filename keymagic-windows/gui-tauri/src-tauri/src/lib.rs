@@ -50,6 +50,7 @@ pub fn run() {
             commands::set_active_keyboard,
             commands::add_keyboard,
             commands::remove_keyboard,
+            commands::validate_keyboards,
             commands::is_key_processing_enabled,
             commands::set_key_processing_enabled,
             commands::get_setting,
