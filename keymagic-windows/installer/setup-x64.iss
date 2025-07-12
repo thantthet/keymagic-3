@@ -44,6 +44,10 @@ UninstallStatusLabel=Uninstalling %1. Please wait...%n%nNote: A logout will be r
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[InstallDelete]
+; Delete existing keyboards directory to ensure clean installation of bundled keyboards
+Type: filesandordirs; Name: "{app}\keyboards"
+
 [Files]
 ; GUI Application (x64)
 Source: "..\target\x86_64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
