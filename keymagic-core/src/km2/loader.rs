@@ -1,8 +1,8 @@
-use crate::types::{FileHeader, Km2File, StringEntry, InfoEntry, Rule, BinaryFormatElement, LayoutOptions};
+use crate::types::{FileHeader, FileHeader_1_3, FileHeader_1_4, Km2File, StringEntry, InfoEntry, Rule, BinaryFormatElement, LayoutOptions};
 use crate::types::opcodes::*;
 use super::error::{Km2Error, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 pub struct Km2Loader;
 
@@ -14,8 +14,8 @@ impl Km2Loader {
         // Read header
         let header = Self::read_header(&mut cursor)?;
         
-        // Validate version
-        if header.major_version != 1 || header.minor_version > 5 {
+        // Validate version (we support 1.3, 1.4, and 1.5)
+        if header.major_version != 1 || header.minor_version < 3 || header.minor_version > 5 {
             return Err(Km2Error::UnsupportedVersion {
                 major: header.major_version,
                 minor: header.minor_version,
@@ -41,7 +41,7 @@ impl Km2Loader {
     
     /// Read file header
     fn read_header(cursor: &mut Cursor<&[u8]>) -> Result<FileHeader> {
-        if cursor.get_ref().len() < 16 {
+        if cursor.get_ref().len() < 12 {
             return Err(Km2Error::FileTooSmall(cursor.get_ref().len()));
         }
         
@@ -54,6 +54,102 @@ impl Km2Loader {
         
         let major_version = cursor.read_u8()?;
         let minor_version = cursor.read_u8()?;
+        
+        // Handle different versions
+        let header = match (major_version, minor_version) {
+            (1, 3) => Self::read_header_v1_3(cursor)?,
+            (1, 4) => Self::read_header_v1_4(cursor)?,
+            (1, 5) => Self::read_header_v1_5(cursor)?,
+            _ => {
+                // For unknown versions, try to read as v1.5
+                // but allow older versions we haven't explicitly handled
+                if major_version == 1 && minor_version < 3 {
+                    // Very old version, not supported
+                    return Err(Km2Error::UnsupportedVersion {
+                        major: major_version,
+                        minor: minor_version,
+                    });
+                }
+                // Newer version, try to read as v1.5
+                Self::read_header_v1_5(cursor)?
+            }
+        };
+        
+        Ok(header)
+    }
+    
+    /// Read version 1.3 header
+    fn read_header_v1_3(cursor: &mut Cursor<&[u8]>) -> Result<FileHeader> {
+        // Reset to start and read the full v1.3 header
+        cursor.seek(SeekFrom::Start(0))?;
+        
+        // Read FileHeader_1_3
+        let mut header_bytes = vec![0u8; std::mem::size_of::<FileHeader_1_3>()];
+        cursor.read_exact(&mut header_bytes)?;
+        
+        let header_1_3: FileHeader_1_3 = unsafe {
+            std::ptr::read(header_bytes.as_ptr() as *const FileHeader_1_3)
+        };
+        
+        // Convert to modern FileHeader
+        Ok(FileHeader {
+            magic_code: header_1_3.magic_code,
+            major_version: header_1_3.major_version,
+            minor_version: header_1_3.minor_version,
+            string_count: header_1_3.string_count,
+            info_count: 0, // v1.3 doesn't have info section
+            rule_count: header_1_3.rule_count,
+            layout_options: LayoutOptions {
+                track_caps: header_1_3.layout_options.track_caps,
+                auto_bksp: header_1_3.layout_options.auto_bksp,
+                eat: header_1_3.layout_options.eat,
+                pos_based: header_1_3.layout_options.pos_based,
+                right_alt: 1, // Default to true for older versions
+            },
+        })
+    }
+    
+    /// Read version 1.4 header
+    fn read_header_v1_4(cursor: &mut Cursor<&[u8]>) -> Result<FileHeader> {
+        // Reset to start and read the full v1.4 header
+        cursor.seek(SeekFrom::Start(0))?;
+        
+        // Read FileHeader_1_4
+        let mut header_bytes = vec![0u8; std::mem::size_of::<FileHeader_1_4>()];
+        cursor.read_exact(&mut header_bytes)?;
+        
+        let header_1_4: FileHeader_1_4 = unsafe {
+            std::ptr::read(header_bytes.as_ptr() as *const FileHeader_1_4)
+        };
+        
+        // Convert to modern FileHeader
+        Ok(FileHeader {
+            magic_code: header_1_4.magic_code,
+            major_version: header_1_4.major_version,
+            minor_version: header_1_4.minor_version,
+            string_count: header_1_4.string_count,
+            info_count: header_1_4.info_count,
+            rule_count: header_1_4.rule_count,
+            layout_options: LayoutOptions {
+                track_caps: header_1_4.layout_options.track_caps,
+                auto_bksp: header_1_4.layout_options.auto_bksp,
+                eat: header_1_4.layout_options.eat,
+                pos_based: header_1_4.layout_options.pos_based,
+                right_alt: 1, // Default to true for older versions
+            },
+        })
+    }
+    
+    /// Read version 1.5 header (current version)
+    fn read_header_v1_5(cursor: &mut Cursor<&[u8]>) -> Result<FileHeader> {
+        // Reset to start if we've already read version bytes
+        cursor.seek(SeekFrom::Start(0))?;
+        
+        let mut magic_code = [0u8; 4];
+        cursor.read_exact(&mut magic_code)?;
+        
+        let major_version = cursor.read_u8()?;
+        let minor_version = cursor.read_u8()?;
         let string_count = cursor.read_u16::<LittleEndian>()?;
         let info_count = cursor.read_u16::<LittleEndian>()?;
         let rule_count = cursor.read_u16::<LittleEndian>()?;
@@ -63,7 +159,7 @@ impl Km2Loader {
             auto_bksp: cursor.read_u8()?,
             eat: cursor.read_u8()?,
             pos_based: cursor.read_u8()?,
-            right_alt: if minor_version >= 5 { cursor.read_u8()? } else { 0 },
+            right_alt: cursor.read_u8()?,
         };
         
         // Skip C++ struct padding byte

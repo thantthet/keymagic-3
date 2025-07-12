@@ -1,6 +1,42 @@
 
 use std::collections::HashMap;
 
+// Version 1.3 layout options (without rightAlt)
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct LayoutOptions_1_3 {
+    pub track_caps: u8,         // 0 or 1
+    pub auto_bksp: u8,          // 0 or 1
+    pub eat: u8,                // 0 or 1
+    pub pos_based: u8,          // 0 or 1
+}
+
+// Version 1.3 header (without info_count)
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct FileHeader_1_3 {
+    pub magic_code: [u8; 4],    // "KMKL"
+    pub major_version: u8,      // 1
+    pub minor_version: u8,      // 3
+    pub string_count: u16,
+    pub rule_count: u16,
+    pub layout_options: LayoutOptions_1_3,
+}
+
+// Version 1.4 header (with info_count but without rightAlt)
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct FileHeader_1_4 {
+    pub magic_code: [u8; 4],    // "KMKL"
+    pub major_version: u8,      // 1
+    pub minor_version: u8,      // 4
+    pub string_count: u16,
+    pub info_count: u16,
+    pub rule_count: u16,
+    pub layout_options: LayoutOptions_1_3, // same as 1.3 layout options
+}
+
+// Current version (1.5) with full features
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 pub struct FileHeader {
