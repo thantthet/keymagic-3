@@ -9,8 +9,8 @@ if [ ! -f "updates.json" ]; then
     exit 1
 fi
 
-# Store current branch
-CURRENT_BRANCH=$(git branch --show-current)
+# Set worktree directory
+WORKTREE_DIR=".gh-pages-worktree"
 
 # Ensure we have the latest gh-pages branch
 git fetch origin gh-pages:gh-pages
@@ -19,32 +19,34 @@ git fetch origin gh-pages:gh-pages
 if ! git show-ref --verify --quiet refs/heads/gh-pages; then
     echo "Creating gh-pages branch..."
     git checkout --orphan gh-pages
-    git rm -rf .
     echo "# KeyMagic Updates" > README.md
     git add README.md
     git commit -m "Initial gh-pages commit"
     git push origin gh-pages
+    git checkout -
 fi
 
-# Stash any changes
-git stash
+# Remove existing worktree if it exists
+if [ -d "$WORKTREE_DIR" ]; then
+    git worktree remove --force "$WORKTREE_DIR"
+fi
 
-# Switch to gh-pages branch
-git checkout gh-pages
+# Create worktree for gh-pages branch
+echo "Creating worktree for gh-pages branch..."
+git worktree add "$WORKTREE_DIR" gh-pages
 
-# Copy updates.json from stashed files
-git checkout stash@{0} -- updates.json
+# Copy updates.json to worktree
+cp updates.json "$WORKTREE_DIR/"
 
-# Commit and push
+# Commit and push changes
+cd "$WORKTREE_DIR"
 git add updates.json
 git commit -m "Update version info $(date +%Y-%m-%d)"
 git push origin gh-pages
+cd ..
 
-# Switch back to original branch
-git checkout $CURRENT_BRANCH
-
-# Pop stash if there were changes
-git stash pop || true
+# Remove worktree
+git worktree remove --force "$WORKTREE_DIR"
 
 echo "Successfully deployed updates.json to GitHub Pages"
 echo "It will be available at: https://thantthet.github.io/keymagic-3/updates.json"
