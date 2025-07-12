@@ -209,8 +209,16 @@ pub fn update_tray_icon(app: &AppHandle, keyboard_manager: &KeyboardManager) {
                             // Fall back to default icon
                             app.default_window_icon().unwrap().clone()
                         }
+                    } else if let Some(color) = &keyboard.color {
+                        // No icon data but has color - create colored icon
+                        if let Ok(icon) = create_icon_from_color(color, &keyboard.name) {
+                            icon
+                        } else {
+                            // Fall back to default icon
+                            app.default_window_icon().unwrap().clone()
+                        }
                     } else {
-                        // No icon data, use default
+                        // No icon data or color, use default
                         app.default_window_icon().unwrap().clone()
                     };
                     
@@ -256,4 +264,39 @@ fn create_icon_from_data(data: &[u8]) -> Result<Image<'static>, Box<dyn std::err
     
     // Create Tauri Image
     Ok(Image::new_owned(rgba_data, width, height))
+}
+
+/// Creates a solid color icon with the first letter of the keyboard name
+fn create_icon_from_color(color: &str, _name: &str) -> Result<Image<'static>, Box<dyn std::error::Error>> {
+    use image::{ImageBuffer, Rgba};
+    
+    const ICON_SIZE: u32 = 32;
+    
+    // Parse hex color
+    let color_hex = color.trim_start_matches('#');
+    let r = u8::from_str_radix(&color_hex[0..2], 16)?;
+    let g = u8::from_str_radix(&color_hex[2..4], 16)?;
+    let b = u8::from_str_radix(&color_hex[4..6], 16)?;
+    
+    // Create image buffer with transparent background
+    let img = ImageBuffer::from_fn(ICON_SIZE, ICON_SIZE, |x, y| {
+        // Create a rounded rectangle
+        let center = ICON_SIZE as f32 / 2.0;
+        let radius = (ICON_SIZE as f32 / 2.0) - 2.0;
+        let dx = x as f32 - center + 0.5;
+        let dy = y as f32 - center + 0.5;
+        let distance = (dx * dx + dy * dy).sqrt();
+        
+        if distance <= radius {
+            Rgba([r, g, b, 255])
+        } else {
+            Rgba([0, 0, 0, 0])
+        }
+    });
+    
+    // TODO: Add text rendering for the first letter of the name
+    // For now, just return the solid color circle
+    
+    let rgba_data = img.into_raw();
+    Ok(Image::new_owned(rgba_data, ICON_SIZE, ICON_SIZE))
 }

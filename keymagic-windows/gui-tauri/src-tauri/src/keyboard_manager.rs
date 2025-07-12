@@ -24,6 +24,7 @@ pub struct KeyboardInfo {
     pub default_hotkey: Option<String>,
     pub hotkey: Option<String>,
     pub enabled: bool,
+    pub color: Option<String>,  // Hex color for keyboards without icons
 }
 
 pub struct KeyboardManager {
@@ -72,6 +73,38 @@ fn normalize_hotkey(hotkey: &str) -> String {
     result.extend(main_keys);
     
     result.join("+")
+}
+
+/// Generate a color for a keyboard based on its name
+fn generate_keyboard_color(name: &str) -> String {
+    // Predefined palette of distinct colors
+    let colors = [
+        "#2196F3", // Blue
+        "#4CAF50", // Green
+        "#FF9800", // Orange
+        "#9C27B0", // Purple
+        "#F44336", // Red
+        "#00BCD4", // Cyan
+        "#795548", // Brown
+        "#607D8B", // Blue Grey
+        "#E91E63", // Pink
+        "#009688", // Teal
+        "#FFC107", // Amber
+        "#3F51B5", // Indigo
+        "#8BC34A", // Light Green
+        "#FF5722", // Deep Orange
+        "#673AB7", // Deep Purple
+    ];
+    
+    // Generate a simple hash from the name
+    let mut hash = 0u32;
+    for byte in name.bytes() {
+        hash = hash.wrapping_mul(31).wrapping_add(byte as u32);
+    }
+    
+    // Select a color based on the hash
+    let index = (hash as usize) % colors.len();
+    colors[index].to_string()
 }
 
 /// Normalize individual key part
@@ -227,6 +260,13 @@ impl KeyboardManager {
         let icon_data = metadata.icon()
             .map(|data| data.to_vec());
             
+        // Generate a color if there's no icon
+        let color = if icon_data.is_none() {
+            Some(generate_keyboard_color(&name))
+        } else {
+            None
+        };
+        
         let info = KeyboardInfo {
             id: keyboard_id.clone(),
             path: managed_path,  // Use the managed path, not the original
@@ -236,6 +276,7 @@ impl KeyboardManager {
             default_hotkey: default_hotkey.clone(),
             hotkey: None,
             enabled: true,
+            color,
         };
         
         self.keyboards.insert(keyboard_id.clone(), info);
@@ -425,6 +466,7 @@ impl KeyboardManager {
                         let description = self.read_registry_string(kb_hkey, w!("Description")).unwrap_or_default();
                         let hotkey = self.read_registry_string(kb_hkey, w!("Hotkey"))
                             .map(|h| normalize_hotkey(&h));
+                        let color = self.read_registry_string(kb_hkey, w!("Color"));
                         let enabled = self.read_registry_dword(kb_hkey, w!("Enabled")).unwrap_or(1) != 0;
                         
                         // Try to load default hotkey and icon from .km2 file
@@ -461,6 +503,7 @@ impl KeyboardManager {
                             default_hotkey,
                             hotkey,
                             enabled,
+                            color,
                         };
                         
                         self.keyboards.insert(keyboard_id, info);
@@ -505,6 +548,9 @@ impl KeyboardManager {
                 self.write_registry_string(hkey, w!("Description"), &info.description)?;
                 if let Some(hotkey) = &info.hotkey {
                     self.write_registry_string(hkey, w!("Hotkey"), hotkey)?;
+                }
+                if let Some(color) = &info.color {
+                    self.write_registry_string(hkey, w!("Color"), color)?;
                 }
                 self.write_registry_dword(hkey, w!("Enabled"), if info.enabled { 1 } else { 0 })?;
                 

@@ -80,7 +80,9 @@ function createKeyboardCard(keyboard) {
   card.innerHTML = `
     <div class="keyboard-header">
       <div class="keyboard-icon">
-        ${keyboard.icon_data ? createIconElement(keyboard.icon_data) : createDefaultIcon()}
+        ${keyboard.icon_data ? createIconElement(keyboard.icon_data) : 
+          keyboard.color ? createColoredIcon(keyboard.color, keyboard.name) : 
+          createDefaultIcon()}
       </div>
       <div class="keyboard-info">
         <div class="keyboard-name">${keyboard.name}</div>
@@ -147,6 +149,29 @@ function createDefaultIcon() {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
       <path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/>
     </svg>
+  `;
+}
+
+function createColoredIcon(color, name) {
+  // Get the first letter of the name (or first character)
+  const firstChar = name.charAt(0).toUpperCase();
+  
+  return `
+    <div style="
+      width: 100%;
+      height: 100%;
+      background-color: ${color};
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    ">
+      ${firstChar}
+    </div>
   `;
 }
 
