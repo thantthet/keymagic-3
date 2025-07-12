@@ -12,8 +12,8 @@ echo.
 :: Navigate to keymagic-windows directory
 cd /d "%~dp0\.."
 
-:: Build components
-echo [1/4] Building ARM64 TSF DLL...
+:: Build dll and gui
+echo [1/3] Building ARM64 TSF DLL...
 call make.bat build arm64 Release
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build ARM64 TSF DLL
@@ -21,32 +21,21 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/4] Building GUI (x64 for ARM64)...
-pushd gui-tauri
-call build.bat
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to build GUI
-    popd
-    exit /b 1
-)
-popd
-
-echo.
-echo [3/4] Verifying build artifacts...
+echo [2/3] Verifying build artifacts...
 
 :: Check ARM64 TSF
-if not exist "tsf\build-ARM64\Release\KeyMagicTSF.dll" (
+if not exist "tsf\build-arm64\Release\KeyMagicTSF.dll" (
     echo [ERROR] ARM64 TSF DLL not found
     exit /b 1
 )
 echo [OK] ARM64 TSF DLL found
 
 :: Check GUI
-if not exist "target\x86_64-pc-windows-msvc\release\gui-tauri.exe" (
+if not exist "target\aarch64-pc-windows-msvc\release\gui-tauri.exe" (
     echo [ERROR] GUI executable not found
     exit /b 1
 )
-echo [OK] GUI executable found (x64 - runs via emulation)
+echo [OK] GUI executable found
 
 :: Check resources
 if not exist "resources\icons\keymagic.ico" (
@@ -54,7 +43,7 @@ if not exist "resources\icons\keymagic.ico" (
 )
 
 echo.
-echo [4/4] Building ARM64 installer...
+echo [3/3] Building ARM64 installer...
 
 cd installer
 
@@ -93,7 +82,7 @@ echo.
 
 :: List output files
 echo Installer files:
-dir /b "output\*ARM64*.exe"
+dir /b "output\*arm64*.exe"
 echo.
 
 endlocal

@@ -45,11 +45,11 @@ UninstallStatusLabel=Uninstalling %1. Please wait...%n%nNote: A logout will be r
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; GUI Application (x64 runs on ARM64 via emulation)
-Source: "..\target\x86_64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
+; GUI Application
+Source: "..\target\aarch64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
 
 ; TSF DLL - ARM64 only
-Source: "..\tsf\build-ARM64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF"; Flags: ignoreversion
+Source: "..\tsf\build-arm64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF"; Flags: ignoreversion
 
 ; Resources
 Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs

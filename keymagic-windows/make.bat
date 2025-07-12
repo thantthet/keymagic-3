@@ -59,9 +59,11 @@ echo.
 :: Build Rust
 echo Building Rust libraries...
 if /i "%CONFIG%"=="Release" (
-    cargo build --release --target %RUST_TARGET% || exit /b 1
+    cargo build -p keymagic-core --release --target %RUST_TARGET% || exit /b 1
+    cargo build -p gui-tauri --release --target %RUST_TARGET% || exit /b 1
 ) else (
-    cargo build --target %RUST_TARGET% || exit /b 1
+    cargo build -p keymagic-core --release --target %RUST_TARGET% || exit /b 1
+    cargo build -p gui-tauri --target %RUST_TARGET% || exit /b 1
 )
 
 :: Build TSF

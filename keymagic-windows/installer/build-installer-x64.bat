@@ -12,8 +12,8 @@ echo.
 :: Navigate to keymagic-windows directory
 cd /d "%~dp0\.."
 
-:: Build components
-echo [1/4] Building x64 TSF DLL...
+:: Build dll and gui
+echo [1/3] Building x64 TSF DLL...
 call make.bat build x64 Release
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build x64 TSF DLL
@@ -21,18 +21,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/4] Building GUI (x64)...
-pushd gui-tauri
-call build.bat
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to build GUI
-    popd
-    exit /b 1
-)
-popd
-
-echo.
-echo [3/4] Verifying build artifacts...
+echo [2/3] Verifying build artifacts...
 
 :: Check x64 TSF
 if not exist "tsf\build-x64\Release\KeyMagicTSF.dll" (
@@ -54,7 +43,7 @@ if not exist "resources\icons\keymagic.ico" (
 )
 
 echo.
-echo [4/4] Building x64 installer...
+echo [3/3] Building x64 installer...
 
 cd installer
 
