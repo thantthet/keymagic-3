@@ -141,6 +141,16 @@ impl AppPaths {
         
         Ok(keyboards)
     }
+    
+    /// Gets the application installation directory (where the exe is located)
+    pub fn get_app_install_dir(&self) -> Result<PathBuf> {
+        let exe_path = std::env::current_exe()
+            .map_err(|e| anyhow!("Failed to get current exe path: {}", e))?;
+        
+        exe_path.parent()
+            .map(|p| p.to_path_buf())
+            .ok_or_else(|| anyhow!("Failed to get parent directory of exe"))
+    }
 }
 
 #[cfg(test)]

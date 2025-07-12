@@ -75,6 +75,9 @@ Root: HKCU; Subkey: "Software\KeyMagic\Keyboards"; Flags: uninsdeletekeyifempty
 ; Set StartWithWindows to 1 on install
 Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: string; ValueName: "StartWithWindows"; ValueData: "1"; Flags: uninsdeletevalue
 
+; Set FirstRunScanKeyboards flag to trigger import wizard on first launch
+Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: dword; ValueName: "FirstRunScanKeyboards"; ValueData: "1"; Flags: createvalueifdoesntexist
+
 ; Add to Windows Run registry for auto-start
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue
 

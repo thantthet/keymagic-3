@@ -533,6 +533,117 @@ body {
   text-decoration: underline;
 }
 
+/* Import Wizard Styles */
+.import-wizard {
+  max-width: 600px;
+  width: 90%;
+}
+
+.wizard-intro {
+  margin-bottom: 20px;
+  color: var(--text-secondary);
+}
+
+.keyboard-comparison-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin: 20px 0;
+}
+
+.keyboard-comparison-item {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+}
+
+.keyboard-comparison-item:hover {
+  background-color: var(--bg-light);
+}
+
+.keyboard-comparison-item.selected {
+  background-color: var(--primary-light);
+  border-color: var(--primary-color);
+}
+
+.comparison-checkbox {
+  margin-right: 15px;
+}
+
+.comparison-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.comparison-icon {
+  width: 40px;
+  height: 40px;
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.comparison-info {
+  flex: 1;
+}
+
+.comparison-name {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.comparison-status {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.new {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.status-badge.update {
+  background-color: #2196F3;
+  color: white;
+}
+
+.status-badge.current {
+  background-color: #9E9E9E;
+  color: white;
+}
+
+.status-badge.modified {
+  background-color: #FF9800;
+  color: white;
+}
+
+.wizard-summary {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: var(--bg-light);
+  border-radius: 4px;
+  text-align: center;
+}
+
 /* Modal */
 .modal {
   display: none;

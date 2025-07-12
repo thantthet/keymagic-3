@@ -71,6 +71,10 @@ pub fn run() {
             commands::set_on_off_hotkey,
             commands::get_on_off_hotkey,
             commands::check_for_update,
+            commands::check_first_run_scan_keyboards,
+            commands::clear_first_run_scan_keyboards,
+            commands::get_bundled_keyboards,
+            commands::import_bundled_keyboard,
         ])
         .setup(|app| {
             // Initialize native HUD window

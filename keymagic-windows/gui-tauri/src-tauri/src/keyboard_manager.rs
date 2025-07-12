@@ -5,6 +5,8 @@ use anyhow::{Result, anyhow};
 use crate::registry_notifier::RegistryNotifier;
 use crate::app_paths::AppPaths;
 use crate::registry;
+use sha2::{Sha256, Digest};
+use std::io::Read;
 
 // Import FFI types from keymagic-core
 use keymagic_core::ffi::*;
@@ -21,6 +23,26 @@ pub struct KeyboardInfo {
     pub hotkey: Option<String>,
     pub enabled: bool,
     pub color: Option<String>,  // Hex color for keyboards without icons
+    pub hash: Option<String>,    // SHA-256 hash of the keyboard file
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum KeyboardStatus {
+    New,              // Not installed
+    Unchanged,        // Same hash - no update needed
+    Updated,          // Different hash - update available
+    Modified,         // Installed but file missing/corrupted
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KeyboardComparison {
+    pub id: String,
+    pub name: String,
+    pub bundled_path: PathBuf,
+    pub bundled_hash: String,
+    pub installed_hash: Option<String>,
+    pub status: KeyboardStatus,
+    pub icon_data: Option<Vec<u8>>,
 }
 
 pub struct KeyboardManager {
@@ -263,6 +285,9 @@ impl KeyboardManager {
             None
         };
         
+        // Calculate hash of the keyboard file
+        let hash = Self::calculate_hash(&managed_path).ok();
+        
         let info = KeyboardInfo {
             id: keyboard_id.clone(),
             path: managed_path,  // Use the managed path, not the original
@@ -273,6 +298,7 @@ impl KeyboardManager {
             hotkey: None,
             enabled: true,
             color,
+            hash,
         };
         
         self.keyboards.insert(keyboard_id.clone(), info);
@@ -411,6 +437,9 @@ impl KeyboardManager {
                 reg_kb.color
             };
             
+            // Calculate hash if not stored in registry
+            let hash = reg_kb.hash.or_else(|| Self::calculate_hash(&path).ok());
+            
             let info = KeyboardInfo {
                 id: reg_kb.id.clone(),
                 path,
@@ -421,6 +450,7 @@ impl KeyboardManager {
                 hotkey: reg_kb.hotkey.map(|h| normalize_hotkey(&h)),
                 enabled: reg_kb.enabled,
                 color,
+                hash,
             };
             
             self.keyboards.insert(reg_kb.id, info);
@@ -445,6 +475,7 @@ impl KeyboardManager {
             hotkey: info.hotkey.clone(),
             color: info.color.clone(),
             enabled: info.enabled,
+            hash: info.hash.clone(),
         };
         
         registry::save_keyboard(&reg_kb)?;
@@ -520,5 +551,116 @@ impl KeyboardManager {
         }
         
         Ok(())
+    }
+    
+    /// Calculate SHA-256 hash of a file
+    pub fn calculate_hash(file_path: &Path) -> Result<String> {
+        let mut file = std::fs::File::open(file_path)?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0; 8192];
+        
+        loop {
+            let bytes_read = file.read(&mut buffer)?;
+            if bytes_read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..bytes_read]);
+        }
+        
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+    
+    /// Compare bundled keyboards with installed keyboards
+    pub fn compare_with_bundled(&self, bundled_keyboards: Vec<(String, PathBuf)>) -> Result<Vec<KeyboardComparison>> {
+        let mut comparisons = Vec::new();
+        
+        for (keyboard_id, bundled_path) in bundled_keyboards {
+            // Read the bundled keyboard file to get metadata
+            let km2_data = std::fs::read(&bundled_path)?;
+            let km2 = Km2Loader::load(&km2_data)?;
+            let metadata = km2.metadata();
+            
+            let name = metadata.name()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| keyboard_id.clone());
+                
+            let icon_data = metadata.icon()
+                .map(|data| data.to_vec());
+            
+            // Calculate hash of bundled file
+            let bundled_hash = Self::calculate_hash(&bundled_path)?;
+            
+            // Check if keyboard is installed by name
+            let installed_info = self.get_keyboard_by_name(&name);
+            
+            let (installed_hash, status) = match installed_info {
+                Some(info) => {
+                    // Check if file still exists
+                    if info.path.exists() {
+                        // Get or calculate current hash
+                        let current_hash = if let Some(stored_hash) = &info.hash {
+                            stored_hash.clone()
+                        } else {
+                            Self::calculate_hash(&info.path)?
+                        };
+                        
+                        // Compare hashes
+                        let status = if current_hash == bundled_hash {
+                            KeyboardStatus::Unchanged
+                        } else {
+                            KeyboardStatus::Updated
+                        };
+                        
+                        (Some(current_hash), status)
+                    } else {
+                        // File is missing
+                        (info.hash.clone(), KeyboardStatus::Modified)
+                    }
+                }
+                None => (None, KeyboardStatus::New),
+            };
+            
+            comparisons.push(KeyboardComparison {
+                id: keyboard_id,
+                name,
+                bundled_path,
+                bundled_hash,
+                installed_hash,
+                status,
+                icon_data,
+            });
+        }
+        
+        Ok(comparisons)
+    }
+    
+    /// Get keyboard by name (case-insensitive)
+    pub fn get_keyboard_by_name(&self, name: &str) -> Option<&KeyboardInfo> {
+        let name_lower = name.to_lowercase();
+        self.keyboards.values()
+            .find(|kb| kb.name.to_lowercase() == name_lower)
+    }
+    
+    /// Get list of bundled keyboards from app installation directory
+    pub fn get_bundled_keyboards(&self) -> Result<Vec<(String, PathBuf)>> {
+        let app_dir = self.app_paths.get_app_install_dir()?;
+        let keyboards_dir = app_dir.join("keyboards");
+        
+        let mut bundled_keyboards = Vec::new();
+        
+        if keyboards_dir.exists() {
+            for entry in std::fs::read_dir(&keyboards_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                
+                if path.extension().and_then(|e| e.to_str()) == Some("km2") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        bundled_keyboards.push((stem.to_string(), path));
+                    }
+                }
+            }
+        }
+        
+        Ok(bundled_keyboards)
     }
 }

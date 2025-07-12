@@ -814,11 +814,21 @@ async function init() {
   // Set up event listeners
   setupEventListeners();
   
+  // Listen for keyboard import events
+  const { listen } = window.__TAURI__.event;
+  listen('keyboards-imported', async (event) => {
+    console.log('Keyboards imported event received:', event);
+    await loadKeyboards();
+  });
+  
   try {
     keyProcessingEnabled = await invoke('is_key_processing_enabled');
     updateStatusIndicator();
     await loadKeyboards();
     await loadSettings();
+    
+    // Check for first run keyboard scan
+    await checkFirstRunImport();
     
     // Load version for about page if it's the active page
     const activeNavItem = document.querySelector('.nav-item.active');
@@ -887,4 +897,50 @@ async function updateTrayMenu() {
 }
 
 // Start the app when DOM is loaded
+// Import Wizard Functions
+async function checkFirstRunImport() {
+  try {
+    const shouldShowWizard = await invoke('check_first_run_scan_keyboards');
+    if (shouldShowWizard) {
+      await showImportWizard();
+    }
+  } catch (error) {
+    console.error('Failed to check first run:', error);
+  }
+}
+
+async function showImportWizard() {
+  try {
+    // Create a new window for the import wizard
+    const { WebviewWindow } = window.__TAURI__.webviewWindow;
+    
+    const wizardWindow = new WebviewWindow('import-wizard', {
+      url: 'import-wizard.html',
+      title: 'Keyboard Import Wizard',
+      width: 600,
+      height: 500,
+      center: true,
+      resizable: true,
+      skipTaskbar: false,
+      alwaysOnTop: false,
+      decorations: true,
+      transparent: false,
+      maximizable: false,
+      minimizable: false,
+    });
+    
+    // Listen for window close to reload keyboards
+    wizardWindow.once('tauri://closed', async () => {
+      console.log('Import wizard closed, reloading keyboards...');
+      // Reload keyboards after wizard closes
+      await loadKeyboards();
+      console.log('Keyboards reloaded');
+    });
+    
+  } catch (error) {
+    console.error('Failed to show import wizard:', error);
+    showError('Failed to open import wizard: ' + error.message);
+  }
+}
+
 window.addEventListener('DOMContentLoaded', init);

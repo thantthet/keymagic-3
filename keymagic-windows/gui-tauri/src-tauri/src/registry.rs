@@ -33,6 +33,7 @@ const KEYBOARD_DESCRIPTION_VALUE: &str = "Description";
 const KEYBOARD_HOTKEY_VALUE: &str = "Hotkey";
 const KEYBOARD_COLOR_VALUE: &str = "Color";
 const KEYBOARD_ENABLED_VALUE: &str = "Enabled";
+const KEYBOARD_HASH_VALUE: &str = "Hash";
 
 /// Represents a keyboard entry in the registry
 #[derive(Debug, Clone)]
@@ -44,6 +45,7 @@ pub struct RegistryKeyboard {
     pub hotkey: Option<String>,
     pub color: Option<String>,
     pub enabled: bool,
+    pub hash: Option<String>,
 }
 
 /// Registry operation errors
@@ -345,6 +347,7 @@ pub fn load_keyboards() -> Result<Vec<RegistryKeyboard>, RegistryError> {
                 hotkey: read_registry_string(keyboard_key, KEYBOARD_HOTKEY_VALUE).ok(),
                 color: read_registry_string(keyboard_key, KEYBOARD_COLOR_VALUE).ok(),
                 enabled: read_registry_dword(keyboard_key, KEYBOARD_ENABLED_VALUE).unwrap_or(1) != 0,
+                hash: read_registry_string(keyboard_key, KEYBOARD_HASH_VALUE).ok(),
             };
             
             keyboards.push(keyboard);
@@ -371,6 +374,10 @@ pub fn save_keyboard(keyboard: &RegistryKeyboard) -> Result<(), RegistryError> {
     
     if let Some(color) = &keyboard.color {
         write_registry_string(keyboard_key, KEYBOARD_COLOR_VALUE, color)?;
+    }
+    
+    if let Some(hash) = &keyboard.hash {
+        write_registry_string(keyboard_key, KEYBOARD_HASH_VALUE, hash)?;
     }
     
     write_registry_dword(keyboard_key, KEYBOARD_ENABLED_VALUE, if keyboard.enabled { 1 } else { 0 })?;
@@ -484,6 +491,33 @@ pub fn set_setting(key: &str, value: Option<&str>) -> Result<(), RegistryError> 
     
     if let Some(val) = value {
         write_registry_string(settings_key, key, val)?;
+    } else {
+        delete_registry_value(settings_key, key)?;
+    }
+    
+    unsafe { let _ = RegCloseKey(settings_key); }
+    Ok(())
+}
+
+/// Gets a generic DWORD setting value
+pub fn get_setting_dword(key: &str) -> Result<Option<u32>, RegistryError> {
+    match open_registry_key(SETTINGS_KEY) {
+        Ok(settings_key) => {
+            let result = read_registry_dword(settings_key, key).ok();
+            unsafe { let _ = RegCloseKey(settings_key); }
+            Ok(result)
+        }
+        Err(RegistryError::KeyNotFound) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Sets a generic DWORD setting value
+pub fn set_setting_dword(key: &str, value: Option<u32>) -> Result<(), RegistryError> {
+    let settings_key = create_or_open_registry_key(SETTINGS_KEY)?;
+    
+    if let Some(val) = value {
+        write_registry_dword(settings_key, key, val)?;
     } else {
         delete_registry_value(settings_key, key)?;
     }

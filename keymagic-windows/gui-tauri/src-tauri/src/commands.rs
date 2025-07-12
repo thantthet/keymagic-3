@@ -1,4 +1,4 @@
-use crate::keyboard_manager::{KeyboardManager, KeyboardInfo};
+use crate::keyboard_manager::{KeyboardManager, KeyboardInfo, KeyboardComparison};
 use crate::hotkey::HotkeyManager;
 use crate::updater::{UpdateInfo, check_for_updates_async};
 use crate::autostart;
@@ -216,4 +216,60 @@ pub fn get_on_off_hotkey() -> Result<Option<String>, String> {
 #[tauri::command]
 pub async fn check_for_update() -> Result<UpdateInfo, String> {
     check_for_updates_async().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn check_first_run_scan_keyboards() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::get_setting_dword("FirstRunScanKeyboards")
+            .map(|val| val.map(|v| v == 1).unwrap_or(false))
+            .map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(false)
+}
+
+#[tauri::command]
+pub fn clear_first_run_scan_keyboards() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::set_setting_dword("FirstRunScanKeyboards", None)
+            .map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_bundled_keyboards(state: State<KeyboardManagerState>) -> Result<Vec<KeyboardComparison>, String> {
+    let manager = state.lock().map_err(|e| e.to_string())?;
+    
+    // Get list of bundled keyboards
+    let bundled = manager.get_bundled_keyboards()
+        .map_err(|e| e.to_string())?;
+    
+    // Compare with installed keyboards
+    manager.compare_with_bundled(bundled)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_bundled_keyboard(
+    state: State<KeyboardManagerState>,
+    app_handle: AppHandle,
+    bundled_path: PathBuf,
+) -> Result<String, String> {
+    let mut manager = state.lock().map_err(|e| e.to_string())?;
+    
+    // Load the keyboard
+    let keyboard_id = manager.load_keyboard(&bundled_path)
+        .map_err(|e| e.to_string())?;
+    
+    // Update tray
+    crate::tray::update_tray_icon(&app_handle, &manager);
+    
+    Ok(keyboard_id)
 }
