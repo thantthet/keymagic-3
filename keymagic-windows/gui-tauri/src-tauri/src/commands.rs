@@ -261,10 +261,35 @@ pub fn import_bundled_keyboard(
     state: State<KeyboardManagerState>,
     app_handle: AppHandle,
     bundled_path: PathBuf,
+    keyboard_status: String,
 ) -> Result<String, String> {
     let mut manager = state.lock().map_err(|e| e.to_string())?;
     
-    // Load the keyboard
+    // Check if this is an update (keyboard with same name already exists)
+    if keyboard_status == "Updated" {
+        // First, read the bundled keyboard to get its name
+        let km2_data = std::fs::read(&bundled_path)
+            .map_err(|e| format!("Failed to read keyboard file: {}", e))?;
+        let km2 = keymagic_core::km2::Km2Loader::load(&km2_data)
+            .map_err(|e| format!("Failed to parse keyboard file: {}", e))?;
+        let metadata = km2.metadata();
+        
+        let name = metadata.name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| bundled_path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string());
+        
+        // Find existing keyboard with the same name
+        if let Some(existing_keyboard) = manager.get_keyboard_by_name(&name).cloned() {
+            // Remove the old keyboard
+            manager.remove_keyboard(&existing_keyboard.id)
+                .map_err(|e| format!("Failed to remove old keyboard: {}", e))?;
+        }
+    }
+    
+    // Load the new/updated keyboard
     let keyboard_id = manager.load_keyboard(&bundled_path)
         .map_err(|e| e.to_string())?;
     

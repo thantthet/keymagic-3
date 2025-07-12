@@ -170,7 +170,10 @@ async function importSelectedKeyboards() {
     for (const index of selectedKeyboards) {
       const keyboard = bundledKeyboards[index];
       try {
-        await invoke('import_bundled_keyboard', { bundledPath: keyboard.bundled_path });
+        await invoke('import_bundled_keyboard', { 
+          bundledPath: keyboard.bundled_path,
+          keyboardStatus: keyboard.status 
+        });
         results.push({ name: keyboard.name, success: true });
       } catch (error) {
         console.error(`Failed to import ${keyboard.name}:`, error);
