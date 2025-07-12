@@ -41,6 +41,15 @@ keymagic-windows/
 
 ```
 
+## Version Management
+
+KeyMagic Windows uses a centralized version management system. See [VERSION_MANAGEMENT.md](VERSION_MANAGEMENT.md) for details.
+
+- **Current Version**: 3.0.0
+- **Version File**: `version.txt`
+- **Update Script**: `update-version.bat`
+- **Check Script**: `check-versions.bat`
+
 ## Building
 
 ### Prerequisites
