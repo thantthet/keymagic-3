@@ -3,28 +3,28 @@
   "platforms": {
     "windows": {
       "aarch64": {
-        "version": "0.0.1",
-        "releaseDate": "2025-07-11T17:44:14Z",
+        "version": "0.0.2",
+        "releaseDate": "2025-07-12T17:45:25Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.1/KeyMagic3-Setup-0.0.1-arm64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.2/KeyMagic3-Setup-0.0.2-arm64.exe",
         "signature": "",
-        "size": 4709334,
-        "sha256": "5db39a99ea850e5cb35e2f0242d8ca710e2f999fe4ba8c3d47b69e9030c96b41"
+        "size": 4653695,
+        "sha256": "c314dd82693665a8647e6bea6a1a84c0dc19395eba69a655d8fff3c2f7663e5a"
       },
       "x86_64": {
-        "version": "0.0.1",
-        "releaseDate": "2025-07-11T17:44:14Z",
+        "version": "0.0.2",
+        "releaseDate": "2025-07-12T17:45:25Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.1/KeyMagic3-Setup-0.0.1-x64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.2/KeyMagic3-Setup-0.0.2-x64.exe",
         "signature": "",
-        "size": 4666936,
-        "sha256": "cd670061bf4dc133d82a9bc81f4adaa8565581caf45ed02a1fd3bbc31ccd4177"
+        "size": 4709906,
+        "sha256": "f6f724bce95bb0109940e7dbe1ee4ca373300c224bfc456f418c320530bd8d44"
       }
     }
   },
   "releaseNotes": {
-    "0.0.1": {
-      "en": "### KeyMagic 0.0.1\n\n- Hello Typers!\n"
+    "0.0.2": {
+      "en": "### KeyMagic 0.0.2\n\n#### New Features\n- Support for multiple KM2 file format versions (1.3, 1.4, and 1.5)\n- Keyboard icon support - display custom icons for your keyboards\n- Import wizard for easy keyboard setup on first run\n- Automatic color assignment for keyboards without custom icons\n- Better keyboard file management in app data directory\n\n#### Improvements\n- Enhanced active keyboard visibility with outline and badge\n- Simplified build process and utilities\n- Centralized version management\n- Better handling of missing keyboard files\n\n#### Bug Fixes\n- Fixed keyboard replacement during updates\n- Improved installer to properly update existing keyboards\n- Skip import wizard when no keyboards need importing\n"
     }
   }
 }
