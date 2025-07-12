@@ -8,6 +8,9 @@ mod updater;
 mod autostart;
 mod app_paths;
 
+#[cfg(target_os = "windows")]
+mod registry;
+
 use std::sync::{Mutex, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use keyboard_manager::KeyboardManager;
@@ -33,6 +36,14 @@ impl Drop for CleanupHandler {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Ensure registry structure exists
+    #[cfg(target_os = "windows")]
+    {
+        if let Err(e) = registry::ensure_registry_structure() {
+            eprintln!("Failed to ensure registry structure: {}", e);
+        }
+    }
+    
     // Initialize keyboard manager
     let keyboard_manager = KeyboardManager::new()
         .expect("Failed to initialize keyboard manager");

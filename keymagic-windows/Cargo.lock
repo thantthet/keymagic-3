@@ -1566,6 +1566,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-opener",
+ "thiserror 1.0.69",
  "tokio",
  "windows 0.52.0",
  "winreg 0.52.0",

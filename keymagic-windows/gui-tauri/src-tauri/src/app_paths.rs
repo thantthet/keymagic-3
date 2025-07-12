@@ -2,8 +2,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow};
 
 #[cfg(target_os = "windows")]
-use windows::core::*;
-#[cfg(target_os = "windows")]
 use windows::Win32::UI::Shell::{SHGetKnownFolderPath, FOLDERID_LocalAppData, KF_FLAG_CREATE};
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Com::CoTaskMemFree;

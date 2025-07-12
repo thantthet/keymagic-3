@@ -250,42 +250,12 @@ impl HotkeyManager {
     pub fn load_on_off_hotkey(&self, app: &AppHandle) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            use windows::core::*;
-            use windows::Win32::System::Registry::*;
+            use crate::registry;
             
-            unsafe {
-                let mut hkey = HKEY::default();
-                
-                if RegOpenKeyExW(
-                    HKEY_CURRENT_USER,
-                    w!("Software\\KeyMagic\\Settings"),
-                    0,
-                    KEY_READ,
-                    &mut hkey
-                ).is_ok() {
-                    let mut buffer = vec![0u16; 256];
-                    let mut size = buffer.len() as u32 * 2;
-                    let mut data_type = REG_VALUE_TYPE::default();
-                    
-                    let result = RegQueryValueExW(
-                        hkey,
-                        w!("OnOffHotkey"),
-                        None,
-                        Some(&mut data_type),
-                        Some(buffer.as_mut_ptr() as *mut u8),
-                        Some(&mut size),
-                    );
-                    
-                    RegCloseKey(hkey);
-                    
-                    if result.is_ok() {
-                        let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-                        buffer.truncate(len);
-                        let hotkey = String::from_utf16_lossy(&buffer);
-                        if !hotkey.is_empty() {
-                            self.set_on_off_hotkey(app, Some(&hotkey))?;
-                        }
-                    }
+            if let Some(hotkey) = registry::get_on_off_hotkey()
+                .map_err(|e| anyhow!("Failed to get on/off hotkey: {}", e))? {
+                if !hotkey.is_empty() {
+                    self.set_on_off_hotkey(app, Some(&hotkey))?;
                 }
             }
         }
