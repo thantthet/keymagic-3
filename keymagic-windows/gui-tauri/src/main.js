@@ -902,7 +902,22 @@ async function checkFirstRunImport() {
   try {
     const shouldShowWizard = await invoke('check_first_run_scan_keyboards');
     if (shouldShowWizard) {
-      await showImportWizard();
+      // Check if there are actually keyboards to import
+      const bundledKeyboards = await invoke('get_bundled_keyboards');
+      
+      // Filter for keyboards that need importing (new or updated)
+      const keyboardsToImport = bundledKeyboards.filter(kb => 
+        kb.status === 'New' || kb.status === 'Updated'
+      );
+      
+      if (keyboardsToImport.length > 0) {
+        // Show wizard only if there are keyboards to import
+        await showImportWizard();
+      } else {
+        // No keyboards to import, clear the flag without showing wizard
+        await invoke('clear_first_run_scan_keyboards');
+        console.log('No keyboards to import, skipping wizard');
+      }
     }
   } catch (error) {
     console.error('Failed to check first run:', error);
