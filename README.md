@@ -1,6 +1,8 @@
-# KeyMagic Rust Rewrite
+# KeyMagic 3
 
-A modern rewrite of the KeyMagic input method editor in Rust, focusing on performance, memory safety, and cross-platform compatibility.
+**KeyMagic: Rust-powered, vibe-coded, future-ready**
+
+A modern rewrite of the KeyMagic input method editor in Rust, focusing on performance, memory safety, and cross-platform compatibility. This project represents the afterlife of the original KeyMagic IME, rebuilt from the ground up using AI-assisted development techniques.
 
 ## Project Structure
 
