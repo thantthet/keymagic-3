@@ -88,6 +88,9 @@ Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: dword; ValueName: "
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue
 
 [Run]
+; Download and install WebView2 if needed
+Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 Runtime..."; Flags: waituntilterminated; Check: ShouldInstallWebView2; BeforeInstall: DownloadWebView2
+
 ; Register TSF DLL (cleanup of old versions is handled automatically)
 Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#TSFDLLName}"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden; BeforeInstall: CleanupOldTSF
 
@@ -99,17 +102,3 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#TSFDLLName}"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
 #include "common.iss"
-
-[Code]
-// Called before registering the new TSF DLL
-procedure CleanupOldTSF();
-var
-  TSFDir: String;
-  CurrentDLLName: String;
-begin
-  TSFDir := ExpandConstant('{app}\TSF');
-  CurrentDLLName := ExpandConstant('{#TSFDLLName}');
-  
-  // Call the common cleanup function
-  CleanupOldTSFDLLs(TSFDir, CurrentDLLName);
-end;
