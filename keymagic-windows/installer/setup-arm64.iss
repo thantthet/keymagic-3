@@ -7,6 +7,8 @@
 #define MyAppURL "https://github.com/thantthet/keymagic-v3"
 #define MyAppExeName "keymagic.exe"
 #define MyAppArch "ARM64"
+#define MyAppVersionSuffix StringChange(MyAppVersion, '.', '_')
+#define TSFDLLName "KeyMagicTSF_" + MyAppVersionSuffix + ".dll"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -52,8 +54,8 @@ Type: filesandordirs; Name: "{app}\keyboards"
 ; GUI Application
 Source: "..\target\aarch64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
 
-; TSF DLL - ARM64 only
-Source: "..\tsf\build-arm64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF"; Flags: ignoreversion
+; TSF DLL - ARM64 only (with version suffix)
+Source: "..\tsf\build-arm64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF"; DestName: "{#TSFDLLName}"; Flags: ignoreversion
 
 ; Resources
 Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -86,14 +88,28 @@ Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: dword; ValueName: "
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue
 
 [Run]
-; Register TSF DLL
-Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\KeyMagicTSF.dll"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden
+; Register TSF DLL (cleanup of old versions is handled automatically)
+Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#TSFDLLName}"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden; BeforeInstall: CleanupOldTSF
 
 ; Launch application after installation
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Unregister TSF DLL before uninstall
-Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\KeyMagicTSF.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
+Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#TSFDLLName}"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
 #include "common.iss"
+
+[Code]
+// Called before registering the new TSF DLL
+procedure CleanupOldTSF();
+var
+  TSFDir: String;
+  CurrentDLLName: String;
+begin
+  TSFDir := ExpandConstant('{app}\TSF');
+  CurrentDLLName := ExpandConstant('{#TSFDLLName}');
+  
+  // Call the common cleanup function
+  CleanupOldTSFDLLs(TSFDir, CurrentDLLName);
+end;

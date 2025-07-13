@@ -1,6 +1,69 @@
 ; Common functions and procedures shared between x64 and ARM64 installers
 
 [Code]
+// Convert version string to DLL suffix (e.g., "0.0.2" -> "0_0_2")
+function GetVersionSuffix(Version: String): String;
+begin
+  Result := Version;
+  StringChangeEx(Result, '.', '_', True);
+end;
+
+// Schedule a file for deletion on next Windows restart
+procedure ScheduleFileForDeletion(FileName: String);
+begin
+  // Use MoveFileEx with MOVEFILE_DELAY_UNTIL_REBOOT flag
+  // This schedules the file for deletion on next restart
+  if not RenameFile(FileName, FileName + '.delete') then
+  begin
+    Log('Could not rename file for deletion: ' + FileName);
+  end
+  else
+  begin
+    // Add to pending file operations
+    RestartReplace(FileName + '.delete', '');
+  end;
+end;
+
+// Find and schedule old TSF DLLs for deletion
+procedure CleanupOldTSFDLLs(TSFDir: String; CurrentDLLName: String);
+var
+  FindRec: TFindRec;
+  DLLPath: String;
+  ResultCode: Integer;
+begin
+  // Find all KeyMagicTSF_*.dll files
+  if FindFirst(TSFDir + '\KeyMagicTSF_*.dll', FindRec) then
+  begin
+    try
+      repeat
+        // Skip the current version DLL
+        if FindRec.Name <> CurrentDLLName then
+        begin
+          DLLPath := TSFDir + '\' + FindRec.Name;
+          Log('Found old TSF DLL: ' + DLLPath);
+          
+          // Try to unregister it first (ignore errors as it might fail if in use)
+          Exec('regsvr32.exe', '/s /u "' + DLLPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+          
+          // Try to delete it
+          if not DeleteFile(DLLPath) then
+          begin
+            // If deletion fails (likely because it's in use), schedule for deletion on restart
+            Log('Scheduling for deletion on restart: ' + DLLPath);
+            ScheduleFileForDeletion(DLLPath);
+          end
+          else
+          begin
+            Log('Deleted old TSF DLL: ' + DLLPath);
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
 // Check if Windows 10 or later
 function IsWindows10OrLater: Boolean;
 var
