@@ -502,6 +502,11 @@ body {
   margin-bottom: 20px;
 }
 
+.about-logo img {
+  display: block;
+  margin: 0 auto;
+}
+
 .about-content h2 {
   font-size: 24px;
   margin-bottom: 10px;
