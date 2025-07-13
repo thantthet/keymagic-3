@@ -259,6 +259,7 @@ pub fn get_bundled_keyboards(state: State<KeyboardManagerState>) -> Result<Vec<K
 #[tauri::command]
 pub fn import_bundled_keyboard(
     state: State<KeyboardManagerState>,
+    hotkey_manager: State<HotkeyManager>,
     app_handle: AppHandle,
     bundled_path: PathBuf,
     keyboard_status: String,
@@ -292,6 +293,11 @@ pub fn import_bundled_keyboard(
     // Load the new/updated keyboard
     let keyboard_id = manager.load_keyboard(&bundled_path)
         .map_err(|e| e.to_string())?;
+    
+    // Refresh hotkeys
+    if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
+        eprintln!("Failed to refresh hotkeys: {}", e);
+    }
     
     // Update tray
     crate::tray::update_tray_icon(&app_handle, &manager);
