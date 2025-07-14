@@ -7,6 +7,7 @@ mod registry_notifier;
 mod updater;
 mod autostart;
 mod app_paths;
+mod windows_event;
 
 #[cfg(target_os = "windows")]
 mod registry;
@@ -41,6 +42,11 @@ pub fn run() {
     {
         if let Err(e) = registry::ensure_registry_structure() {
             eprintln!("Failed to ensure registry structure: {}", e);
+        }
+        
+        // Initialize the global event for TSF communication
+        if let Err(e) = windows_event::initialize_global_event() {
+            eprintln!("Failed to initialize global event: {}", e);
         }
     }
     

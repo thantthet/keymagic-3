@@ -63,12 +63,10 @@ public:
 
 private:
     // Helper methods
-    BOOL InitializeEngine();
     void UninitializeEngine();
     HKEY OpenSettingsKey(REGSAM samDesired);
     BOOL LoadKeyboard(const std::wstring& km2Path);
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
-    void CheckAndReloadKeyboard();
     void ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
     void ProcessKeyWithSendInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
     void ResetEngine();
@@ -136,11 +134,19 @@ private:
     
     // SendInput signatures
     static const ULONG_PTR KEYMAGIC_EXTRAINFO_SIGNATURE = 0x4B4D5453; // "KMTS" in hex
-    static const ULONG_PTR KEYMAGIC_REGISTRY_RELOAD_SIGNATURE = 0x4B4D5252; // "KMRR" in hex
     
     // Processing state
     bool m_isProcessingKey;
     DWORD m_lastSendInputTime;
+    
+    // Event monitoring
+    HANDLE m_hRegistryUpdateEvent;
+    HANDLE m_hEventThread;
+    bool m_bEventThreadRunning;
+    bool m_bIsForeground;
+    static DWORD WINAPI EventMonitorThreadProc(LPVOID lpParam);
+    HRESULT StartEventMonitoring();
+    HRESULT StopEventMonitoring();
     
     // Friend classes
     friend class CDirectEditSession;

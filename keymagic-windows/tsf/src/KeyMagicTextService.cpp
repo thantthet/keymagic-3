@@ -110,9 +110,15 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_dwMouseSinkCookie = TF_INVALID_COOKIE;
     m_pDocMgrFocus = nullptr;
     m_pTextEditContext = nullptr;
-    m_pEngine = nullptr;
     m_tsfEnabled = true;  // Default to enabled
     m_pCompositionMgr = nullptr;
+    
+    // Create engine
+    m_pEngine = keymagic_engine_new();
+    if (!m_pEngine)
+    {
+        DEBUG_LOG(L"Failed to create KeyMagic engine");
+    }
     m_supportsComposition = FALSE;  // Not using composition anymore
     
     // Initialize display attributes
@@ -121,6 +127,12 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_inputDisplayAttributeAtom = TF_INVALID_GUIDATOM;
     
     m_isProcessingKey = false;
+    
+    // Initialize event monitoring
+    m_hRegistryUpdateEvent = nullptr;
+    m_hEventThread = nullptr;
+    m_bEventThreadRunning = false;
+    m_bIsForeground = false;
     m_lastSendInputTime = 0;
     
     
@@ -150,6 +162,9 @@ CKeyMagicTextService::~CKeyMagicTextService()
         delete[] m_ppDisplayAttributeInfo;
         m_ppDisplayAttributeInfo = nullptr;
     }
+    
+    // Stop event monitoring
+    StopEventMonitoring();
     
     UninitializeEngine();
     DeleteCriticalSection(&m_cs);
@@ -223,15 +238,6 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
     m_pThreadMgr->AddRef();
     m_tfClientId = tid;
 
-    // Initialize engine
-    if (!InitializeEngine())
-    {
-        DEBUG_LOG(L"Failed to initialize engine");
-        LeaveCriticalSection(&m_cs);
-        return E_FAIL;
-    }
-    DEBUG_LOG(L"Engine initialized successfully");
-
     // Register thread manager event sink
     ITfSource *pSource;
     if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource)))
@@ -252,8 +258,8 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
     RegisterDisplayAttributeProvider();
     CreateDisplayAttributeInfo();
     
-    // Load initial keyboard
-    CheckAndReloadKeyboard();
+    // Load initial keyboard and settings
+    ReloadRegistrySettings();
     
 
     LeaveCriticalSection(&m_cs);
@@ -389,9 +395,6 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
         // Lost focus entirely, reset engine
         ResetEngine();
     }
-    
-    // Check and reload keyboard for new context
-    CheckAndReloadKeyboard();
 
     LeaveCriticalSection(&m_cs);
     return S_OK;
@@ -412,11 +415,22 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
 {
     DEBUG_LOG_FUNC();
     
-    // Reload registry settings when window gains focus
+    m_bIsForeground = fForeground ? true : false;
+    
     if (fForeground)
     {
-        DEBUG_LOG(L"Window gained focus, reloading registry settings");
+        DEBUG_LOG(L"Window gained focus");
+        
+        // Start event monitoring when gaining focus
+        StartEventMonitoring();
+        
+        // Also reload registry settings immediately
         ReloadRegistrySettings();
+    }
+    else
+    {
+        DEBUG_LOG(L"Window lost focus");
+        // We keep the monitoring thread running but it won't actively wait when not in foreground
     }
     
     return S_OK;
@@ -492,14 +506,6 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         return S_OK;
     }
     
-    // Check if this is a registry reload notification
-    if (extraInfo == KEYMAGIC_REGISTRY_RELOAD_SIGNATURE)
-    {
-        *pfEaten = TRUE;
-        DEBUG_LOG(L"Registry reload notification received via SendInput");
-        ReloadRegistrySettings();
-        return S_OK;
-    }
     
     // Also check time-based filtering for VK_BACK as GetMessageExtraInfo is not reliable
     // Skip VK_BACK if we recently sent input (within 50ms)
@@ -659,56 +665,6 @@ HKEY CKeyMagicTextService::OpenSettingsKey(REGSAM samDesired)
     return nullptr;
 }
 
-BOOL CKeyMagicTextService::InitializeEngine()
-{
-    if (m_pEngine)
-        return TRUE;
-
-    m_pEngine = keymagic_engine_new();
-    if (!m_pEngine)
-        return FALSE;
-
-    // Load default keyboard from registry
-    HKEY hKey = OpenSettingsKey(KEY_READ);
-    if (hKey)
-    {
-        wchar_t defaultKeyboard[256] = {0};
-        DWORD dataSize = sizeof(defaultKeyboard);
-        DWORD dataType;
-        
-        if (RegQueryValueExW(hKey, L"DefaultKeyboard", NULL, &dataType, (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
-        {
-            if (dataType == REG_SZ && defaultKeyboard[0] != L'\0')
-            {
-                DEBUG_LOG(L"Default keyboard from registry: " + std::wstring(defaultKeyboard));
-                
-                // Load the keyboard
-                LoadKeyboardByID(defaultKeyboard);
-            }
-        }
-        else
-        {
-            DEBUG_LOG(L"No default keyboard set in registry");
-        }
-        
-        RegCloseKey(hKey);
-    }
-    else
-    {
-        DEBUG_LOG(L"Failed to open KeyMagic settings registry key");
-    }
-
-    // read KeyProcessingEnabled from registry using RegGetValue
-    DWORD keyProcessingEnabled = 1;
-    DWORD dataSize = sizeof(keyProcessingEnabled);
-    DWORD dataType;
-    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", L"KeyProcessingEnabled", RRF_RT_REG_DWORD, &dataType, (LPBYTE)&keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
-    {
-        DEBUG_LOG(L"InitializeEngine::KeyProcessingEnabled: " + std::to_wstring(keyProcessingEnabled));
-        m_tsfEnabled = (keyProcessingEnabled != 0);
-    }
-    return TRUE;
-}
 
 void CKeyMagicTextService::UninitializeEngine()
 {
@@ -740,8 +696,19 @@ BOOL CKeyMagicTextService::LoadKeyboard(const std::wstring& km2Path)
 
 BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
 {
-    if (!m_pEngine || keyboardId.empty())
+    if (keyboardId.empty())
         return FALSE;
+    
+    // Ensure engine exists (should have been created in constructor)
+    if (!m_pEngine)
+    {
+        m_pEngine = keymagic_engine_new();
+        if (!m_pEngine)
+        {
+            DEBUG_LOG(L"Failed to create KeyMagic engine");
+            return FALSE;
+        }
+    }
 
     // Build registry key path for this keyboard
     std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + keyboardId;
@@ -752,17 +719,16 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
         // Read keyboard path
         wchar_t km2Path[MAX_PATH] = {0};
         DWORD dataSize = sizeof(km2Path);
-        DWORD dataType;
         
-        if (RegQueryValueExW(hKey, L"Path", NULL, &dataType, (LPBYTE)km2Path, &dataSize) == ERROR_SUCCESS)
+        if (RegGetValueW(hKey, NULL, L"Path", RRF_RT_REG_SZ, NULL, km2Path, &dataSize) == ERROR_SUCCESS)
         {
-            if (dataType == REG_SZ && km2Path[0] != L'\0')
+            if (km2Path[0] != L'\0')
             {
                 // Check if keyboard is enabled
                 DWORD enabled = 0;
                 dataSize = sizeof(enabled);
                 
-                if (RegQueryValueExW(hKey, L"Enabled", NULL, &dataType, (LPBYTE)&enabled, &dataSize) == ERROR_SUCCESS)
+                if (RegGetValueW(hKey, NULL, L"Enabled", RRF_RT_REG_DWORD, NULL, &enabled, &dataSize) == ERROR_SUCCESS)
                 {
                     if (!enabled)
                     {
@@ -783,7 +749,7 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
                     // Read keyboard name
                     wchar_t name[256] = {0};
                     dataSize = sizeof(name);
-                    if (RegQueryValueExW(hKey, L"Name", NULL, &dataType, (LPBYTE)name, &dataSize) == ERROR_SUCCESS)
+                    if (RegGetValueW(hKey, NULL, L"Name", RRF_RT_REG_SZ, NULL, name, &dataSize) == ERROR_SUCCESS)
                     {
                         DEBUG_LOG(L"Loaded keyboard: " + std::wstring(name) + L" (" + keyboardId + L")");
                     }
@@ -804,47 +770,6 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
     return FALSE;
 }
 
-void CKeyMagicTextService::CheckAndReloadKeyboard()
-{
-    // Check if default keyboard has changed
-    HKEY hKey = OpenSettingsKey(KEY_READ);
-    if (hKey)
-    {
-        // First check if TSF is enabled
-        DWORD tsfEnabled = 1; // Default to enabled
-        DWORD dataSize = sizeof(tsfEnabled);
-        DWORD dataType;
-        
-        RegQueryValueExW(hKey, L"KeyProcessingEnabled", NULL, &dataType, (LPBYTE)&tsfEnabled, &dataSize);
-        m_tsfEnabled = (tsfEnabled != 0);
-        
-        if (!m_tsfEnabled)
-        {
-            DEBUG_LOG(L"Key processing is disabled");
-            RegCloseKey(hKey);
-            return;
-        }
-        
-        // Check default keyboard
-        wchar_t defaultKeyboard[256] = {0};
-        dataSize = sizeof(defaultKeyboard);
-        
-        if (RegQueryValueExW(hKey, L"DefaultKeyboard", NULL, &dataType, (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
-        {
-            if (dataType == REG_SZ && defaultKeyboard[0] != L'\0')
-            {
-                std::wstring newKeyboardId(defaultKeyboard);
-                if (newKeyboardId != m_currentKeyboardId)
-                {
-                    DEBUG_LOG(L"Default keyboard changed from \"" + m_currentKeyboardId + L"\" to \"" + newKeyboardId + L"\"");
-                    LoadKeyboardByID(newKeyboardId);
-                }
-            }
-        }
-        
-        RegCloseKey(hKey);
-    }
-}
 
 void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
@@ -1034,9 +959,6 @@ void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARA
         LeaveCriticalSection(&m_cs);
         return;
     }
-    
-    // Check if keyboard needs to be reloaded
-    CheckAndReloadKeyboard();
     
     // Check if TSF is disabled
     if (!m_tsfEnabled)
@@ -1790,11 +1712,10 @@ void CKeyMagicTextService::ReloadRegistrySettings()
     if (hKey)
     {
         // Read KeyProcessingEnabled
-        DWORD keyProcessingEnabled = 1;
+        DWORD keyProcessingEnabled = 0;  // Default to disabled
         DWORD dataSize = sizeof(keyProcessingEnabled);
-        DWORD dataType;
-        if (RegQueryValueExW(hKey, L"KeyProcessingEnabled", NULL, &dataType, 
-                           (LPBYTE)&keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
+        if (RegGetValueW(hKey, NULL, L"KeyProcessingEnabled", RRF_RT_REG_DWORD, 
+                         NULL, &keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
         {
             DEBUG_LOG(L"Read KeyProcessingEnabled: " + std::to_wstring(keyProcessingEnabled));
         }
@@ -1802,13 +1723,10 @@ void CKeyMagicTextService::ReloadRegistrySettings()
         // Read DefaultKeyboard
         wchar_t defaultKeyboard[256] = {0};
         dataSize = sizeof(defaultKeyboard);
-        if (RegQueryValueExW(hKey, L"DefaultKeyboard", NULL, &dataType, 
-                           (LPBYTE)defaultKeyboard, &dataSize) == ERROR_SUCCESS)
+        if (RegGetValueW(hKey, NULL, L"DefaultKeyboard", RRF_RT_REG_SZ, 
+                         NULL, defaultKeyboard, &dataSize) == ERROR_SUCCESS)
         {
-            if (dataType == REG_SZ)
-            {
-                DEBUG_LOG(L"Read DefaultKeyboard: " + std::wstring(defaultKeyboard));
-            }
+            DEBUG_LOG(L"Read DefaultKeyboard: " + std::wstring(defaultKeyboard));
         }
         
         RegCloseKey(hKey);
@@ -1820,4 +1738,161 @@ void CKeyMagicTextService::ReloadRegistrySettings()
     {
         DEBUG_LOG(L"Failed to open registry key for reading");
     }
+}
+
+// Event monitoring implementation
+HRESULT CKeyMagicTextService::StartEventMonitoring()
+{
+    DEBUG_LOG(L"StartEventMonitoring called");
+    
+    // Don't start if already running
+    if (m_bEventThreadRunning)
+    {
+        DEBUG_LOG(L"Event monitoring already running");
+        return S_OK;
+    }
+    
+    // Try to open the global event first
+    m_hRegistryUpdateEvent = OpenEventW(
+        SYNCHRONIZE | EVENT_MODIFY_STATE,
+        FALSE,
+        L"Global\\KeyMagicRegistryUpdate"
+    );
+    
+    if (!m_hRegistryUpdateEvent)
+    {
+        DWORD dwError = GetLastError();
+        DEBUG_LOG(L"Failed to open registry update event. Error: " + std::to_wstring(dwError));
+        
+        // If event doesn't exist (ERROR_FILE_NOT_FOUND), try to create it
+        if (dwError == ERROR_FILE_NOT_FOUND)
+        {
+            DEBUG_LOG(L"Event doesn't exist, trying to create it");
+            
+            // Create security descriptor with NULL DACL for universal access
+            SECURITY_DESCRIPTOR sd;
+            InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
+            SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE);
+            
+            SECURITY_ATTRIBUTES sa;
+            sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+            sa.lpSecurityDescriptor = &sd;
+            sa.bInheritHandle = FALSE;
+            
+            m_hRegistryUpdateEvent = CreateEventW(
+                &sa,
+                TRUE,  // Manual reset
+                FALSE, // Initial state
+                L"Global\\KeyMagicRegistryUpdate"
+            );
+            
+            if (!m_hRegistryUpdateEvent)
+            {
+                dwError = GetLastError();
+                DEBUG_LOG(L"Failed to create registry update event. Error: " + std::to_wstring(dwError));
+                // Don't fail completely - TSF can still work without event monitoring
+                return S_OK;
+            }
+            else
+            {
+                DEBUG_LOG(L"Successfully created registry update event");
+            }
+        }
+        else
+        {
+            // Other error (e.g., access denied)
+            // Don't fail completely - TSF can still work without event monitoring
+            return S_OK;
+        }
+    }
+    
+    // Create monitoring thread
+    m_bEventThreadRunning = true;
+    m_hEventThread = CreateThread(
+        nullptr,
+        0,
+        EventMonitorThreadProc,
+        this,
+        0,
+        nullptr
+    );
+    
+    if (!m_hEventThread)
+    {
+        DEBUG_LOG(L"Failed to create event monitor thread");
+        m_bEventThreadRunning = false;
+        CloseHandle(m_hRegistryUpdateEvent);
+        m_hRegistryUpdateEvent = nullptr;
+        return E_FAIL;
+    }
+    
+    DEBUG_LOG(L"Event monitoring started successfully");
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::StopEventMonitoring()
+{
+    DEBUG_LOG(L"StopEventMonitoring called");
+    
+    // Signal thread to stop
+    m_bEventThreadRunning = false;
+    
+    // Signal the event to wake up the thread if it's waiting
+    if (m_hRegistryUpdateEvent)
+    {
+        SetEvent(m_hRegistryUpdateEvent);
+    }
+    
+    // Wait for thread to finish
+    if (m_hEventThread)
+    {
+        WaitForSingleObject(m_hEventThread, 1000);  // Wait max 1 second
+        CloseHandle(m_hEventThread);
+        m_hEventThread = nullptr;
+    }
+    
+    // Close event handle
+    if (m_hRegistryUpdateEvent)
+    {
+        CloseHandle(m_hRegistryUpdateEvent);
+        m_hRegistryUpdateEvent = nullptr;
+    }
+    
+    DEBUG_LOG(L"Event monitoring stopped");
+    return S_OK;
+}
+
+DWORD WINAPI CKeyMagicTextService::EventMonitorThreadProc(LPVOID lpParam)
+{
+    CKeyMagicTextService* pThis = static_cast<CKeyMagicTextService*>(lpParam);
+    
+    DEBUG_LOG(L"Event monitor thread started");
+    
+    while (pThis->m_bEventThreadRunning)
+    {
+        // Only wait for events if we're in foreground
+        if (pThis->m_bIsForeground && pThis->m_hRegistryUpdateEvent)
+        {
+            DWORD dwResult = WaitForSingleObject(pThis->m_hRegistryUpdateEvent, 500);  // Check every 500ms
+            
+            if (dwResult == WAIT_OBJECT_0)
+            {
+                DEBUG_LOG(L"Registry update event signaled");
+                
+                // Reset the event (manual reset event)
+                ResetEvent(pThis->m_hRegistryUpdateEvent);
+                
+                // Reload registry settings
+                pThis->ReloadRegistrySettings();
+            }
+        }
+        else
+        {
+            // Not in foreground, just sleep
+            Sleep(500);
+        }
+    }
+    
+    DEBUG_LOG(L"Event monitor thread exiting");
+    return 0;
 }
