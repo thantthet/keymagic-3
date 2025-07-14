@@ -137,6 +137,8 @@ pub struct KeyboardHook {
     hook: RwLock<Option<HHOOK>>,
     hotkeys: Arc<Mutex<HashMap<String, HotkeyState>>>,
     modifier_state: Arc<Mutex<u32>>,
+    last_modifier_state: Arc<Mutex<u32>>,
+    modifier_only_candidate: Arc<Mutex<Option<u32>>>,
 }
 
 impl KeyboardHook {
@@ -145,6 +147,8 @@ impl KeyboardHook {
             hook: RwLock::new(None),
             hotkeys: Arc::new(Mutex::new(HashMap::new())),
             modifier_state: Arc::new(Mutex::new(0)),
+            last_modifier_state: Arc::new(Mutex::new(0)),
+            modifier_only_candidate: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -206,6 +210,16 @@ impl KeyboardHook {
 
     fn process_key(&self, vk_code: u32, is_keydown: bool) -> bool {
         let mut modifier_state = self.modifier_state.lock().unwrap();
+        let mut last_modifier_state = self.last_modifier_state.lock().unwrap();
+        let mut modifier_only_candidate = self.modifier_only_candidate.lock().unwrap();
+        
+        let is_modifier_key = match vk_code {
+            vk if vk == VK_CONTROL.0 as u32 || vk == VK_LCONTROL.0 as u32 || vk == VK_RCONTROL.0 as u32 => true,
+            vk if vk == VK_MENU.0 as u32 || vk == VK_LMENU.0 as u32 || vk == VK_RMENU.0 as u32 => true,
+            vk if vk == VK_SHIFT.0 as u32 || vk == VK_LSHIFT.0 as u32 || vk == VK_RSHIFT.0 as u32 => true,
+            vk if vk == VK_LWIN.0 as u32 || vk == VK_RWIN.0 as u32 => true,
+            _ => false,
+        };
         
         // Update modifier state
         match vk_code {
@@ -241,50 +255,81 @@ impl KeyboardHook {
         }
 
         let current_modifiers = *modifier_state;
-        drop(modifier_state);
-
+        
         // Track if we should eat this key event
         let mut should_eat_key = false;
 
-        // Check hotkeys
-        let mut hotkeys = self.hotkeys.lock().unwrap();
-        
-        for (_, state) in hotkeys.iter_mut() {
+        // Handle modifier-only hotkey detection
+        if is_modifier_key {
             if is_keydown {
-                // For modifier-only hotkeys
-                if state.hotkey.vk_code.is_none() {
-                    // Check if exact modifiers are pressed
-                    if current_modifiers == state.hotkey.modifiers && !state.triggered {
-                        state.triggered = true;
-                        (state.callback)();
-                        // Don't eat modifier-only hotkeys
+                // When a modifier is pressed, set it as a candidate
+                *modifier_only_candidate = Some(current_modifiers);
+            } else {
+                // When a modifier is released, check if we should trigger a modifier-only hotkey
+                if let Some(candidate_modifiers) = *modifier_only_candidate {
+                    // Only trigger if we're releasing from the candidate state without any regular keys pressed
+                    if *last_modifier_state == candidate_modifiers && current_modifiers != candidate_modifiers {
+                        // Check for matching modifier-only hotkeys
+                        let mut hotkeys = self.hotkeys.lock().unwrap();
+                        for (_, state) in hotkeys.iter_mut() {
+                            if state.hotkey.vk_code.is_none() && state.hotkey.modifiers == candidate_modifiers && !state.triggered {
+                                state.triggered = true;
+                                (state.callback)();
+                                break;
+                            }
+                        }
                     }
-                } else if let Some(hotkey_vk) = state.hotkey.vk_code {
-                    // For hotkeys with a regular key
-                    if vk_code == hotkey_vk && current_modifiers == state.hotkey.modifiers && !state.triggered {
-                        state.triggered = true;
-                        (state.callback)();
-                        // Eat the key event for hotkeys with regular keys
-                        should_eat_key = true;
+                }
+                // Clear candidate when any modifier is released
+                *modifier_only_candidate = None;
+            }
+        } else {
+            // Non-modifier key pressed - clear modifier-only candidate
+            if is_keydown {
+                *modifier_only_candidate = None;
+                
+                // Check hotkeys with regular keys
+                let mut hotkeys = self.hotkeys.lock().unwrap();
+                for (_, state) in hotkeys.iter_mut() {
+                    if let Some(hotkey_vk) = state.hotkey.vk_code {
+                        // For hotkeys with a regular key
+                        if vk_code == hotkey_vk && current_modifiers == state.hotkey.modifiers && !state.triggered {
+                            state.triggered = true;
+                            (state.callback)();
+                            // Eat the key event for hotkeys with regular keys
+                            should_eat_key = true;
+                        }
                     }
                 }
             } else {
-                // Reset triggered state when any key is released
-                if state.triggered {
-                    // For modifier-only hotkeys, reset when any modifier is released
-                    if state.hotkey.vk_code.is_none() {
-                        if current_modifiers != state.hotkey.modifiers {
-                            state.triggered = false;
-                        }
-                    } else if let Some(hotkey_vk) = state.hotkey.vk_code {
-                        // For regular hotkeys, reset when the key or modifiers are released
-                        if vk_code == hotkey_vk || current_modifiers != state.hotkey.modifiers {
-                            state.triggered = false;
+                // Reset triggered state for regular hotkeys when key is released
+                let mut hotkeys = self.hotkeys.lock().unwrap();
+                for (_, state) in hotkeys.iter_mut() {
+                    if state.triggered {
+                        if let Some(hotkey_vk) = state.hotkey.vk_code {
+                            // For regular hotkeys, reset when the key is released
+                            if vk_code == hotkey_vk {
+                                state.triggered = false;
+                            }
                         }
                     }
                 }
             }
         }
+        
+        // Reset triggered state for modifier-only hotkeys when modifiers change
+        if current_modifiers != *last_modifier_state {
+            let mut hotkeys = self.hotkeys.lock().unwrap();
+            for (_, state) in hotkeys.iter_mut() {
+                if state.triggered && state.hotkey.vk_code.is_none() {
+                    if current_modifiers != state.hotkey.modifiers {
+                        state.triggered = false;
+                    }
+                }
+            }
+        }
+        
+        *last_modifier_state = current_modifiers;
         
         should_eat_key
     }
