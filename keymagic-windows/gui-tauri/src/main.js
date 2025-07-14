@@ -686,10 +686,12 @@ let updateInfo = null;
 window.checkForUpdates = async function() {
   const button = document.querySelector('button[onclick="checkForUpdates()"]');
   const statusElement = document.getElementById('update-status');
+  const statusContainer = document.getElementById('update-status-container');
   
   // Show loading state
   button.disabled = true;
   button.textContent = 'Checking...';
+  statusContainer.style.display = 'block';
   statusElement.textContent = 'Checking for updates...';
   statusElement.className = 'update-status checking';
   
@@ -757,11 +759,18 @@ window.showUpdateWindow = async function(updateInfo) {
 
 // Load current version on settings page
 async function loadCurrentVersion() {
-  // Don't load version here - it will be loaded when checking for updates
-  // Just ensure the element shows "-" initially
-  const currentVersionElement = document.getElementById('current-version');
-  if (currentVersionElement) {
-    currentVersionElement.textContent = '-';
+  try {
+    const currentVersionElement = document.getElementById('current-version');
+    if (currentVersionElement) {
+      const version = await invoke('get_app_version');
+      currentVersionElement.textContent = version;
+    }
+  } catch (error) {
+    console.error('Failed to load current version:', error);
+    const currentVersionElement = document.getElementById('current-version');
+    if (currentVersionElement) {
+      currentVersionElement.textContent = '-';
+    }
   }
 }
 

@@ -725,23 +725,43 @@ body {
   gap: 15px;
 }
 
-.update-info {
+.update-card {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.update-card-content {
+  padding: 20px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.update-version-info h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .current-version {
+  margin: 4px 0 0 0;
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.update-status-container {
+  border-top: 1px solid var(--border-color);
 }
 
 .update-status {
   font-size: 14px;
   font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 4px;
-  display: inline-block;
+  padding: 12px 20px;
+  text-align: center;
 }
 
 .update-status.checking {
@@ -767,14 +787,6 @@ body {
 .update-actions {
   display: flex;
   gap: 10px;
-}
-
-.update-notes {
-  margin-top: 15px;
-  padding: 15px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  border-left: 4px solid var(--primary-color);
 }
 
 .update-notes h4 {

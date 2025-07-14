@@ -108,12 +108,17 @@
               <h2>Updates</h2>
               <div class="setting-item">
                 <div class="update-settings">
-                  <div class="update-info" id="update-info">
-                    <p class="current-version">Current version: <span id="current-version">Loading...</span></p>
-                    <p class="update-status" id="update-status"></p>
-                  </div>
-                  <div class="update-actions">
-                    <button class="btn btn-primary" onclick="checkForUpdates()">Check for Updates</button>
+                  <div class="update-card">
+                    <div class="update-card-content">
+                      <div class="update-version-info">
+                        <h3>KeyMagic 3</h3>
+                        <p class="current-version">Version <span id="current-version">Loading...</span></p>
+                      </div>
+                      <button class="btn btn-primary" onclick="checkForUpdates()">Check for Updates</button>
+                    </div>
+                    <div class="update-status-container" id="update-status-container" style="display: none;">
+                      <div class="update-status" id="update-status"></div>
+                    </div>
                   </div>
                 </div>
               </div>
