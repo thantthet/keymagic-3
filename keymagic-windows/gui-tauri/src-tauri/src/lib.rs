@@ -9,6 +9,9 @@ mod app_paths;
 mod windows_event;
 
 #[cfg(target_os = "windows")]
+mod keyboard_hook;
+
+#[cfg(target_os = "windows")]
 mod registry;
 
 use std::sync::{Mutex, Arc};
@@ -65,7 +68,6 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .manage(Mutex::new(keyboard_manager))
         .manage(HotkeyManager::new())

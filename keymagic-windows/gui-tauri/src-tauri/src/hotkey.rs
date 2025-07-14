@@ -1,19 +1,28 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, Emitter};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, ShortcutState, Shortcut};
 use anyhow::{Result, anyhow};
 
 use crate::keyboard_manager::KeyboardManager;
+use crate::keyboard_hook::KeyboardHook;
 
 pub struct HotkeyManager {
+    keyboard_hook: Arc<KeyboardHook>,
     registered_hotkeys: Mutex<HashMap<String, String>>, // hotkey -> keyboard_id
     on_off_hotkey: Mutex<Option<String>>, // Global on/off hotkey
 }
 
 impl HotkeyManager {
     pub fn new() -> Self {
+        let hook = KeyboardHook::new();
+        
+        // Install the keyboard hook
+        if let Err(e) = hook.install() {
+            eprintln!("Failed to install keyboard hook: {}", e);
+        }
+        
         Self {
+            keyboard_hook: hook,
             registered_hotkeys: Mutex::new(HashMap::new()),
             on_off_hotkey: Mutex::new(None),
         }
@@ -54,7 +63,7 @@ impl HotkeyManager {
         // If any hotkeys failed, return an error with details
         if !failed_hotkeys.is_empty() {
             return Err(anyhow!(
-                "Failed to register hotkeys for: {}. Note: Modifier-only hotkeys (e.g., 'Ctrl+Shift') may not be supported.",
+                "Failed to register hotkeys for: {}",
                 failed_hotkeys.join(", ")
             ));
         }
@@ -64,89 +73,76 @@ impl HotkeyManager {
 
     /// Register a single hotkey for a keyboard
     pub fn register_hotkey(&self, app: &AppHandle, keyboard_id: &str, hotkey: &str) -> Result<()> {
-        let shortcut = app.global_shortcut();
-        
-        // Parse the hotkey string for validation
-        let (_modifiers, _key_code) = parse_hotkey(hotkey)?;
-        
-        // Clone values for the closure and storage
+        // Clone values for the closure
         let keyboard_id_str = keyboard_id.to_string();
-        let keyboard_id_clone = keyboard_id_str.clone();
         let app_handle = app.clone();
         
-        // Register the shortcut
-        shortcut
-            .on_shortcut(hotkey, move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    // Switch to this keyboard
-                    let state = app_handle.state::<Mutex<KeyboardManager>>();
-                    let (switch_result, keyboard_name, was_enabled) = if let Ok(mut manager) = state.lock() {
-                        let was_enabled = manager.is_key_processing_enabled();
-                        let result = manager.set_active_keyboard(&keyboard_id_clone);
-                        
-                        // Enable key processing when switching keyboards via hotkey
-                        if result.is_ok() && !was_enabled {
-                            let _ = manager.set_key_processing_enabled(true);
-                        }
-                        
-                        let name = if result.is_ok() {
-                            manager.get_keyboards()
-                                .iter()
-                                .find(|k| k.id == keyboard_id_clone)
-                                .map(|k| k.name.clone())
-                                .unwrap_or_else(|| keyboard_id_clone.clone())
-                        } else {
-                            keyboard_id_clone.clone()
-                        };
-                        (result, name, was_enabled)
-                    } else {
-                        (Err(anyhow::anyhow!("Failed to lock keyboard manager")), keyboard_id_clone.clone(), false)
-                    };
-                    
-                    if let Err(e) = switch_result {
-                        eprintln!("Failed to switch keyboard: {}", e);
-                    } else {
-                        // Re-acquire lock for tray updates
-                        if let Ok(manager) = state.lock() {
-                            // Update tray menu and icon
-                            crate::tray::update_tray_menu(&app_handle, &manager);
-                            crate::tray::update_tray_icon(&app_handle, &manager);
-                        }
-                        
-                        // Emit event to update UI
-                        let _ = app_handle.emit("keyboard-switched", &keyboard_id_clone);
-                        
-                        // If key processing was just enabled, emit that event too
-                        if !was_enabled {
-                            let _ = app_handle.emit("key_processing_changed", true);
-                        }
-                        
-                        // Show native HUD notification
-                        if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
-                            eprintln!("Failed to show HUD: {}", e);
-                        }
-                    }
+        // Register the hotkey with our keyboard hook
+        self.keyboard_hook.register_hotkey(hotkey, move || {
+            // Switch to this keyboard
+            let state = app_handle.state::<Mutex<KeyboardManager>>();
+            let (switch_result, keyboard_name, was_enabled) = if let Ok(mut manager) = state.lock() {
+                let was_enabled = manager.is_key_processing_enabled();
+                let result = manager.set_active_keyboard(&keyboard_id_str);
+                
+                // Enable key processing when switching keyboards via hotkey
+                if result.is_ok() && !was_enabled {
+                    let _ = manager.set_key_processing_enabled(true);
                 }
-            })
-            .map_err(|e| anyhow!("Failed to register hotkey {}: {}", hotkey, e))?;
+                
+                let name = if result.is_ok() {
+                    manager.get_keyboards()
+                        .iter()
+                        .find(|k| k.id == keyboard_id_str)
+                        .map(|k| k.name.clone())
+                        .unwrap_or_else(|| keyboard_id_str.clone())
+                } else {
+                    keyboard_id_str.clone()
+                };
+                (result, name, was_enabled)
+            } else {
+                (Err(anyhow::anyhow!("Failed to lock keyboard manager")), keyboard_id_str.clone(), false)
+            };
+            
+            if let Err(e) = switch_result {
+                eprintln!("Failed to switch keyboard: {}", e);
+            } else {
+                // Re-acquire lock for tray updates
+                if let Ok(manager) = state.lock() {
+                    // Update tray menu and icon
+                    crate::tray::update_tray_menu(&app_handle, &manager);
+                    crate::tray::update_tray_icon(&app_handle, &manager);
+                }
+                
+                // Emit event to update UI
+                let _ = app_handle.emit("keyboard-switched", &keyboard_id_str);
+                
+                // If key processing was just enabled, emit that event too
+                if !was_enabled {
+                    let _ = app_handle.emit("key_processing_changed", true);
+                }
+                
+                // Show native HUD notification
+                if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
+                    eprintln!("Failed to show HUD: {}", e);
+                }
+            }
+        })?;
 
         // Store the registration
         let mut registered = self.registered_hotkeys.lock().unwrap();
-        registered.insert(hotkey.to_string(), keyboard_id_str);
+        registered.insert(hotkey.to_string(), keyboard_id.to_string());
 
         Ok(())
     }
 
     /// Unregister all hotkeys
     pub fn unregister_all_hotkeys(&self, app: &AppHandle) -> Result<()> {
-        let shortcut = app.global_shortcut();
-        
         // Save the on/off hotkey before clearing
         let on_off_key = self.on_off_hotkey.lock().unwrap().clone();
         
-        // Unregister all shortcuts
-        shortcut.unregister_all()
-            .map_err(|e| anyhow!("Failed to unregister hotkeys: {}", e))?;
+        // Unregister all hotkeys from keyboard hook
+        self.keyboard_hook.unregister_all_hotkeys()?;
 
         // Clear the registration map
         let mut registered = self.registered_hotkeys.lock().unwrap();
@@ -167,43 +163,34 @@ impl HotkeyManager {
 
     /// Register the global on/off hotkey
     pub fn register_on_off_hotkey(&self, app: &AppHandle, hotkey: &str) -> Result<()> {
-        let shortcut = app.global_shortcut();
-        
-        // Parse the hotkey string for validation
-        let (_modifiers, _key_code) = parse_hotkey(hotkey)?;
-        
         let app_handle = app.clone();
         
-        // Register the shortcut
-        shortcut
-            .on_shortcut(hotkey, move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    // Toggle key processing
-                    let state = app_handle.state::<Mutex<KeyboardManager>>();
-                    if let Ok(mut manager) = state.lock() {
-                        let current_state = manager.is_key_processing_enabled();
-                        let new_state = !current_state;
-                        
-                        if let Err(e) = manager.set_key_processing_enabled(new_state) {
-                            eprintln!("Failed to toggle key processing: {}", e);
-                        } else {
-                            // Update tray menu and icon
-                            crate::tray::update_tray_menu(&app_handle, &manager);
-                            crate::tray::update_tray_icon(&app_handle, &manager);
-                            
-                            // Emit event to update UI
-                            let _ = app_handle.emit("key_processing_changed", new_state);
-                            
-                            // Show HUD notification
-                            let status = if new_state { "Enabled" } else { "Disabled" };
-                            if let Err(e) = crate::hud::show_status_hud(&format!("KeyMagic {}", status)) {
-                                eprintln!("Failed to show HUD: {}", e);
-                            }
-                        }
-                    };
+        // Register the hotkey with our keyboard hook
+        self.keyboard_hook.register_hotkey(hotkey, move || {
+            // Toggle key processing
+            let state = app_handle.state::<Mutex<KeyboardManager>>();
+            if let Ok(mut manager) = state.lock() {
+                let current_state = manager.is_key_processing_enabled();
+                let new_state = !current_state;
+                
+                if let Err(e) = manager.set_key_processing_enabled(new_state) {
+                    eprintln!("Failed to toggle key processing: {}", e);
+                } else {
+                    // Update tray menu and icon
+                    crate::tray::update_tray_menu(&app_handle, &manager);
+                    crate::tray::update_tray_icon(&app_handle, &manager);
+                    
+                    // Emit event to update UI
+                    let _ = app_handle.emit("key_processing_changed", new_state);
+                    
+                    // Show HUD notification
+                    let status = if new_state { "Enabled" } else { "Disabled" };
+                    if let Err(e) = crate::hud::show_status_hud(&format!("KeyMagic {}", status)) {
+                        eprintln!("Failed to show HUD: {}", e);
+                    }
                 }
-            })
-            .map_err(|e| anyhow!("Failed to register on/off hotkey {}: {}", hotkey, e))?;
+            };
+        })?;
 
         // Store the registration
         let mut on_off = self.on_off_hotkey.lock().unwrap();
@@ -216,17 +203,7 @@ impl HotkeyManager {
     pub fn unregister_on_off_hotkey(&self, app: &AppHandle) -> Result<()> {
         let mut on_off = self.on_off_hotkey.lock().unwrap();
         if let Some(hotkey_str) = on_off.take() {
-            let shortcut = app.global_shortcut();
-            // Parse the hotkey string back to Shortcut
-            match hotkey_str.parse::<Shortcut>() {
-                Ok(hotkey) => {
-                    shortcut.unregister(hotkey)
-                        .map_err(|e| anyhow!("Failed to unregister on/off hotkey: {}", e))?;
-                }
-                Err(e) => {
-                    eprintln!("Failed to parse hotkey '{}': {}", hotkey_str, e);
-                }
-            }
+            self.keyboard_hook.unregister_hotkey(&hotkey_str)?;
         }
         Ok(())
     }
@@ -264,114 +241,8 @@ impl HotkeyManager {
     }
 }
 
-/// Parse a hotkey string like "Ctrl+Shift+M" or "Ctrl+Shift" into Tauri modifiers and optional key code
-fn parse_hotkey(hotkey: &str) -> Result<(Modifiers, Option<Code>)> {
-    let parts: Vec<&str> = hotkey.split('+').collect();
-    if parts.is_empty() {
-        return Err(anyhow!("Invalid hotkey format"));
+impl Drop for HotkeyManager {
+    fn drop(&mut self) {
+        // The keyboard hook will uninstall itself when dropped
     }
-
-    let mut modifiers = Modifiers::empty();
-    let mut key_code = None;
-
-    // Process all parts to identify modifiers and regular keys
-    for part in parts.iter() {
-        let part = part.trim();
-        
-        // Try to parse as modifier first
-        match part.to_lowercase().as_str() {
-            "ctrl" | "control" => modifiers |= Modifiers::CONTROL,
-            "alt" => modifiers |= Modifiers::ALT,
-            "shift" => modifiers |= Modifiers::SHIFT,
-            "cmd" | "win" | "super" | "meta" => modifiers |= Modifiers::META,
-            _ => {
-                // Not a modifier, try to parse as a regular key
-                if key_code.is_some() {
-                    return Err(anyhow!("Multiple non-modifier keys specified"));
-                }
-                
-                // Parse the key code
-                key_code = Some(match part.to_uppercase().as_str() {
-                    "A" => Code::KeyA,
-                    "B" => Code::KeyB,
-                    "C" => Code::KeyC,
-                    "D" => Code::KeyD,
-                    "E" => Code::KeyE,
-                    "F" => Code::KeyF,
-                    "G" => Code::KeyG,
-                    "H" => Code::KeyH,
-                    "I" => Code::KeyI,
-                    "J" => Code::KeyJ,
-                    "K" => Code::KeyK,
-                    "L" => Code::KeyL,
-                    "M" => Code::KeyM,
-                    "N" => Code::KeyN,
-                    "O" => Code::KeyO,
-                    "P" => Code::KeyP,
-                    "Q" => Code::KeyQ,
-                    "R" => Code::KeyR,
-                    "S" => Code::KeyS,
-                    "T" => Code::KeyT,
-                    "U" => Code::KeyU,
-                    "V" => Code::KeyV,
-                    "W" => Code::KeyW,
-                    "X" => Code::KeyX,
-                    "Y" => Code::KeyY,
-                    "Z" => Code::KeyZ,
-                    "0" => Code::Digit0,
-                    "1" => Code::Digit1,
-                    "2" => Code::Digit2,
-                    "3" => Code::Digit3,
-                    "4" => Code::Digit4,
-                    "5" => Code::Digit5,
-                    "6" => Code::Digit6,
-                    "7" => Code::Digit7,
-                    "8" => Code::Digit8,
-                    "9" => Code::Digit9,
-                    "F1" => Code::F1,
-                    "F2" => Code::F2,
-                    "F3" => Code::F3,
-                    "F4" => Code::F4,
-                    "F5" => Code::F5,
-                    "F6" => Code::F6,
-                    "F7" => Code::F7,
-                    "F8" => Code::F8,
-                    "F9" => Code::F9,
-                    "F10" => Code::F10,
-                    "F11" => Code::F11,
-                    "F12" => Code::F12,
-                    "SPACE" => Code::Space,
-                    "TAB" => Code::Tab,
-                    "ENTER" | "RETURN" => Code::Enter,
-                    "ESC" | "ESCAPE" => Code::Escape,
-                    "BACKSPACE" => Code::Backspace,
-                    "DELETE" => Code::Delete,
-                    "INSERT" => Code::Insert,
-                    "HOME" => Code::Home,
-                    "END" => Code::End,
-                    "PAGEUP" => Code::PageUp,
-                    "PAGEDOWN" => Code::PageDown,
-                    "LEFT" => Code::ArrowLeft,
-                    "RIGHT" => Code::ArrowRight,
-                    "UP" => Code::ArrowUp,
-                    "DOWN" => Code::ArrowDown,
-                    _ => return Err(anyhow!("Unknown key: {}", part)),
-                });
-            }
-        }
-    }
-
-    // Validate: must have at least one modifier
-    if modifiers.is_empty() {
-        return Err(anyhow!("Hotkey must include at least one modifier (Ctrl, Alt, Shift, or Win/Cmd)"));
-    }
-
-    // Warn about potential issues with modifier-only hotkeys
-    if key_code.is_none() {
-        // Note: We still return Ok, but the caller should be aware this might not work
-        eprintln!("Warning: Modifier-only hotkey '{}' may not be supported by the system", hotkey);
-    }
-
-    // Both modifiers-only and modifiers+key are valid from parsing perspective
-    Ok((modifiers, key_code))
 }
