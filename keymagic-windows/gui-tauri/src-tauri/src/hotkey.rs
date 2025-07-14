@@ -79,33 +79,44 @@ impl HotkeyManager {
         
         // Register the hotkey with our keyboard hook
         self.keyboard_hook.register_hotkey(hotkey, move || {
-            // Switch to this keyboard
+            // Toggle this keyboard
             let state = app_handle.state::<Mutex<KeyboardManager>>();
-            let (switch_result, keyboard_name, was_enabled) = if let Ok(mut manager) = state.lock() {
-                let was_enabled = manager.is_key_processing_enabled();
-                let result = manager.set_active_keyboard(&keyboard_id_str);
+            let (action_result, keyboard_name, key_processing_changed) = if let Ok(mut manager) = state.lock() {
+                let current_active = manager.get_active_keyboard();
+                let is_key_processing_enabled = manager.is_key_processing_enabled();
                 
-                // Enable key processing when switching keyboards via hotkey
-                if result.is_ok() && !was_enabled {
-                    let _ = manager.set_key_processing_enabled(true);
-                }
+                // Check if this keyboard is currently active
+                let is_currently_active = current_active == Some(&keyboard_id_str);
                 
-                let name = if result.is_ok() {
-                    manager.get_keyboards()
-                        .iter()
-                        .find(|k| k.id == keyboard_id_str)
-                        .map(|k| k.name.clone())
-                        .unwrap_or_else(|| keyboard_id_str.clone())
+                let (result, _action_name, key_processing_changed) = if is_currently_active && is_key_processing_enabled {
+                    // This keyboard is active and processing is enabled - disable processing
+                    let disable_result = manager.set_key_processing_enabled(false);
+                    (disable_result, "disabled", true)
                 } else {
-                    keyboard_id_str.clone()
+                    // Either this keyboard is not active or processing is disabled - activate it
+                    let switch_result = manager.set_active_keyboard(&keyboard_id_str);
+                    if switch_result.is_ok() && !is_key_processing_enabled {
+                        // Also enable key processing if it was disabled
+                        let _ = manager.set_key_processing_enabled(true);
+                        (switch_result, "activated", true)
+                    } else {
+                        (switch_result, "activated", false)
+                    }
                 };
-                (result, name, was_enabled)
+                
+                let name = manager.get_keyboards()
+                    .iter()
+                    .find(|k| k.id == keyboard_id_str)
+                    .map(|k| k.name.clone())
+                    .unwrap_or_else(|| keyboard_id_str.clone());
+                
+                (result, name, key_processing_changed)
             } else {
                 (Err(anyhow::anyhow!("Failed to lock keyboard manager")), keyboard_id_str.clone(), false)
             };
             
-            if let Err(e) = switch_result {
-                eprintln!("Failed to switch keyboard: {}", e);
+            if let Err(e) = action_result {
+                eprintln!("Failed to toggle keyboard: {}", e);
             } else {
                 // Re-acquire lock for tray updates
                 if let Ok(manager) = state.lock() {
@@ -117,14 +128,28 @@ impl HotkeyManager {
                 // Emit event to update UI
                 let _ = app_handle.emit("keyboard-switched", &keyboard_id_str);
                 
-                // If key processing was just enabled, emit that event too
-                if !was_enabled {
-                    let _ = app_handle.emit("key_processing_changed", true);
+                // If key processing state changed, emit that event too
+                if key_processing_changed {
+                    if let Ok(manager) = state.lock() {
+                        let is_enabled = manager.is_key_processing_enabled();
+                        let _ = app_handle.emit("key_processing_changed", is_enabled);
+                    }
                 }
                 
-                // Show native HUD notification
-                if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
-                    eprintln!("Failed to show HUD: {}", e);
+                // Show native HUD notification with appropriate status
+                if let Ok(manager) = state.lock() {
+                    let is_enabled = manager.is_key_processing_enabled();
+                    if is_enabled {
+                        // Show the keyboard name when enabled
+                        if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
+                            eprintln!("Failed to show HUD: {}", e);
+                        }
+                    } else {
+                        // Show "KeyMagic Disabled" when disabled
+                        if let Err(e) = crate::hud::show_status_hud("KeyMagic Disabled") {
+                            eprintln!("Failed to show HUD: {}", e);
+                        }
+                    }
                 }
             }
         })?;
