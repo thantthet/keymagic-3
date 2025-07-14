@@ -110,7 +110,7 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_dwMouseSinkCookie = TF_INVALID_COOKIE;
     m_pDocMgrFocus = nullptr;
     m_pTextEditContext = nullptr;
-    m_tsfEnabled = true;  // Default to enabled
+    m_tsfEnabled = false;  // Default to disabled
     m_pCompositionMgr = nullptr;
     
     // Create engine
@@ -1718,6 +1718,10 @@ void CKeyMagicTextService::ReloadRegistrySettings()
                          NULL, &keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
         {
             DEBUG_LOG(L"Read KeyProcessingEnabled: " + std::to_wstring(keyProcessingEnabled));
+        }
+        else
+        {
+            DEBUG_LOG(L"KeyProcessingEnabled not found in registry, using default: 0 (disabled)");
         }
         
         // Read DefaultKeyboard

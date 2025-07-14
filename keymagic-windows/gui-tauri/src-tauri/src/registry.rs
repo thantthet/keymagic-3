@@ -428,11 +428,11 @@ pub fn get_key_processing_enabled() -> Result<bool, RegistryError> {
     match open_registry_key(SETTINGS_KEY) {
         Ok(settings_key) => {
             let enabled = read_registry_dword(settings_key, KEY_PROCESSING_ENABLED_VALUE)
-                .unwrap_or(1) != 0;
+                .unwrap_or(0) != 0;  // Default to disabled
             unsafe { let _ = RegCloseKey(settings_key); }
             Ok(enabled)
         }
-        Err(RegistryError::KeyNotFound) => Ok(true), // Default to enabled
+        Err(RegistryError::KeyNotFound) => Ok(false), // Default to disabled
         Err(e) => Err(e),
     }
 }

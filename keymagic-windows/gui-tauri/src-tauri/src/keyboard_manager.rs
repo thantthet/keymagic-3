@@ -360,7 +360,7 @@ impl KeyboardManager {
     pub fn is_key_processing_enabled(&self) -> bool {
         #[cfg(target_os = "windows")]
         {
-            registry::get_key_processing_enabled().unwrap_or(true)
+            registry::get_key_processing_enabled().unwrap_or(false)
         }
         #[cfg(not(target_os = "windows"))]
         {
