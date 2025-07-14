@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KeyMagic Update Available</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .header {
+      background-color: #fff;
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .version-info {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .version-info span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .version-info .current {
+      color: #666;
+    }
+
+    .version-info .new {
+      color: #4CAF50;
+      font-weight: 600;
+    }
+
+    .arrow {
+      color: #999;
+    }
+
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background-color: #fff;
+      margin: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .release-notes {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #444;
+    }
+
+    .release-notes h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    .release-notes h3 {
+      font-size: 16px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .release-notes ul {
+      margin-left: 20px;
+      margin-bottom: 15px;
+    }
+
+    .release-notes li {
+      margin-bottom: 8px;
+    }
+
+    .release-notes p {
+      margin-bottom: 15px;
+    }
+
+    .release-notes code {
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: "SF Mono", Monaco, "Courier New", monospace;
+      font-size: 13px;
+    }
+
+    .release-notes pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin-bottom: 15px;
+    }
+
+    .release-notes pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+
+    .release-notes blockquote {
+      border-left: 4px solid #ddd;
+      padding-left: 15px;
+      margin: 15px 0;
+      color: #666;
+    }
+
+    .footer {
+      padding: 20px;
+      background-color: #fff;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: #007acc;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #005a9e;
+    }
+
+    .btn-secondary {
+      background-color: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background-color: #d0d0d0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: #d32f2f;
+    }
+
+    /* Markdown specific styles */
+    .release-notes a {
+      color: #007acc;
+      text-decoration: none;
+    }
+
+    .release-notes a:hover {
+      text-decoration: underline;
+    }
+
+    .release-notes strong {
+      font-weight: 600;
+    }
+
+    .release-notes em {
+      font-style: italic;
+    }
+
+    .release-notes hr {
+      border: none;
+      border-top: 1px solid #e0e0e0;
+      margin: 20px 0;
+    }
+
+    .release-notes table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 15px;
+    }
+
+    .release-notes th,
+    .release-notes td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+
+    .release-notes th {
+      background-color: #f5f5f5;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Update Available</h1>
+    <div class="version-info">
+      <span class="current">Current: <span id="current-version">-</span></span>
+      <span class="arrow">→</span>
+      <span class="new">New: <span id="new-version">-</span></span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="loading-state" class="loading">Loading update information...</div>
+    <div id="error-state" class="error" style="display: none;">Failed to load update information</div>
+    <div id="release-notes" class="release-notes" style="display: none;">
+      <h2>What's New</h2>
+      <div id="release-notes-content"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn btn-secondary" onclick="remindLater()">Remind Me Later</button>
+    <button class="btn btn-primary" onclick="downloadUpdate()">Download Update</button>
+  </div>
+
+  <script src="update-window.js"></script>
+</body>
+</html>

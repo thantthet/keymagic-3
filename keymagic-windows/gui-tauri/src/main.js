@@ -686,9 +686,6 @@ let updateInfo = null;
 window.checkForUpdates = async function() {
   const button = document.querySelector('button[onclick="checkForUpdates()"]');
   const statusElement = document.getElementById('update-status');
-  const downloadBtn = document.getElementById('download-update-btn');
-  const updateNotes = document.getElementById('update-notes');
-  const releaseNotesContent = document.getElementById('release-notes-content');
   
   // Show loading state
   button.disabled = true;
@@ -706,44 +703,55 @@ window.checkForUpdates = async function() {
       statusElement.textContent = `New version ${updateInfo.latest_version} is available!`;
       statusElement.className = 'update-status available';
       
-      // Show download button if download URL is available
-      if (updateInfo.download_url) {
-        downloadBtn.style.display = 'inline-block';
-      }
-      
-      // Show release notes if available
-      if (updateInfo.release_notes) {
-        updateNotes.style.display = 'block';
-        // Simple text rendering without markdown parsing
-        releaseNotesContent.textContent = updateInfo.release_notes;
-      }
+      // Open update window
+      await showUpdateWindow(updateInfo);
     } else {
       statusElement.textContent = 'You are using the latest version.';
       statusElement.className = 'update-status up-to-date';
-      downloadBtn.style.display = 'none';
-      updateNotes.style.display = 'none';
     }
   } catch (error) {
     console.error('Failed to check for updates:', error);
     statusElement.textContent = 'Failed to check for updates. Please try again later.';
     statusElement.className = 'update-status error';
-    downloadBtn.style.display = 'none';
-    updateNotes.style.display = 'none';
   } finally {
     button.disabled = false;
     button.textContent = 'Check for Updates';
   }
 }
 
-window.downloadUpdate = async function() {
-  if (updateInfo && updateInfo.download_url) {
-    try {
-      const { open } = window.__TAURI__.shell;
-      await open(updateInfo.download_url);
-    } catch (error) {
-      console.error('Failed to open download URL:', error);
-      showError('Failed to open download page');
+// Show update window
+window.showUpdateWindow = async function(updateInfo) {
+  try {
+    // Check if we should show the update (remind me later logic)
+    const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
+    if (remindAfterStr) {
+      const remindAfter = parseInt(remindAfterStr);
+      if (!isNaN(remindAfter) && Date.now() < remindAfter) {
+        // Still in "remind later" period, don't show window
+        console.log('Update window skipped due to remind later setting');
+        return;
+      }
     }
+    
+    // Create update window
+    const { WebviewWindow } = window.__TAURI__.webviewWindow;
+    
+    const updateWindow = new WebviewWindow('update-window', {
+      url: `update-window.html?updateInfo=${encodeURIComponent(JSON.stringify(updateInfo))}`,
+      title: 'KeyMagic Update Available',
+      width: 600,
+      height: 450,
+      center: true,
+      resizable: true,
+      alwaysOnTop: false,
+      decorations: true,
+      transparent: false,
+      maximizable: false,
+      minimizable: true,
+    });
+    
+  } catch (error) {
+    console.error('Failed to show update window:', error);
   }
 }
 
@@ -782,7 +790,7 @@ function showUpdateNotification(updateInfo) {
   banner.innerHTML = `
     <div class="update-notification-content">
       <span>New version ${updateInfo.latest_version} is available!</span>
-      <button class="btn-link" onclick="switchPage('settings'); checkForUpdates(); this.parentElement.parentElement.remove();">
+      <button class="btn-link" onclick="window.showUpdateWindow(${JSON.stringify(updateInfo).replace(/"/g, '&quot;')}); this.parentElement.parentElement.remove();">
         View Details
       </button>
       <button class="btn-link" onclick="this.parentElement.parentElement.remove();">
@@ -882,8 +890,8 @@ async function setupTrayEventListeners() {
   // Listen for update available notification
   await listen('update_available', async (event) => {
     const updateInfo = event.payload;
-    // Show a subtle notification in the UI
-    showUpdateNotification(updateInfo);
+    // Show update window directly on automatic check
+    await showUpdateWindow(updateInfo);
   });
 }
 
