@@ -204,7 +204,7 @@ impl KeyboardHook {
         Ok(())
     }
 
-    fn process_key(&self, vk_code: u32, is_keydown: bool) {
+    fn process_key(&self, vk_code: u32, is_keydown: bool) -> bool {
         let mut modifier_state = self.modifier_state.lock().unwrap();
         
         // Update modifier state
@@ -243,6 +243,9 @@ impl KeyboardHook {
         let current_modifiers = *modifier_state;
         drop(modifier_state);
 
+        // Track if we should eat this key event
+        let mut should_eat_key = false;
+
         // Check hotkeys
         let mut hotkeys = self.hotkeys.lock().unwrap();
         
@@ -254,12 +257,15 @@ impl KeyboardHook {
                     if current_modifiers == state.hotkey.modifiers && !state.triggered {
                         state.triggered = true;
                         (state.callback)();
+                        // Don't eat modifier-only hotkeys
                     }
                 } else if let Some(hotkey_vk) = state.hotkey.vk_code {
                     // For hotkeys with a regular key
                     if vk_code == hotkey_vk && current_modifiers == state.hotkey.modifiers && !state.triggered {
                         state.triggered = true;
                         (state.callback)();
+                        // Eat the key event for hotkeys with regular keys
+                        should_eat_key = true;
                     }
                 }
             } else {
@@ -279,6 +285,8 @@ impl KeyboardHook {
                 }
             }
         }
+        
+        should_eat_key
     }
 }
 
@@ -293,7 +301,10 @@ unsafe extern "system" fn low_level_keyboard_proc(
             let vk_code = kb_struct.vkCode;
             let is_keydown = wparam.0 == WM_KEYDOWN as usize || wparam.0 == WM_SYSKEYDOWN as usize;
             
-            hook.process_key(vk_code, is_keydown);
+            // If process_key returns true, eat the key event
+            if hook.process_key(vk_code, is_keydown) {
+                return LRESULT(1); // Non-zero return value prevents further processing
+            }
         }
     }
     
