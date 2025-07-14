@@ -13,8 +13,17 @@
 #define DEBUG_LOG(msg) DebugLog(msg)
 #define DEBUG_LOG_W(msg) DebugLog(msg)
 #define DEBUG_LOG_FUNC() DebugLog(__FUNCTIONW__)
-#define DEBUG_LOG_KEY(context, wParam, lParam, character) DebugLogKeyEvent(context, wParam, lParam, character)
-#define DEBUG_LOG_ENGINE(output) DebugLogEngineOutput(output)
+
+// Censor sensitive data in Release builds
+#ifdef _DEBUG
+    #define DEBUG_LOG_KEY(context, wParam, lParam, character) DebugLogKeyEvent(context, wParam, lParam, character)
+    #define DEBUG_LOG_ENGINE(output) DebugLogEngineOutput(output)
+#else
+    // Release build - censor key events and engine output
+    #define DEBUG_LOG_KEY(context, wParam, lParam, character) DebugLogKeyCensored(context, wParam)
+    #define DEBUG_LOG_ENGINE(output) DebugLogEngineCensored(output)
+#endif
+
 #define DEBUG_LOG_HR(context, hr) DebugLogHR(context, hr)
 // DEBUG_LOG_UTF8 is deprecated - all DEBUG_LOG calls now automatically format Unicode
 
@@ -173,6 +182,69 @@ inline void DebugLogEngineOutput(const ProcessKeyOutput& output)
     if (output.composing_text) {
         std::string comp(output.composing_text);
         oss << L", Composing: \"" << FormatStringWithUnicodeNotation(comp) << L"\"";
+    }
+    
+    DebugLog(oss.str());
+}
+
+// Censored version for Release builds - only logs key type without actual values
+inline void DebugLogKeyCensored(const std::wstring& context, WPARAM wParam)
+{
+    std::wostringstream oss;
+    oss << context << L" - ";
+    
+    // Only log key categories, not actual keys
+    if (wParam >= 'A' && wParam <= 'Z') {
+        oss << L"[LETTER KEY]";
+    } else if (wParam >= '0' && wParam <= '9') {
+        oss << L"[DIGIT KEY]";
+    } else if (wParam == VK_SPACE) {
+        oss << L"[SPACE]";
+    } else if (wParam == VK_RETURN) {
+        oss << L"[ENTER]";
+    } else if (wParam == VK_BACK) {
+        oss << L"[BACKSPACE]";
+    } else if (wParam == VK_TAB) {
+        oss << L"[TAB]";
+    } else if (wParam == VK_ESCAPE) {
+        oss << L"[ESCAPE]";
+    } else if (wParam >= VK_F1 && wParam <= VK_F12) {
+        oss << L"[FUNCTION KEY]";
+    } else {
+        oss << L"[OTHER KEY]";
+    }
+    
+    // Show modifiers since they're not sensitive
+    if (GetKeyState(VK_SHIFT) & 0x8000) oss << L" [SHIFT]";
+    if (GetKeyState(VK_CONTROL) & 0x8000) oss << L" [CTRL]";
+    if (GetKeyState(VK_MENU) & 0x8000) oss << L" [ALT]";
+    if (GetKeyState(VK_CAPITAL) & 0x0001) oss << L" [CAPS]";
+    
+    DebugLog(oss.str());
+}
+
+// Censored engine output for Release builds - no text content
+inline void DebugLogEngineCensored(const ProcessKeyOutput& output)
+{
+    std::wostringstream oss;
+    oss << L"Engine Output - Processed: " << (output.is_processed ? L"YES" : L"NO");
+    oss << L", Action: ";
+    
+    switch (output.action_type) {
+        case 0: oss << L"None"; break;
+        case 1: oss << L"Insert"; break;
+        case 2: oss << L"Delete(" << output.delete_count << L")"; break;
+        case 3: oss << L"DeleteAndInsert(" << output.delete_count << L")"; break;
+        default: oss << L"Unknown(" << output.action_type << L")"; break;
+    }
+    
+    // Don't log actual text content in release builds
+    if (output.text) {
+        oss << L", Text: [REDACTED]";
+    }
+    
+    if (output.composing_text) {
+        oss << L", Composing: [REDACTED]";
     }
     
     DebugLog(oss.str());
