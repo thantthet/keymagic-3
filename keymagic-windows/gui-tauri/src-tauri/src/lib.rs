@@ -5,7 +5,6 @@ mod hotkey;
 mod hud;
 mod registry_notifier;
 mod updater;
-mod autostart;
 mod app_paths;
 mod windows_event;
 
@@ -17,6 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use keyboard_manager::KeyboardManager;
 use hotkey::HotkeyManager;
 use tauri::{Manager, Emitter};
+use tauri_plugin_autostart::ManagerExt;
 
 // Cleanup handler that disables key processing on drop
 struct CleanupHandler {
@@ -58,6 +58,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .manage(Mutex::new(keyboard_manager))
         .manage(HotkeyManager::new())
         .invoke_handler(tauri::generate_handler![
@@ -91,11 +92,22 @@ pub fn run() {
                 }
             }
             
-            // Sync autostart setting with actual Windows Run registry
+            // Sync autostart setting with plugin
             #[cfg(target_os = "windows")]
             {
-                if let Err(e) = autostart::sync_autostart_with_preference() {
-                    eprintln!("Failed to sync autostart setting: {}", e);
+                if let Ok(Some(setting)) = registry::get_setting("StartWithWindows") {
+                    let should_be_enabled = setting == "1";
+                    let autostart_manager = app.autolaunch();
+                    let is_enabled = autostart_manager.is_enabled().unwrap_or(false);
+                    
+                    // Sync if they don't match
+                    if should_be_enabled != is_enabled {
+                        if should_be_enabled {
+                            let _ = autostart_manager.enable();
+                        } else {
+                            let _ = autostart_manager.disable();
+                        }
+                    }
                 }
             }
             

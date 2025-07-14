@@ -18,13 +18,11 @@ use windows::Win32::System::Registry::{
 const KEYMAGIC_ROOT: &str = "Software\\KeyMagic";
 const KEYBOARDS_KEY: &str = "Software\\KeyMagic\\Keyboards";
 const SETTINGS_KEY: &str = "Software\\KeyMagic\\Settings";
-const WINDOWS_RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
 // Registry value names
 const DEFAULT_KEYBOARD_VALUE: &str = "DefaultKeyboard";
 const KEY_PROCESSING_ENABLED_VALUE: &str = "KeyProcessingEnabled";
 const ON_OFF_HOTKEY_VALUE: &str = "OnOffHotkey";
-const KEYMAGIC_AUTOSTART_VALUE: &str = "KeyMagic";
 
 // Keyboard entry value names
 const KEYBOARD_PATH_VALUE: &str = "Path";
@@ -526,41 +524,6 @@ pub fn set_setting_dword(key: &str, value: Option<u32>) -> Result<(), RegistryEr
     Ok(())
 }
 
-// ===== Autostart Management =====
-
-/// Checks if autostart is enabled
-pub fn is_autostart_enabled() -> Result<bool, RegistryError> {
-    match open_registry_key(WINDOWS_RUN_KEY) {
-        Ok(run_key) => {
-            let result = read_registry_string(run_key, KEYMAGIC_AUTOSTART_VALUE).is_ok();
-            unsafe { let _ = RegCloseKey(run_key); }
-            Ok(result)
-        }
-        Err(_) => Ok(false),
-    }
-}
-
-/// Sets autostart enabled/disabled
-pub fn set_autostart_enabled(enabled: bool, exe_path: Option<&PathBuf>) -> Result<(), RegistryError> {
-    let run_key = match create_or_open_registry_key(WINDOWS_RUN_KEY) {
-        Ok(key) => key,
-        Err(_) => return Err(RegistryError::OpenKeyFailed(WINDOWS_RUN_KEY.to_string())),
-    };
-    
-    if enabled {
-        if let Some(path) = exe_path {
-            let path_str = path.to_string_lossy();
-            write_registry_string(run_key, KEYMAGIC_AUTOSTART_VALUE, &path_str)?;
-        } else {
-            return Err(RegistryError::WriteValueFailed("No executable path provided".to_string()));
-        }
-    } else {
-        delete_registry_value(run_key, KEYMAGIC_AUTOSTART_VALUE)?;
-    }
-    
-    unsafe { let _ = RegCloseKey(run_key); }
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {

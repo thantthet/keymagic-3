@@ -1,10 +1,10 @@
 use crate::keyboard_manager::{KeyboardManager, KeyboardInfo, KeyboardComparison};
 use crate::hotkey::HotkeyManager;
 use crate::updater::{UpdateInfo, check_for_updates_async};
-use crate::autostart;
 use crate::registry;
 use std::sync::Mutex;
 use tauri::{State, Manager, AppHandle};
+use tauri_plugin_autostart::ManagerExt;
 use std::path::PathBuf;
 
 type KeyboardManagerState = Mutex<KeyboardManager>;
@@ -136,7 +136,7 @@ pub fn get_setting(key: String) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub fn set_setting(key: String, value: String) -> Result<(), String> {
+pub fn set_setting(app_handle: AppHandle, key: String, value: String) -> Result<(), String> {
     // First save the setting to registry
     #[cfg(target_os = "windows")]
     {
@@ -146,7 +146,14 @@ pub fn set_setting(key: String, value: String) -> Result<(), String> {
     // Handle special settings
     if key == "StartWithWindows" {
         let enabled = value == "1";
-        autostart::set_autostart(enabled)?;
+        let autostart_manager = app_handle.autolaunch();
+        if enabled {
+            autostart_manager.enable()
+                .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+        } else {
+            autostart_manager.disable()
+                .map_err(|e| format!("Failed to disable autostart: {}", e))?;
+        }
     }
     
     Ok(())

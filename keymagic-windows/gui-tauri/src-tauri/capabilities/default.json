@@ -12,6 +12,7 @@
     "core:event:default",
     "opener:default",
     "dialog:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "autostart:default"
   ]
 }
