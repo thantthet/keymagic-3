@@ -341,7 +341,9 @@ unsafe extern "system" fn low_level_keyboard_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     if ncode >= 0 {
-        if let Some(hook) = &HOOK_INSTANCE {
+        #[allow(static_mut_refs)]
+        let hook_ref = unsafe { HOOK_INSTANCE.as_ref() };
+        if let Some(hook) = hook_ref {
             let kb_struct = *(lparam.0 as *const KBDLLHOOKSTRUCT);
             let vk_code = kb_struct.vkCode;
             let is_keydown = wparam.0 == WM_KEYDOWN as usize || wparam.0 == WM_SYSKEYDOWN as usize;

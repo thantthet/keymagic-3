@@ -332,9 +332,6 @@ impl KeyboardManager {
         self.keyboards.values().collect()
     }
     
-    pub fn get_keyboard(&self, id: &str) -> Option<&KeyboardInfo> {
-        self.keyboards.get(id)
-    }
     
     pub fn set_active_keyboard(&mut self, id: &str) -> Result<()> {
         if self.keyboards.contains_key(id) {
@@ -388,18 +385,6 @@ impl KeyboardManager {
         }
     }
     
-    pub fn get_setting(&self, key: &str) -> Result<String> {
-        #[cfg(target_os = "windows")]
-        {
-            registry::get_setting(key)
-                .map_err(|e| anyhow!("Failed to get setting: {}", e))?
-                .ok_or_else(|| anyhow!("Setting '{}' not found", key))
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            Err(anyhow!("Settings not supported on this platform"))
-        }
-    }
     
     // Windows-specific registry operations
     #[cfg(target_os = "windows")]

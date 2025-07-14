@@ -43,25 +43,4 @@ impl<'a> MatchContext<'a> {
         }
     }
 
-    /// Gets the virtual key code if available
-    pub fn vk_code(&self) -> Option<u16> {
-        self.key_input.map(|input| input.key_code)
-    }
-
-    /// Gets the character if available
-    pub fn character(&self) -> Option<char> {
-        self.key_input.and_then(|input| input.character)
-    }
-
-    /// Checks if modifiers match the input
-    pub fn modifiers_match(&self, shift: bool, ctrl: bool, alt: bool) -> bool {
-        if let Some(input) = self.key_input {
-            input.modifiers.shift == shift
-                && input.modifiers.ctrl == ctrl
-                && input.modifiers.alt == alt
-        } else {
-            // No modifiers in recursive matching
-            !shift && !ctrl && !alt
-        }
-    }
 }

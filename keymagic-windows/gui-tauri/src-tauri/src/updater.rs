@@ -18,6 +18,7 @@ pub struct UpdateInfo {
 
 #[derive(Debug, Deserialize)]
 struct UpdateManifest {
+    #[allow(dead_code)]
     name: String,
     platforms: HashMap<String, HashMap<String, PlatformRelease>>,
     #[serde(rename = "releaseNotes")]
@@ -30,10 +31,14 @@ struct PlatformRelease {
     #[serde(rename = "releaseDate")]
     release_date: Option<String>,
     #[serde(rename = "minimumSystemVersion")]
+    #[allow(dead_code)]
     minimum_system_version: Option<String>,
     url: String,
+    #[allow(dead_code)]
     signature: Option<String>,
+    #[allow(dead_code)]
     size: Option<u64>,
+    #[allow(dead_code)]
     sha256: Option<String>,
 }
 
@@ -57,44 +62,6 @@ fn get_platform_info() -> (&'static str, &'static str) {
     (os, arch)
 }
 
-pub fn check_for_updates() -> Result<UpdateInfo> {
-    // Get current version from cargo
-    let current_version_str = env!("CARGO_PKG_VERSION");
-    let current_version = Version::parse(current_version_str)?;
-    
-    // Create a blocking runtime for the HTTP request
-    let runtime = tokio::runtime::Runtime::new()?;
-    let update_manifest = runtime.block_on(fetch_update_manifest())?;
-    
-    // Get platform-specific release info
-    let (os, arch) = get_platform_info();
-    
-    let platform_releases = update_manifest.platforms
-        .get(os)
-        .ok_or_else(|| anyhow!("No releases found for {}", os))?;
-    
-    let release_info = platform_releases
-        .get(arch)
-        .ok_or_else(|| anyhow!("No releases found for {} {}", os, arch))?;
-    
-    let latest_version = Version::parse(&release_info.version)?;
-    let update_available = latest_version > current_version;
-    
-    // Get release notes for the latest version
-    let release_notes = update_manifest.release_notes
-        .get(&release_info.version)
-        .and_then(|notes| notes.get("en"))
-        .cloned();
-    
-    Ok(UpdateInfo {
-        current_version: current_version_str.to_string(),
-        latest_version: release_info.version.clone(),
-        update_available,
-        download_url: Some(release_info.url.clone()),
-        release_notes,
-        published_at: release_info.release_date.clone(),
-    })
-}
 
 async fn fetch_update_manifest() -> Result<UpdateManifest> {
     let client = reqwest::Client::builder()

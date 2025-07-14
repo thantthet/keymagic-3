@@ -8,4 +8,4 @@ mod capture;
 pub use matcher::RuleMatcher;
 pub use pattern::{Pattern, PatternElement};
 pub use context::MatchContext;
-pub use capture::{CaptureManager, Capture};
+pub use capture::CaptureManager;

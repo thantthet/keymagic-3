@@ -37,10 +37,6 @@ impl CaptureManager {
         }
     }
 
-    /// Clears all captures
-    pub fn clear(&mut self) {
-        self.captures.clear();
-    }
 
     /// Stores a capture with content only
     pub fn set_capture(&mut self, index: usize, value: String) {
@@ -62,12 +58,6 @@ impl CaptureManager {
         self.captures.get(&index)
     }
 
-    /// Creates a new manager with captures from this one
-    pub fn clone_captures(&self) -> Self {
-        Self {
-            captures: self.captures.clone(),
-        }
-    }
     
     /// Gets the next capture index
     pub fn next_index(&self) -> usize {

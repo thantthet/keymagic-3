@@ -44,10 +44,6 @@ impl EngineState {
         &mut self.composing_buffer
     }
 
-    /// Checks if a state is currently active
-    pub fn is_state_active(&self, state_index: usize) -> bool {
-        self.active_states.contains(&state_index)
-    }
 
     /// Activates a state immediately
     pub fn activate_state(&mut self, state_index: usize) {

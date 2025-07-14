@@ -24,10 +24,6 @@ impl ComposingBuffer {
         self.content.clear();
     }
 
-    /// Sets the buffer content
-    pub fn set(&mut self, text: String) {
-        self.content = text;
-    }
 
     /// Appends text to the buffer
     pub fn append(&mut self, text: &str) {
@@ -39,20 +35,6 @@ impl ComposingBuffer {
         &self.content
     }
 
-    /// Gets the buffer length in characters
-    pub fn char_count(&self) -> usize {
-        self.content.chars().count()
-    }
-
-    /// Checks if the buffer is empty
-    pub fn is_empty(&self) -> bool {
-        self.content.is_empty()
-    }
-
-    /// Takes the content, leaving an empty buffer
-    pub fn take(&mut self) -> String {
-        std::mem::take(&mut self.content)
-    }
 
     /// Replaces characters from the end of the buffer
     /// 

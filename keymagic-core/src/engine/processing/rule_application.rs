@@ -3,7 +3,7 @@
 use crate::types::Rule;
 use crate::engine::types::Element;
 use crate::engine::state::EngineState;
-use crate::engine::matching::{CaptureManager, Capture};
+use crate::engine::matching::CaptureManager;
 use crate::Result;
 
 /// Handles applying matched rules to engine state

@@ -9,6 +9,7 @@ use windows::Win32::System::Com::CoTaskMemFree;
 /// Manages application data directories for KeyMagic
 pub struct AppPaths {
     /// Root application data directory (e.g., %LOCALAPPDATA%\KeyMagic)
+    #[allow(dead_code)]
     app_data_dir: PathBuf,
     /// Directory for keyboard files (e.g., %LOCALAPPDATA%\KeyMagic\Keyboards)
     keyboards_dir: PathBuf,
@@ -51,15 +52,6 @@ impl AppPaths {
         Ok(PathBuf::from(home).join(".keymagic"))
     }
     
-    /// Gets the root application data directory
-    pub fn app_data_dir(&self) -> &PathBuf {
-        &self.app_data_dir
-    }
-    
-    /// Gets the keyboards directory
-    pub fn keyboards_dir(&self) -> &PathBuf {
-        &self.keyboards_dir
-    }
     
     /// Generates a managed path for a keyboard file based on its ID
     pub fn keyboard_file_path(&self, keyboard_id: &str) -> PathBuf {
@@ -119,28 +111,6 @@ impl AppPaths {
         Ok(())
     }
     
-    /// Checks if a keyboard is installed in the managed location
-    pub fn is_keyboard_installed(&self, keyboard_id: &str) -> bool {
-        self.keyboard_file_path(keyboard_id).exists()
-    }
-    
-    /// Lists all installed keyboard files
-    pub fn list_installed_keyboards(&self) -> Result<Vec<(String, PathBuf)>> {
-        let mut keyboards = Vec::new();
-        
-        if let Ok(entries) = std::fs::read_dir(&self.keyboards_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("km2") {
-                    if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
-                        keyboards.push((id.to_string(), path));
-                    }
-                }
-            }
-        }
-        
-        Ok(keyboards)
-    }
     
     /// Gets the application installation directory (where the exe is located)
     pub fn get_app_install_dir(&self) -> Result<PathBuf> {
@@ -163,8 +133,8 @@ mod tests {
         assert!(app_paths.is_ok());
         
         let paths = app_paths.unwrap();
-        assert!(paths.app_data_dir().exists());
-        assert!(paths.keyboards_dir().exists());
+        assert!(paths.app_data_dir.exists());
+        assert!(paths.keyboards_dir.exists());
     }
     
     #[test]

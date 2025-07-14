@@ -2,8 +2,7 @@
 use windows::core::{Error, Result, PCWSTR};
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Security::{SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR, InitializeSecurityDescriptor, SetSecurityDescriptorDacl, PSECURITY_DESCRIPTOR};
-use windows::Win32::System::Threading::{CreateEventW, SetEvent, OpenEventW, EVENT_MODIFY_STATE, SYNCHRONIZATION_ACCESS_RIGHTS};
-use std::ptr;
+use windows::Win32::System::Threading::{CreateEventW, SetEvent};
 use std::iter::once;
 use std::sync::Mutex;
 
@@ -29,7 +28,7 @@ impl WindowsEvent {
             SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false)?;
             
             // Create security attributes
-            let mut sa = SECURITY_ATTRIBUTES {
+            let sa = SECURITY_ATTRIBUTES {
                 nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
                 lpSecurityDescriptor: &mut sd as *mut _ as *mut _,
                 bInheritHandle: false.into(),
@@ -57,27 +56,6 @@ impl WindowsEvent {
         }
     }
     
-    /// Opens existing event for signaling only
-    pub fn open_existing() -> Result<Self> {
-        unsafe {
-            let event_name_wide: Vec<u16> = GLOBAL_EVENT_NAME
-                .encode_utf16()
-                .chain(once(0))
-                .collect();
-            
-            let handle = OpenEventW(
-                EVENT_MODIFY_STATE,
-                false,
-                PCWSTR::from_raw(event_name_wide.as_ptr()),
-            )?;
-            
-            if handle.is_invalid() {
-                return Err(Error::from_win32());
-            }
-            
-            Ok(WindowsEvent { handle })
-        }
-    }
     
     /// Signals the event to notify all waiting threads
     pub fn signal(&self) -> Result<()> {

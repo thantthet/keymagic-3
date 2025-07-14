@@ -5,7 +5,6 @@
 
 #![cfg(target_os = "windows")]
 
-use std::path::PathBuf;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
 use windows::Win32::System::Registry::{

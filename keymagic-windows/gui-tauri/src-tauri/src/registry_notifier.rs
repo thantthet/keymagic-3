@@ -34,20 +34,3 @@ impl RegistryNotifier {
     }
 }
 
-// Helper function to notify after registry changes
-pub fn save_settings_and_notify<F>(save_fn: F) -> Result<()>
-where
-    F: FnOnce() -> Result<()>
-{
-    println!("[RegistryNotifier] save_settings_and_notify: Starting registry update");
-    
-    // 1. Write to registry
-    save_fn()?;
-    println!("[RegistryNotifier] save_settings_and_notify: Registry write completed");
-    
-    // 2. Notify all TSF instances via SendInput
-    RegistryNotifier::notify_registry_changed()?;
-    println!("[RegistryNotifier] save_settings_and_notify: Notification sent");
-    
-    Ok(())
-}

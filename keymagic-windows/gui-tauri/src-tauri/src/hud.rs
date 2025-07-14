@@ -164,7 +164,7 @@ fn show_hud_internal(hwnd: HWND, text: &[u16]) {
         
         // Create font
         let font = CreateFontW(
-            -MulDiv(20, GetDeviceCaps(hdc, LOGPIXELSY), 72),
+            -mul_div(20, GetDeviceCaps(hdc, LOGPIXELSY), 72),
             0, 0, 0,
             FW_NORMAL.0 as i32,
             FALSE.0 as u32,
@@ -193,9 +193,9 @@ fn show_hud_internal(hwnd: HWND, text: &[u16]) {
         let _old_bitmap = SelectObject(mem_dc, bitmap);
         
         // Define colors
-        let transparent_color = RGB(255, 0, 255); // Magenta for transparency
-        let bg_color = RGB(0, 0, 0); // Black background
-        let text_color = RGB(255, 255, 255); // White text
+        let transparent_color = rgb(255, 0, 255); // Magenta for transparency
+        let bg_color = rgb(0, 0, 0); // Black background
+        let text_color = rgb(255, 255, 255); // White text
         
         // First fill entire bitmap with transparent color
         let transparent_pen = CreatePen(PS_SOLID, 0, transparent_color);
@@ -265,7 +265,7 @@ fn update_layered_window(hwnd: HWND, mem_dc: HDC, width: i32, height: i32) {
             AlphaFormat: AC_SRC_ALPHA as u8,  // Important: use per-pixel alpha
         };
         
-        let transparent_color = RGB(255, 0, 255); // Magenta for transparency
+        let transparent_color = rgb(255, 0, 255); // Magenta for transparency
         
         let _ = UpdateLayeredWindow(
             hwnd,
@@ -295,12 +295,12 @@ fn hide_hud(hwnd: HWND) {
 }
 
 // MulDiv implementation for Windows
-fn MulDiv(nNumber: i32, nNumerator: i32, nDenominator: i32) -> i32 {
-    ((nNumber as i64 * nNumerator as i64) / nDenominator as i64) as i32
+fn mul_div(n_number: i32, n_numerator: i32, n_denominator: i32) -> i32 {
+    ((n_number as i64 * n_numerator as i64) / n_denominator as i64) as i32
 }
 
 // RGB macro to create COLORREF
-fn RGB(r: u8, g: u8, b: u8) -> COLORREF {
+fn rgb(r: u8, g: u8, b: u8) -> COLORREF {
     COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16))
 }
 
@@ -336,7 +336,7 @@ fn set_bitmap_alpha(hdc: HDC, bitmap: HBITMAP, transparent_color: COLORREF, text
             let b = pixel_data[offset];
             let g = pixel_data[offset + 1];
             let r = pixel_data[offset + 2];
-            let color = RGB(r, g, b);
+            let color = rgb(r, g, b);
             
             let alpha = if color == transparent_color {
                 0u8

@@ -225,7 +225,7 @@ impl HotkeyManager {
     }
 
     /// Unregister the on/off hotkey
-    pub fn unregister_on_off_hotkey(&self, app: &AppHandle) -> Result<()> {
+    pub fn unregister_on_off_hotkey(&self, _app: &AppHandle) -> Result<()> {
         let mut on_off = self.on_off_hotkey.lock().unwrap();
         if let Some(hotkey_str) = on_off.take() {
             self.keyboard_hook.unregister_hotkey(&hotkey_str)?;
