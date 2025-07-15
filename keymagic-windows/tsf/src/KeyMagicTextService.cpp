@@ -467,6 +467,13 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         return E_INVALIDARG;
 
     *pfEaten = FALSE;
+
+    // Check if TSF is disabled (value is now updated by registry monitor thread)
+    if (!m_tsfEnabled)
+    {
+        DEBUG_LOG(L"Key processing is disabled, not processing key");
+        return S_OK;
+    }
     
     // Check if this is our own SendInput by examining the extra info
     ULONG_PTR extraInfo = GetMessageExtraInfo();
