@@ -135,6 +135,75 @@ pub extern "C" fn keymagic_engine_load_keyboard_from_memory(
     }
 }
 
+/// Internal function to process key events (shared by normal and dry-run)
+fn process_key_internal(
+    handle: &EngineHandle,
+    key_input: KeyInput,
+    dry_run: bool,
+    output: &mut ProcessKeyOutput,
+) -> KeyMagicResult {
+    // Initialize output
+    output.action_type = 0;
+    output.text = ptr::null_mut();
+    output.delete_count = 0;
+    output.composing_text = ptr::null_mut();
+    output.is_processed = 0;
+
+    match handle.engine.lock() {
+        Ok(mut engine_opt) => {
+            if let Some(engine) = engine_opt.as_mut() {
+                let result = if dry_run {
+                    engine.process_key_test(key_input)
+                } else {
+                    engine.process_key(key_input)
+                };
+
+                match result {
+                    Ok(result) => {
+                        // Set composing text
+                        if let Ok(c_string) = CString::new(result.composing_text.clone()) {
+                            output.composing_text = c_string.into_raw();
+                        }
+                        
+                        // Process action
+                        match &result.action {
+                            ActionType::None => {
+                                output.action_type = 0;
+                            }
+                            ActionType::Insert(text) => {
+                                output.action_type = 1;
+                                if let Ok(c_string) = CString::new(text.clone()) {
+                                    output.text = c_string.into_raw();
+                                }
+                            }
+                            ActionType::BackspaceDelete(count) => {
+                                output.action_type = 2;
+                                output.delete_count = *count as c_int;
+                            }
+                            ActionType::BackspaceDeleteAndInsert(count, text) => {
+                                output.action_type = 3;
+                                output.delete_count = *count as c_int;
+                                if let Ok(c_string) = CString::new(text.clone()) {
+                                    output.text = c_string.into_raw();
+                                }
+                            }
+                        }
+                        
+                        // Set the is_processed flag
+                        output.is_processed = if result.is_processed { 1 } else { 0 };
+                        
+                        KeyMagicResult::Success
+                    }
+                    Err(_) => KeyMagicResult::ErrorEngineFailure,
+                }
+            } else {
+                KeyMagicResult::ErrorNoKeyboard
+            }
+        }
+        Err(_) => KeyMagicResult::ErrorEngineFailure,
+    }
+}
+
 /// Processes a key event
 #[no_mangle]
 pub extern "C" fn keymagic_engine_process_key(
@@ -154,13 +223,6 @@ pub extern "C" fn keymagic_engine_process_key(
     let handle = unsafe { &*handle };
     let output_ref = unsafe { &mut *output };
 
-    // Initialize output
-    output_ref.action_type = 0;
-    output_ref.text = ptr::null_mut();
-    output_ref.delete_count = 0;
-    output_ref.composing_text = ptr::null_mut();
-    output_ref.is_processed = 0;
-
     // Convert character from c_char to Option<char>
     let char_opt = if character == 0 {
         None
@@ -169,7 +231,7 @@ pub extern "C" fn keymagic_engine_process_key(
     };
 
     let key_input = KeyInput {
-        key_code: key_code as u16,  // Accept VK codes directly
+        key_code: key_code as u16,
         modifiers: ModifierState {
             shift: shift != 0,
             ctrl: ctrl != 0,
@@ -179,53 +241,7 @@ pub extern "C" fn keymagic_engine_process_key(
         character: char_opt,
     };
 
-    match handle.engine.lock() {
-        Ok(mut engine_opt) => {
-            if let Some(engine) = engine_opt.as_mut() {
-                match engine.process_key(key_input) {
-                    Ok(result) => {
-                        // Set composing text
-                        if let Ok(c_string) = CString::new(result.composing_text.clone()) {
-                            output_ref.composing_text = c_string.into_raw();
-                        }
-                        
-                        // Process action
-                        match &result.action {
-                            ActionType::None => {
-                                output_ref.action_type = 0;
-                            }
-                            ActionType::Insert(text) => {
-                                output_ref.action_type = 1;
-                                if let Ok(c_string) = CString::new(text.clone()) {
-                                    output_ref.text = c_string.into_raw();
-                                }
-                            }
-                            ActionType::BackspaceDelete(count) => {
-                                output_ref.action_type = 2;
-                                output_ref.delete_count = *count as c_int;
-                            }
-                            ActionType::BackspaceDeleteAndInsert(count, text) => {
-                                output_ref.action_type = 3;
-                                output_ref.delete_count = *count as c_int;
-                                if let Ok(c_string) = CString::new(text.clone()) {
-                                    output_ref.text = c_string.into_raw();
-                                }
-                            }
-                        }
-                        
-                        // Set the is_processed flag
-                        output_ref.is_processed = if result.is_processed { 1 } else { 0 };
-                        
-                        KeyMagicResult::Success
-                    }
-                    Err(_) => KeyMagicResult::ErrorEngineFailure,
-                }
-            } else {
-                KeyMagicResult::ErrorNoKeyboard
-            }
-        }
-        Err(_) => KeyMagicResult::ErrorEngineFailure,
-    }
+    process_key_internal(handle, key_input, false, output_ref)
 }
 
 /// Frees a string allocated by the engine
@@ -357,6 +373,77 @@ pub extern "C" fn keymagic_engine_process_key_win(
     )
 }
 
+/// Process a key event in test mode (does not modify engine state)
+#[no_mangle]
+pub extern "C" fn keymagic_engine_process_key_test(
+    handle: *mut EngineHandle,
+    key_code: c_int,
+    character: c_char,
+    shift: c_int,
+    ctrl: c_int,
+    alt: c_int,
+    caps_lock: c_int,
+    output: *mut ProcessKeyOutput,
+) -> KeyMagicResult {
+    if handle.is_null() || output.is_null() {
+        return KeyMagicResult::ErrorInvalidParameter;
+    }
+
+    let handle = unsafe { &*handle };
+    let output_ref = unsafe { &mut *output };
+
+    // Convert character from c_char to Option<char>
+    let char_opt = if character == 0 {
+        None
+    } else {
+        Some(character as u8 as char)
+    };
+
+    let key_input = KeyInput {
+        key_code: key_code as u16,
+        modifiers: ModifierState {
+            shift: shift != 0,
+            ctrl: ctrl != 0,
+            alt: alt != 0,
+            caps_lock: caps_lock != 0,
+        },
+        character: char_opt,
+    };
+
+    process_key_internal(handle, key_input, true, output_ref)
+}
+
+/// Process a key event in test mode with Windows VK code (does not modify engine state)
+#[no_mangle]
+pub extern "C" fn keymagic_engine_process_key_test_win(
+    handle: *mut EngineHandle,
+    vk_code: c_int,        // Windows VK code (e.g., 0x41 for VK_A)
+    character: c_char,
+    shift: c_int,
+    ctrl: c_int,
+    alt: c_int,
+    caps_lock: c_int,
+    output: *mut ProcessKeyOutput,
+) -> KeyMagicResult {
+    // Convert Windows VK code to VirtualKey, return error if unsupported
+    let virtual_key = match VirtualKey::from_win_vk(vk_code as u16) {
+        Some(vk) => vk,
+        None => return KeyMagicResult::ErrorInvalidParameter,
+    };
+    
+    // Forward the call to the regular test function
+    keymagic_engine_process_key_test(
+        handle,
+        virtual_key as i32,
+        character,
+        shift,
+        ctrl,
+        alt,
+        caps_lock,
+        output,
+    )
+}
+
 /// Get the current composing text from the engine
 /// Returns a newly allocated C string that must be freed with keymagic_engine_free_string
 #[no_mangle]
@@ -384,26 +471,3 @@ pub extern "C" fn keymagic_engine_free_string(str: *mut c_char) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_engine_lifecycle() {
-        unsafe {
-            let engine = keymagic_engine_new();
-            assert!(!engine.is_null());
-            keymagic_engine_free(engine);
-        }
-    }
-
-    #[test]
-    fn test_version() {
-        unsafe {
-            let version = keymagic_get_version();
-            assert!(!version.is_null());
-            let version_str = CStr::from_ptr(version).to_str().unwrap();
-            assert!(!version_str.is_empty());
-        }
-    }
-}

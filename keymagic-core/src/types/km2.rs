@@ -176,7 +176,7 @@ pub enum BinaryFormatElement {
     Switch(usize),             // State switch (0-based integer ID)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Km2File {
     pub header: FileHeader,
     pub strings: Vec<StringEntry>,

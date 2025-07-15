@@ -46,55 +46,66 @@ impl KeyMagicEngine {
 
     /// Processes a key input and returns the engine output
     pub fn process_key(&mut self, input: KeyInput) -> Result<EngineOutput> {
+        Self::process_key_internal(&self.keyboard, &self.rules, &self.strings, input, &mut self.state)
+    }
+
+    /// Processes a key input without modifying engine state (test/preview mode)
+    pub fn process_key_test(&self, input: KeyInput) -> Result<EngineOutput> {
+        let mut temp_state = self.state.clone();
+        Self::process_key_internal(&self.keyboard, &self.rules, &self.strings, input, &mut temp_state)
+    }
+
+    /// Internal key processing that works with a mutable state reference
+    fn process_key_internal(keyboard: &Km2File, rules: &[(Rule, Pattern)], strings: &[String], input: KeyInput, state: &mut EngineState) -> Result<EngineOutput> {
         // Store initial state for action generation
-        let before_text = self.state.composing_text().to_string();
+        let before_text = state.composing_text().to_string();
 
         // Create match context
         let context = MatchContext::for_key_input(
-            self.state.composing_text(),
+            state.composing_text(),
             &input,
-            self.state.active_states(),
+            state.active_states(),
         );
 
         // Track whether a rule was matched (input was processed)
         let is_processed: bool;
 
         // Try to find a matching rule
-        if let Some((rule, pattern, captures)) = RuleMatcher::find_match(&self.rules, &context, &self.strings) {
+        if let Some((rule, pattern, captures)) = RuleMatcher::find_match(rules, &context, strings) {
             // A rule matched, so the input was processed
             is_processed = true;
 
             // Calculate the matched length from the pattern
-            let matched_len = pattern.calculate_match_length(&self.strings).unwrap_or(0);
+            let matched_len = pattern.calculate_match_length(strings).unwrap_or(0);
 
             // Clear active states
-            self.state.clear_states();
+            state.clear_states();
 
             // Apply the matched rule
             let output = RuleProcessor::apply_rule(
                 rule,
-                &mut self.state,
+                state,
                 &captures,
-                &self.strings,
+                strings,
             )?;
 
             // Append conetxt char to the composing buffer if rule has no VK
             if !pattern.has_vk() {
                 if let Some(ch) = input.character {
-                    self.state.composing_buffer_mut().append(&ch.to_string());
+                    state.composing_buffer_mut().append(&ch.to_string());
                 }
             }
 
             // Update composing buffer by replacing only the matched portion
-            self.state.composing_buffer_mut().replace_from_end(matched_len, &output);
+            state.composing_buffer_mut().replace_from_end(matched_len, &output);
 
             // Check if we should stop recursion based on the output
             if !should_stop_recursion(&output) {
                 // Process recursive rules
                 RecursiveProcessor::process_recursive(
-                    &mut self.state,
-                    &self.rules,
-                    &self.strings,
+                    state,
+                    rules,
+                    strings,
                 )?;
             }
         } else {
@@ -102,21 +113,21 @@ impl KeyMagicEngine {
             
             // Check if this is a backspace key with auto_bksp enabled
             if input.key_code == VirtualKey::Back as u16
-                && !self.state.composing_text().is_empty() {
+                && !state.composing_text().is_empty() {
                 // Backspace key pressed, and composing buffer is not empty
-                if self.keyboard.header.layout_options.auto_bksp == 1 {
+                if keyboard.header.layout_options.auto_bksp == 1 {
                     // TODO: implement composition text history for BACK key to act as undo like behaviour
                 }
                 // Delete one character backward
-                self.state.composing_buffer_mut().backspace();
+                state.composing_buffer_mut().backspace();
                 is_processed = true;
             } else if let Some(ch) = input.character {
                 // if character is available, set is_processed to true
                 is_processed = true;
 
                 // append character if available & not eat_all_unused_keys
-                if self.keyboard.header.layout_options.eat == 0 {
-                    self.state.composing_buffer_mut().append(&ch.to_string());
+                if keyboard.header.layout_options.eat == 0 {
+                    state.composing_buffer_mut().append(&ch.to_string());
                 } else {
                     // key is processed and eaten
                 }
@@ -126,11 +137,11 @@ impl KeyMagicEngine {
             }
 
             // Clear active states
-            self.state.clear_states();
+            state.clear_states();
         }
 
         // Generate output action
-        let after_text = self.state.composing_text().to_string();
+        let after_text = state.composing_text().to_string();
         let action = ActionGenerator::generate_action(&before_text, &after_text, true);
 
         Ok(EngineOutput::new(after_text, action, is_processed))
@@ -231,5 +242,52 @@ mod tests {
         
         engine.set_composing_text("test".to_string());
         assert_eq!(engine.composing_text(), "test");
+    }
+
+    #[test]
+    fn test_process_key_test_does_not_modify_state() {
+        let keyboard = Km2File::default();
+        let mut engine = KeyMagicEngine::new(keyboard).unwrap();
+        
+        // Set initial state
+        engine.process_key(KeyInput::from_char('a')).unwrap();
+        assert_eq!(engine.composing_text(), "a");
+        
+        // Test mode should not modify state
+        let test_output = engine.process_key_test(KeyInput::from_char('b')).unwrap();
+        assert_eq!(test_output.composing_text, "ab");
+        
+        // Original state should be unchanged
+        assert_eq!(engine.composing_text(), "a");
+        
+        // Normal processing should still work
+        let normal_output = engine.process_key(KeyInput::from_char('b')).unwrap();
+        assert_eq!(normal_output.composing_text, "ab");
+        assert_eq!(engine.composing_text(), "ab");
+    }
+
+    #[test]
+    fn test_process_key_test_same_result_as_normal() {
+        let keyboard = Km2File::default();
+        let mut engine1 = KeyMagicEngine::new(keyboard.clone()).unwrap();
+        let mut engine2 = KeyMagicEngine::new(keyboard).unwrap();
+        
+        // Set same initial state
+        engine1.process_key(KeyInput::from_char('a')).unwrap();
+        engine2.process_key(KeyInput::from_char('a')).unwrap();
+        
+        // Test key
+        let input = KeyInput::from_char('b');
+        
+        // Get test result
+        let test_output = engine1.process_key_test(input.clone()).unwrap();
+        
+        // Get normal result
+        let normal_output = engine2.process_key(input).unwrap();
+        
+        // Results should be identical
+        assert_eq!(test_output.composing_text, normal_output.composing_text);
+        assert_eq!(test_output.action, normal_output.action);
+        assert_eq!(test_output.is_processed, normal_output.is_processed);
     }
 }
