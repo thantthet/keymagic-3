@@ -18,7 +18,8 @@ public:
     {
         ProcessKey,
         SyncEngine,
-        CommitAndRecompose
+        CommitAndRecompose,
+        TerminateComposition
     };
     
     CCompositionEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
@@ -54,6 +55,7 @@ private:
     HRESULT ProcessKey(TfEditCookie ec);
     HRESULT SyncEngineWithDocument(TfEditCookie ec);
     HRESULT CommitAndRecomposeAtCursor(TfEditCookie ec);
+    HRESULT TerminateComposition(TfEditCookie ec);
     
     // Document reading methods
     HRESULT ReadTextBeforeCursor(TfEditCookie ec, int maxChars, std::wstring &text);

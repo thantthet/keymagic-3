@@ -485,6 +485,39 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
 
     *pfEaten = FALSE;
 
+    // Check if this is our own SendInput by examining the extra info
+    ULONG_PTR extraInfo = GetMessageExtraInfo();
+    
+    // Special handling for F24 with our signature (used to terminate composition when disabling TSF)
+    if (wParam == VK_F24 && extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+    {
+        DEBUG_LOG(L"F24 key with KeyMagic signature detected - terminating composition");
+        
+        // Handle composition termination if using composition edit session
+        if (m_useCompositionEditSession && m_pEngine)
+        {
+            // Create edit session to terminate composition
+            CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic, 
+                                                                              m_pCompositionMgr,
+                                                                              CCompositionEditSession::EditAction::TerminateComposition,
+                                                                              m_pEngine);
+            if (pEditSession)
+            {
+                HRESULT hr;
+                pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+                pEditSession->Release();
+            }
+        }
+        else if (m_pEngine)
+        {
+            // If not using composition edit session, just reset engine
+            keymagic_engine_reset(m_pEngine);
+        }
+        
+        *pfEaten = TRUE;
+        return S_OK;
+    }
+    
     // Check if TSF is disabled (value is now updated by registry monitor thread)
     if (!m_tsfEnabled)
     {
@@ -492,8 +525,7 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         return S_OK;
     }
     
-    // Check if this is our own SendInput by examining the extra info
-    ULONG_PTR extraInfo = GetMessageExtraInfo();
+    // Skip other keys with our signature
     if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
     {
         DEBUG_LOG(L"Skipping key event from our SendInput");
@@ -1077,6 +1109,39 @@ void CKeyMagicTextService::UpdateSettings(bool enabled, const std::wstring& keyb
     if (enabled != m_tsfEnabled)
     {
         DEBUG_LOG(L"KeyProcessingEnabled changed from " + std::to_wstring(m_tsfEnabled) + L" to " + std::to_wstring(enabled));
+        
+        // If disabling TSF and using composition edit session, simulate F24 to terminate composition
+        if (!enabled && m_useCompositionEditSession)
+        {
+            DEBUG_LOG(L"TSF being disabled - simulating F24 key to terminate composition");
+            
+            // Prepare INPUT structures for F24 key down and up
+            INPUT inputs[2] = {0};
+            
+            // F24 key down
+            inputs[0].type = INPUT_KEYBOARD;
+            inputs[0].ki.wVk = VK_F24;
+            inputs[0].ki.dwFlags = 0;
+            inputs[0].ki.dwExtraInfo = KEYMAGIC_EXTRAINFO_SIGNATURE;
+            
+            // F24 key up
+            inputs[1].type = INPUT_KEYBOARD;
+            inputs[1].ki.wVk = VK_F24;
+            inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+            inputs[1].ki.dwExtraInfo = KEYMAGIC_EXTRAINFO_SIGNATURE;
+            
+            // Send the input
+            UINT sent = SendInput(2, inputs, sizeof(INPUT));
+            if (sent == 2)
+            {
+                DEBUG_LOG(L"Successfully sent F24 key to terminate composition");
+            }
+            else
+            {
+                DEBUG_LOG(L"Failed to send F24 key, sent=" + std::to_wstring(sent));
+            }
+        }
+        
         m_tsfEnabled = enabled;
     }
     

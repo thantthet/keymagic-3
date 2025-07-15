@@ -86,6 +86,9 @@ STDAPI CCompositionEditSession::DoEditSession(TfEditCookie ec)
             
         case EditAction::CommitAndRecompose:
             return CommitAndRecomposeAtCursor(ec);
+            
+        case EditAction::TerminateComposition:
+            return TerminateComposition(ec);
     }
     
     return S_OK;
@@ -502,15 +505,35 @@ bool CCompositionEditSession::ShouldCommitComposition(WPARAM wParam, const std::
             
         case VK_RETURN:
         case VK_TAB:
-            // Always commit on Enter or Tab
+        case VK_ESCAPE:
+            // Always commit for these keys
             return true;
             
-        case VK_ESCAPE:
-            // Escape cancels composition (handled separately)
-            return false;
             
         default:
             // Don't commit for other keys
             return false;
     }
+}
+
+// Terminate composition and reset engine
+HRESULT CCompositionEditSession::TerminateComposition(TfEditCookie ec)
+{
+    DEBUG_LOG_FUNC();
+    
+    // Terminate any active composition
+    if (m_pCompositionManager && m_pCompositionManager->IsComposing())
+    {
+        DEBUG_LOG(L"Terminating active composition");
+        m_pCompositionManager->EndComposition(ec);
+    }
+    
+    // Reset the engine
+    if (m_pEngine)
+    {
+        DEBUG_LOG(L"Resetting engine");
+        keymagic_engine_reset(m_pEngine);
+    }
+    
+    return S_OK;
 }
