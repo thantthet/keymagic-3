@@ -4,6 +4,8 @@
 #include <windows.h>
 #include <msctf.h>
 #include <string>
+#include <vector>
+#include "../include/keymagic_ffi.h"
 
 // Forward declaration
 class CKeyMagicTextService;
@@ -19,7 +21,7 @@ public:
     };
     
     CDirectEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
-                       EditAction action);
+                       EditAction action, EngineHandle *pEngine);
     ~CDirectEditSession();
     
     // IUnknown
@@ -38,11 +40,27 @@ private:
     CKeyMagicTextService *m_pTextService;
     ITfContext *m_pContext;
     EditAction m_action;
+    EngineHandle *m_pEngine;
     
     // Action-specific data
     WPARAM m_wParam;
     LPARAM m_lParam;
     BOOL *m_pfEaten;
+    
+    // Action implementations
+    HRESULT ProcessKey(TfEditCookie ec);
+    HRESULT SyncEngineWithDocument(TfEditCookie ec);
+    
+    // Text manipulation methods
+    void SendBackspaces(int count, ULONG_PTR dwExtraInfo = 0, DWORD* pLastSendTime = nullptr);
+    void SendUnicodeText(const std::wstring& text, ULONG_PTR dwExtraInfo = 0, DWORD* pLastSendTime = nullptr);
+    
+    // Document reading methods
+    HRESULT ReadDocumentSuffix(TfEditCookie ec, int maxChars, std::wstring &text);
+    
+    // Helper methods
+    char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
+    bool IsPrintableAscii(char c);
 };
 
 #endif // DIRECT_EDIT_SESSION_H

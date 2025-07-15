@@ -24,4 +24,7 @@ inline void DllRelease() { g_cRefDll--; }
 // Use Myanmar language ID (0x0455)
 #define TEXTSERVICE_LANGID 0x0455
 
+// Define the extra info signature for our SendInput calls
+#define KEYMAGIC_EXTRAINFO_SIGNATURE 0x4B4D4147 // "KMAG"
+
 #endif // GLOBALS_H

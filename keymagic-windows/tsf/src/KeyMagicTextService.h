@@ -67,15 +67,10 @@ private:
     HKEY OpenSettingsKey(REGSAM samDesired);
     BOOL LoadKeyboard(const std::wstring& km2Path);
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
-    void ProcessKeyWithSendInput(ITfContext *pic, TfEditCookie ec, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
     void ResetEngine();
-    void SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec);
     
     // Application compatibility detection
     BOOL TestCompositionSupport(ITfContext *pContext);
-    
-    // Text manipulation
-    HRESULT ReadDocumentSuffix(ITfContext *pic, TfEditCookie ec, int maxChars, std::wstring &text);
     
     // Key translation
     char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
