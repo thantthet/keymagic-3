@@ -69,8 +69,6 @@ private:
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
     void ResetEngine();
     
-    // Application compatibility detection
-    BOOL TestCompositionSupport(ITfContext *pContext);
     
     // Key translation
     char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
@@ -118,8 +116,6 @@ private:
     // Composition manager
     CCompositionManager *m_pCompositionMgr;
     
-    // Application compatibility
-    BOOL m_supportsComposition;
     
     // Edit session mode flag
     bool m_useCompositionEditSession;  // If true, use CCompositionEditSession; if false, use CDirectEditSession

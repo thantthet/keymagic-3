@@ -54,7 +54,6 @@ CKeyMagicTextService::CKeyMagicTextService()
     {
         DEBUG_LOG(L"Failed to create KeyMagic engine");
     }
-    m_supportsComposition = FALSE;  // Not using composition anymore
     m_useCompositionEditSession = true;  // Default to using composition edit session
     
     // Create composition manager
@@ -841,48 +840,6 @@ void CKeyMagicTextService::ResetEngine()
     LeaveCriticalSection(&m_cs);
 }
 
-BOOL CKeyMagicTextService::TestCompositionSupport(ITfContext *pContext)
-{
-    DEBUG_LOG_FUNC();
-    
-    if (!pContext)
-    {
-        DEBUG_LOG(L"No context for composition test");
-        return FALSE;
-    }
-    
-    // Test if the context supports composition by checking for ITfContextComposition
-    ITfContextComposition *pContextComposition;
-    HRESULT hr = pContext->QueryInterface(IID_ITfContextComposition, (void **)&pContextComposition);
-    
-    if (FAILED(hr))
-    {
-        DEBUG_LOG(L"Context does not support ITfContextComposition interface - using direct editing");
-        return FALSE;
-    }
-    
-    DEBUG_LOG(L"Context supports ITfContextComposition interface");
-    
-    // For now, assume that if the context supports ITfContextComposition interface,
-    // it supports composition. Most modern applications including Edge, Explorer, Word should support this.
-    // We can add more sophisticated testing later if needed.
-    
-    // Check if it's likely a simple application by testing for basic TSF capabilities
-    ITfInsertAtSelection *pInsertAtSelection;
-    hr = pContext->QueryInterface(IID_ITfInsertAtSelection, (void **)&pInsertAtSelection);
-    if (FAILED(hr))
-    {
-        DEBUG_LOG(L"Context does not support ITfInsertAtSelection - likely a very basic app, using direct editing");
-        pContextComposition->Release();
-        return FALSE;
-    }
-    
-    pInsertAtSelection->Release();
-    
-    DEBUG_LOG(L"Context supports both composition and insertion interfaces - using composition mode");
-    pContextComposition->Release();
-    return TRUE;
-}
 
 char CKeyMagicTextService::MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam)
 {
