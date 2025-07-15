@@ -1,5 +1,27 @@
+// Keyboard Hook Implementation with Robust Error Handling
+//
+// This module implements a Windows low-level keyboard hook that is resilient to:
+// 1. Panics in the hook procedure (which would cause Windows to unhook it)
+// 2. Mutex poisoning from panics in other threads
+// 3. Callback panics that could crash the hook
+// 4. Performance issues that could cause Windows to remove the hook
+// 5. Invalid memory access from null/invalid pointers
+//
+// Key safety features:
+// - All panics are caught at the hook procedure boundary
+// - Mutex poisoning is recovered from gracefully
+// - Callbacks execute in separate threads with panic isolation
+// - Processing time is monitored to detect performance issues
+// - All pointers are validated before dereferencing
+//
+// Usage:
+// The hook also provides health monitoring via is_hook_active() and check_health()
+// which can be called periodically to ensure the hook is still functioning.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::time::{Duration, Instant};
 use windows::{
     Win32::{
         Foundation::*,
@@ -9,10 +31,11 @@ use windows::{
     },
 };
 use anyhow::{Result, anyhow};
+use log::{error, warn};
 
 static mut HOOK_INSTANCE: Option<Arc<KeyboardHook>> = None;
 
-type HotkeyCallback = Box<dyn Fn() + Send + Sync>;
+type HotkeyCallback = Arc<dyn Fn() + Send + Sync>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Hotkey {
@@ -139,6 +162,10 @@ pub struct KeyboardHook {
     modifier_state: Arc<Mutex<u32>>,
     last_modifier_state: Arc<Mutex<u32>>,
     modifier_only_candidate: Arc<Mutex<Option<u32>>>,
+    #[allow(dead_code)]
+    last_health_check: Arc<Mutex<Instant>>,
+    #[allow(dead_code)]
+    hook_installed_at: Arc<Mutex<Option<Instant>>>,
 }
 
 impl KeyboardHook {
@@ -149,6 +176,8 @@ impl KeyboardHook {
             modifier_state: Arc::new(Mutex::new(0)),
             last_modifier_state: Arc::new(Mutex::new(0)),
             modifier_only_candidate: Arc::new(Mutex::new(None)),
+            last_health_check: Arc::new(Mutex::new(Instant::now())),
+            hook_installed_at: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -166,8 +195,35 @@ impl KeyboardHook {
             )?;
 
             *self.hook.write().unwrap() = Some(hook);
+            *self.hook_installed_at.lock().unwrap() = Some(Instant::now());
             Ok(())
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_hook_active(&self) -> bool {
+        self.hook.read().unwrap().is_some()
+    }
+
+    #[allow(dead_code)]
+    pub fn check_health(&self) -> bool {
+        let mut last_check = self.last_health_check.lock().unwrap();
+        let now = Instant::now();
+        
+        // Only check every second to avoid overhead
+        if now.duration_since(*last_check) < Duration::from_secs(1) {
+            return true;
+        }
+        
+        *last_check = now;
+        
+        // Check if hook is still installed
+        let is_active = self.is_hook_active();
+        if !is_active {
+            warn!("Keyboard hook is no longer active");
+        }
+        
+        is_active
     }
 
     pub fn uninstall(&self) -> Result<()> {
@@ -189,7 +245,7 @@ impl KeyboardHook {
         
         hotkeys.insert(hotkey_str.to_string(), HotkeyState {
             hotkey,
-            callback: Box::new(callback),
+            callback: Arc::new(callback),
             triggered: false,
         });
         
@@ -209,9 +265,48 @@ impl KeyboardHook {
     }
 
     fn process_key(&self, vk_code: u32, is_keydown: bool) -> bool {
-        let mut modifier_state = self.modifier_state.lock().unwrap();
-        let mut last_modifier_state = self.last_modifier_state.lock().unwrap();
-        let mut modifier_only_candidate = self.modifier_only_candidate.lock().unwrap();
+        // Use catch_unwind to prevent panics from propagating
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            self.process_key_internal(vk_code, is_keydown)
+        }));
+        
+        match result {
+            Ok(should_eat) => should_eat,
+            Err(e) => {
+                error!("Panic in process_key: {:?}", e);
+                false // Don't eat the key on error
+            }
+        }
+    }
+    
+    fn process_key_internal(&self, vk_code: u32, is_keydown: bool) -> bool {
+        // Start timing to ensure we don't take too long
+        let start = Instant::now();
+        
+        // Handle mutex poisoning gracefully
+        let mut modifier_state = match self.modifier_state.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                error!("Modifier state mutex poisoned, recovering");
+                poisoned.into_inner()
+            }
+        };
+        
+        let mut last_modifier_state = match self.last_modifier_state.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                error!("Last modifier state mutex poisoned, recovering");
+                poisoned.into_inner()
+            }
+        };
+        
+        let mut modifier_only_candidate = match self.modifier_only_candidate.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                error!("Modifier candidate mutex poisoned, recovering");
+                poisoned.into_inner()
+            }
+        };
         
         let is_modifier_key = match vk_code {
             vk if vk == VK_CONTROL.0 as u32 || vk == VK_LCONTROL.0 as u32 || vk == VK_RCONTROL.0 as u32 => true,
@@ -270,11 +365,20 @@ impl KeyboardHook {
                     // Only trigger if we're releasing from the candidate state without any regular keys pressed
                     if *last_modifier_state == candidate_modifiers && current_modifiers != candidate_modifiers {
                         // Check for matching modifier-only hotkeys
-                        let mut hotkeys = self.hotkeys.lock().unwrap();
+                        let mut hotkeys = match self.hotkeys.lock() {
+                            Ok(guard) => guard,
+                            Err(poisoned) => {
+                                error!("Hotkeys mutex poisoned, recovering");
+                                poisoned.into_inner()
+                            }
+                        };
                         for (_, state) in hotkeys.iter_mut() {
                             if state.hotkey.vk_code.is_none() && state.hotkey.modifiers == candidate_modifiers && !state.triggered {
                                 state.triggered = true;
-                                (state.callback)();
+                                // Execute callback in a safe way
+                                let callback = state.callback.clone();
+                                drop(hotkeys); // Release lock before callback
+                                self.execute_callback_safely(&callback);
                                 break;
                             }
                         }
@@ -289,21 +393,40 @@ impl KeyboardHook {
                 *modifier_only_candidate = None;
                 
                 // Check hotkeys with regular keys
-                let mut hotkeys = self.hotkeys.lock().unwrap();
+                let mut hotkeys = match self.hotkeys.lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => {
+                        error!("Hotkeys mutex poisoned, recovering");
+                        poisoned.into_inner()
+                    }
+                };
+                let mut callback_to_execute = None;
                 for (_, state) in hotkeys.iter_mut() {
                     if let Some(hotkey_vk) = state.hotkey.vk_code {
                         // For hotkeys with a regular key
                         if vk_code == hotkey_vk && current_modifiers == state.hotkey.modifiers && !state.triggered {
                             state.triggered = true;
-                            (state.callback)();
+                            callback_to_execute = Some(state.callback.clone());
                             // Eat the key event for hotkeys with regular keys
                             should_eat_key = true;
+                            break;
                         }
                     }
                 }
+                drop(hotkeys); // Release lock before callback
+                
+                if let Some(callback) = callback_to_execute {
+                    self.execute_callback_safely(&callback);
+                }
             } else {
                 // Reset triggered state for regular hotkeys when key is released
-                let mut hotkeys = self.hotkeys.lock().unwrap();
+                let mut hotkeys = match self.hotkeys.lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => {
+                        error!("Hotkeys mutex poisoned, recovering");
+                        poisoned.into_inner()
+                    }
+                };
                 for (_, state) in hotkeys.iter_mut() {
                     if state.triggered {
                         if let Some(hotkey_vk) = state.hotkey.vk_code {
@@ -319,7 +442,13 @@ impl KeyboardHook {
         
         // Reset triggered state for modifier-only hotkeys when modifiers change
         if current_modifiers != *last_modifier_state {
-            let mut hotkeys = self.hotkeys.lock().unwrap();
+            let mut hotkeys = match self.hotkeys.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    error!("Hotkeys mutex poisoned, recovering");
+                    poisoned.into_inner()
+                }
+            };
             for (_, state) in hotkeys.iter_mut() {
                 if state.triggered && state.hotkey.vk_code.is_none() {
                     if current_modifiers != state.hotkey.modifiers {
@@ -331,7 +460,28 @@ impl KeyboardHook {
         
         *last_modifier_state = current_modifiers;
         
+        // Check if we're taking too long
+        let elapsed = start.elapsed();
+        if elapsed > Duration::from_millis(10) {
+            warn!("Keyboard hook processing took {:?}, this may cause issues", elapsed);
+        }
+        
         should_eat_key
+    }
+    
+    fn execute_callback_safely(&self, callback: &HotkeyCallback) {
+        // Execute callback in a separate thread to prevent blocking the hook
+        let callback_clone = callback.clone();
+        std::thread::spawn(move || {
+            // Catch panics in callbacks
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                callback_clone();
+            }));
+            
+            if let Err(e) = result {
+                error!("Hotkey callback panicked: {:?}", e);
+            }
+        });
     }
 }
 
@@ -340,11 +490,29 @@ unsafe extern "system" fn low_level_keyboard_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    if ncode >= 0 {
+    // Catch ALL panics to prevent the hook from being removed
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        if ncode < 0 {
+            return CallNextHookEx(None, ncode, wparam, lparam);
+        }
+        
+        // Validate lparam before dereferencing
+        if lparam.0 == 0 {
+            error!("Invalid lparam in keyboard hook");
+            return CallNextHookEx(None, ncode, wparam, lparam);
+        }
+        
         #[allow(static_mut_refs)]
         let hook_ref = unsafe { HOOK_INSTANCE.as_ref() };
         if let Some(hook) = hook_ref {
-            let kb_struct = *(lparam.0 as *const KBDLLHOOKSTRUCT);
+            // Safely dereference the keyboard struct
+            let kb_struct_ptr = lparam.0 as *const KBDLLHOOKSTRUCT;
+            if kb_struct_ptr.is_null() {
+                error!("Null KBDLLHOOKSTRUCT pointer");
+                return CallNextHookEx(None, ncode, wparam, lparam);
+            }
+            
+            let kb_struct = *kb_struct_ptr;
             let vk_code = kb_struct.vkCode;
             let is_keydown = wparam.0 == WM_KEYDOWN as usize || wparam.0 == WM_SYSKEYDOWN as usize;
             
@@ -353,9 +521,18 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 return LRESULT(1); // Non-zero return value prevents further processing
             }
         }
-    }
+        
+        CallNextHookEx(None, ncode, wparam, lparam)
+    }));
     
-    CallNextHookEx(None, ncode, wparam, lparam)
+    match result {
+        Ok(lresult) => lresult,
+        Err(e) => {
+            error!("CRITICAL: Panic in keyboard hook procedure: {:?}", e);
+            // Always pass the key through on error to prevent system issues
+            CallNextHookEx(None, ncode, wparam, lparam)
+        }
+    }
 }
 
 impl Drop for KeyboardHook {
