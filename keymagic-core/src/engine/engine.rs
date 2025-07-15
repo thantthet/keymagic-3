@@ -101,10 +101,12 @@ impl KeyMagicEngine {
             // No rule matched
             
             // Check if this is a backspace key with auto_bksp enabled
-            if input.key_code == VirtualKey::Back as u16 // VK_BACK Windows code
-                && self.keyboard.header.layout_options.auto_bksp == 1 
+            if input.key_code == VirtualKey::Back as u16
                 && !self.state.composing_text().is_empty() {
-                // Auto backspace is enabled, backspace key pressed, and composing buffer is not empty
+                // Backspace key pressed, and composing buffer is not empty
+                if self.keyboard.header.layout_options.auto_bksp == 1 {
+                    // TODO: implement composition text history for BACK key to act as undo like behaviour
+                }
                 // Delete one character backward
                 self.state.composing_buffer_mut().backspace();
                 is_processed = true;
