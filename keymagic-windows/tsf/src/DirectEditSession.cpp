@@ -187,7 +187,7 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
         if (output.text && strlen(output.text) > 0)
         {
             std::wstring textToInsert = ConvertUtf8ToUtf16(output.text);
-            DEBUG_LOG(L"Sending text: \"" + textToInsert + L"\"");
+            DEBUG_LOG_TEXT(L"Sending text", textToInsert);
             SendUnicodeText(textToInsert, KEYMAGIC_EXTRAINFO_SIGNATURE, nullptr);
         }
     }
@@ -298,7 +298,7 @@ HRESULT CDirectEditSession::SyncEngineWithDocument(TfEditCookie ec)
             
             // Convert to UTF-8 and set as engine composition
             std::string utf8Text = ConvertUtf16ToUtf8(composeText);
-            DEBUG_LOG(L"Syncing engine with document text: \"" + composeText + L"\"");
+            DEBUG_LOG_TEXT(L"Syncing engine with document text", composeText);
             
             KeyMagicResult result = keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());
             if (result == KeyMagicResult_Success)

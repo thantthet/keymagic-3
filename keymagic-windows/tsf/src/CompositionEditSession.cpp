@@ -192,7 +192,7 @@ HRESULT CCompositionEditSession::ProcessKey(TfEditCookie ec)
         std::string composingUtf8(output.composing_text);
         std::wstring composingText = ConvertUtf8ToUtf16(composingUtf8);
         
-        DEBUG_LOG(L"Engine composing text: \"" + composingText + L"\"");
+        DEBUG_LOG_TEXT(L"Engine composing text", composingText);
         
         // Check if we should commit the composition
         if (ShouldCommitComposition(m_wParam, composingUtf8, output.is_processed))
@@ -217,7 +217,7 @@ HRESULT CCompositionEditSession::ProcessKey(TfEditCookie ec)
         else
         {
             // Update composition display with engine's composing text
-            DEBUG_LOG(L"Updating composition: \"" + composingText + L"\"");
+            DEBUG_LOG_TEXT(L"Updating composition", composingText);
             
             if (!m_pCompositionManager->IsComposing())
             {
@@ -284,13 +284,12 @@ HRESULT CCompositionEditSession::SyncEngineWithDocument(TfEditCookie ec)
                 // Compare engine and document composition text
                 if (engineText == documentTextUtf8)
                 {
-                    DEBUG_LOG(L"Engine and document composition are already in sync: \"" + documentCompositionText + L"\"");
+                    DEBUG_LOG_TEXT(L"Engine and document composition are already in sync", documentCompositionText);
                     return S_OK;  // Already in sync, no need to sync again
                 }
                 else
                 {
-                    DEBUG_LOG(L"Composition text mismatch - Engine: \"" + ConvertUtf8ToUtf16(engineText) + 
-                              L"\", Document: \"" + documentCompositionText + L"\" - continuing with sync");
+                    DEBUG_LOG_SYNC_MISMATCH(engineText, documentCompositionText);
                 }
             }
         }
@@ -346,7 +345,7 @@ HRESULT CCompositionEditSession::SyncEngineWithDocument(TfEditCookie ec)
             // First try to start composition on the existing text
             if (!composeText.empty())
             {
-                DEBUG_LOG(L"Starting composition on document text: \"" + composeText + L"\"");
+                DEBUG_LOG_TEXT(L"Starting composition on document text", composeText);
                 
                 // Use the new method to compose existing text at cursor position
                 HRESULT hr = m_pCompositionManager->StartCompositionAtSelection(m_pContext, ec, composeText.length(), 0);

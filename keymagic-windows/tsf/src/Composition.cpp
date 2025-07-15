@@ -150,7 +150,7 @@ HRESULT CCompositionManager::StartComposition(ITfContext *pContext, TfEditCookie
 HRESULT CCompositionManager::UpdateComposition(ITfContext *pContext, TfEditCookie ec, const std::wstring &text)
 {
     DEBUG_LOG_FUNC();
-    DEBUG_LOG(L"Updating composition with: \"" + text + L"\"");
+    DEBUG_LOG_TEXT(L"Updating composition with", text);
     
     // Start composition if needed
     if (!m_pComposition)
@@ -244,7 +244,7 @@ HRESULT CCompositionManager::EndComposition(TfEditCookie ec)
 HRESULT CCompositionManager::CommitComposition(ITfContext *pContext, TfEditCookie ec, const std::wstring &text)
 {
     DEBUG_LOG_FUNC();
-    DEBUG_LOG(L"Committing text: \"" + text + L"\"");
+    DEBUG_LOG_TEXT(L"Committing text", text);
     
     if (m_pComposition)
     {
