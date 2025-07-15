@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, Emitter};
 use anyhow::{Result, anyhow};
+use log::error;
 
 use crate::keyboard_manager::KeyboardManager;
 use crate::keyboard_hook::KeyboardHook;
@@ -18,7 +19,7 @@ impl HotkeyManager {
         
         // Install the keyboard hook
         if let Err(e) = hook.install() {
-            eprintln!("Failed to install keyboard hook: {}", e);
+            error!("Failed to install keyboard hook: {}", e);
         }
         
         Self {
@@ -52,7 +53,7 @@ impl HotkeyManager {
             if let Some(hotkey) = hotkey_to_register {
                 if !hotkey.is_empty() {
                     if let Err(e) = self.register_hotkey(app, &keyboard.id, hotkey) {
-                        eprintln!("Failed to register hotkey '{}' for keyboard '{}': {}", 
+                        error!("Failed to register hotkey '{}' for keyboard '{}': {}", 
                                  hotkey, keyboard.name, e);
                         failed_hotkeys.push(format!("{} ({})", keyboard.name, hotkey));
                     }
@@ -116,7 +117,7 @@ impl HotkeyManager {
             };
             
             if let Err(e) = action_result {
-                eprintln!("Failed to toggle keyboard: {}", e);
+                error!("Failed to toggle keyboard: {}", e);
             } else {
                 // Re-acquire lock for tray updates
                 if let Ok(manager) = state.lock() {
@@ -142,12 +143,12 @@ impl HotkeyManager {
                     if is_enabled {
                         // Show the keyboard name when enabled
                         if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
-                            eprintln!("Failed to show HUD: {}", e);
+                            error!("Failed to show HUD: {}", e);
                         }
                     } else {
                         // Show "KeyMagic Disabled" when disabled
                         if let Err(e) = crate::hud::show_status_hud("KeyMagic Disabled") {
-                            eprintln!("Failed to show HUD: {}", e);
+                            error!("Failed to show HUD: {}", e);
                         }
                     }
                 }
@@ -199,7 +200,7 @@ impl HotkeyManager {
                 let new_state = !current_state;
                 
                 if let Err(e) = manager.set_key_processing_enabled(new_state) {
-                    eprintln!("Failed to toggle key processing: {}", e);
+                    error!("Failed to toggle key processing: {}", e);
                 } else {
                     // Update tray menu and icon
                     crate::tray::update_tray_menu(&app_handle, &manager);
@@ -211,7 +212,7 @@ impl HotkeyManager {
                     // Show HUD notification
                     let status = if new_state { "Enabled" } else { "Disabled" };
                     if let Err(e) = crate::hud::show_status_hud(&format!("KeyMagic {}", status)) {
-                        eprintln!("Failed to show HUD: {}", e);
+                        error!("Failed to show HUD: {}", e);
                     }
                 }
             };

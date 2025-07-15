@@ -7,6 +7,7 @@ use crate::app_paths::AppPaths;
 use crate::registry;
 use sha2::{Sha256, Digest};
 use std::io::Read;
+use log::{info, debug, warn};
 
 // Import FFI types from keymagic-core
 use keymagic_core::ffi::*;
@@ -338,12 +339,12 @@ impl KeyboardManager {
             self.active_keyboard = Some(id.to_string());
             #[cfg(target_os = "windows")]
             {
-                println!("[KeyboardManager] Setting active keyboard to: {}", id);
+                debug!("[KeyboardManager] Setting active keyboard to: {}", id);
                 self.save_active_keyboard()?;
-                println!("[KeyboardManager] Active keyboard saved to registry");
+                debug!("[KeyboardManager] Active keyboard saved to registry");
                 
                 // Notify TSF instances to reload via SendInput
-                println!("[KeyboardManager] Notifying TSF instances of keyboard change");
+                debug!("[KeyboardManager] Notifying TSF instances of keyboard change");
                 RegistryNotifier::notify_registry_changed()?;
             }
         }
@@ -368,13 +369,13 @@ impl KeyboardManager {
     pub fn set_key_processing_enabled(&mut self, enabled: bool) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            println!("[KeyboardManager] Setting key processing enabled: {}", enabled);
+            debug!("[KeyboardManager] Setting key processing enabled: {}", enabled);
             registry::set_key_processing_enabled(enabled)
                 .map_err(|e| anyhow!("Failed to set key processing enabled: {}", e))?;
-            println!("[KeyboardManager] Key processing enabled setting saved to registry");
+            debug!("[KeyboardManager] Key processing enabled setting saved to registry");
             
             // Notify TSF instances to reload via SendInput
-            println!("[KeyboardManager] Notifying TSF instances of enabled state change");
+            debug!("[KeyboardManager] Notifying TSF instances of enabled state change");
             RegistryNotifier::notify_registry_changed()?;
             
             Ok(())
@@ -396,7 +397,7 @@ impl KeyboardManager {
             // Skip keyboards with missing files
             let path = PathBuf::from(&reg_kb.path);
             if !path.exists() {
-                println!("[KeyboardManager] Skipping keyboard {} - file not found: {}", reg_kb.id, path.display());
+                warn!("[KeyboardManager] Skipping keyboard {} - file not found: {}", reg_kb.id, path.display());
                 continue;
             }
             
@@ -507,7 +508,7 @@ impl KeyboardManager {
         // Check each keyboard for missing files
         for (id, info) in &self.keyboards {
             if !info.path.exists() {
-                println!("[KeyboardManager] Keyboard file missing: {} at {}", id, info.path.display());
+                warn!("[KeyboardManager] Keyboard file missing: {} at {}", id, info.path.display());
                 missing_keyboards.push(id.clone());
             }
         }
@@ -517,7 +518,7 @@ impl KeyboardManager {
         
         // Remove missing keyboards
         for id in missing_keyboards {
-            println!("[KeyboardManager] Removing missing keyboard from registry: {}", id);
+            warn!("[KeyboardManager] Removing missing keyboard from registry: {}", id);
             self.keyboards.remove(&id);
             
             #[cfg(target_os = "windows")]
@@ -532,7 +533,7 @@ impl KeyboardManager {
         }
         
         if removed_count > 0 {
-            println!("[KeyboardManager] Cleaned up {} missing keyboards", removed_count);
+            info!("[KeyboardManager] Cleaned up {} missing keyboards", removed_count);
         }
         
         Ok(())

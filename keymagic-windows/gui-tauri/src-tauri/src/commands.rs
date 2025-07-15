@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use tauri::{State, Manager, AppHandle};
 use tauri_plugin_autostart::ManagerExt;
 use std::path::PathBuf;
+use log::error;
 
 type KeyboardManagerState = Mutex<KeyboardManager>;
 
@@ -78,7 +79,7 @@ pub fn add_keyboard(
     
     // Refresh hotkeys
     if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
-        eprintln!("Failed to refresh hotkeys: {}", e);
+        error!("Failed to refresh hotkeys: {}", e);
     }
     
     Ok(result)
@@ -96,7 +97,7 @@ pub fn remove_keyboard(
     
     // Refresh hotkeys
     if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
-        eprintln!("Failed to refresh hotkeys: {}", e);
+        error!("Failed to refresh hotkeys: {}", e);
     }
     
     Ok(())
@@ -303,7 +304,7 @@ pub fn import_bundled_keyboard(
     
     // Refresh hotkeys
     if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, &manager) {
-        eprintln!("Failed to refresh hotkeys: {}", e);
+        error!("Failed to refresh hotkeys: {}", e);
     }
     
     // Update tray

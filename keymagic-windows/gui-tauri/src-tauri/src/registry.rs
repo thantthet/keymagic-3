@@ -13,6 +13,7 @@ use windows::Win32::System::Registry::{
     KEY_READ, REG_DWORD, REG_SZ, REG_MULTI_SZ,
 };
 use crate::registry_notifier::RegistryNotifier;
+use log::error;
 
 // Registry key paths
 const KEYMAGIC_ROOT: &str = "Software\\KeyMagic";
@@ -640,7 +641,7 @@ fn notify_registry_change() -> Result<(), RegistryError> {
     match RegistryNotifier::notify_registry_changed() {
         Ok(()) => Ok(()),
         Err(e) => {
-            eprintln!("Failed to notify registry change: {}", e);
+            error!("Failed to notify registry change: {}", e);
             // Don't fail the entire operation if notification fails
             Ok(())
         }

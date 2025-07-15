@@ -20,6 +20,7 @@ use keyboard_manager::KeyboardManager;
 use hotkey::HotkeyManager;
 use tauri::{Manager, Emitter};
 use tauri_plugin_autostart::ManagerExt;
+use log::{error, info};
 
 // Cleanup handler that disables key processing on drop
 struct CleanupHandler {
@@ -28,11 +29,11 @@ struct CleanupHandler {
 
 impl Drop for CleanupHandler {
     fn drop(&mut self) {
-        eprintln!("KeyMagic GUI exiting - disabling key processing");
+        info!("KeyMagic GUI exiting - disabling key processing");
         if let Some(keyboard_manager) = self.app_handle.try_state::<Mutex<KeyboardManager>>() {
             if let Ok(mut manager) = keyboard_manager.lock() {
                 let _ = manager.set_key_processing_enabled(false);
-                eprintln!("Key processing disabled on exit");
+                info!("Key processing disabled on exit");
             }
         }
     }
@@ -44,12 +45,12 @@ pub fn run() {
     #[cfg(target_os = "windows")]
     {
         if let Err(e) = registry::ensure_registry_structure() {
-            eprintln!("Failed to ensure registry structure: {}", e);
+            error!("Failed to ensure registry structure: {}", e);
         }
         
         // Initialize the global event for TSF communication
         if let Err(e) = windows_event::initialize_global_event() {
-            eprintln!("Failed to initialize global event: {}", e);
+            error!("Failed to initialize global event: {}", e);
         }
     }
     
@@ -66,6 +67,14 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(tauri_plugin_log::Builder::new()
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::Stdout,
+            ))
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::Webview,
+            ))
+            .build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
@@ -102,7 +111,7 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 if let Err(e) = hud::initialize_hud() {
-                    eprintln!("Failed to initialize HUD: {}", e);
+                    error!("Failed to initialize HUD: {}", e);
                 }
             }
             
@@ -144,12 +153,12 @@ pub fn run() {
                 // Register all keyboard hotkeys
                 let hotkey_manager = app.state::<HotkeyManager>();
                 if let Err(e) = hotkey_manager.register_all_hotkeys(&app.app_handle(), &manager) {
-                    eprintln!("Failed to register hotkeys: {}", e);
+                    error!("Failed to register hotkeys: {}", e);
                 }
                 
                 // Load and register on/off hotkey
                 if let Err(e) = hotkey_manager.load_on_off_hotkey(&app.app_handle()) {
-                    eprintln!("Failed to load on/off hotkey: {}", e);
+                    error!("Failed to load on/off hotkey: {}", e);
                 }
                 
                 drop(manager);
@@ -172,7 +181,7 @@ pub fn run() {
                                 
                                 // Show the notification using HUD
                                 if let Err(e) = crate::hud::show_tray_minimize_notification() {
-                                    eprintln!("Failed to show minimize notification: {}", e);
+                                    error!("Failed to show minimize notification: {}", e);
                                 }
                             }
                         }
@@ -197,7 +206,7 @@ pub fn run() {
                             }
                         }
                         Err(e) => {
-                            eprintln!("Failed to check for updates on startup: {}", e);
+                            error!("Failed to check for updates on startup: {}", e);
                         }
                     }
                 });

@@ -1,12 +1,13 @@
 use anyhow::Result;
 use crate::windows_event::WindowsEvent;
+use log::{debug, error};
 
 pub struct RegistryNotifier;
 
 impl RegistryNotifier {
     /// Notify all TSF instances to reload registry settings using Windows Event
     pub fn notify_registry_changed() -> Result<()> {
-        println!("[RegistryNotifier] Sending registry reload notification to TSF instances via Windows Event");
+        debug!("[RegistryNotifier] Sending registry reload notification to TSF instances via Windows Event");
         
         #[cfg(target_os = "windows")]
         {
@@ -16,10 +17,10 @@ impl RegistryNotifier {
                     // Signal the event
                     event.signal()
                         .map_err(|e| anyhow::anyhow!("Failed to signal event: {:?}", e))?;
-                    println!("[RegistryNotifier] Event signaled successfully");
+                    debug!("[RegistryNotifier] Event signaled successfully");
                 }
                 Err(e) => {
-                    eprintln!("[RegistryNotifier] Failed to create/open event: {:?}", e);
+                    error!("[RegistryNotifier] Failed to create/open event: {:?}", e);
                     return Err(anyhow::anyhow!("Failed to create/open event: {:?}", e));
                 }
             }
@@ -27,7 +28,7 @@ impl RegistryNotifier {
         
         #[cfg(not(target_os = "windows"))]
         {
-            println!("[RegistryNotifier] Registry notification skipped (not Windows)");
+            debug!("[RegistryNotifier] Registry notification skipped (not Windows)");
         }
         
         Ok(())

@@ -6,6 +6,7 @@ use tauri::{
 };
 use std::sync::Mutex;
 use crate::keyboard_manager::KeyboardManager;
+use log::error;
 
 pub fn create_system_tray(app: &AppHandle) -> tauri::Result<()> {
     let keyboard_manager = app.state::<Mutex<KeyboardManager>>();
@@ -173,7 +174,7 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
                 
                 // Show native HUD notification
                 if let Err(e) = crate::hud::show_keyboard_hud(&keyboard_name) {
-                    eprintln!("Failed to show HUD: {}", e);
+                    error!("Failed to show HUD: {}", e);
                 }
             }
         }

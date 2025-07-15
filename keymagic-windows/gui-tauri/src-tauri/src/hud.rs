@@ -7,6 +7,7 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::{Result, anyhow};
+use log::{debug, error};
 
 static HUD_INSTANCE: OnceLock<Mutex<HWND>> = OnceLock::new();
 
@@ -18,10 +19,10 @@ const AC_SRC_ALPHA: u8 = 0x01;
 
 /// Initialize the HUD window
 pub fn initialize_hud() -> Result<()> {
-    println!("Initializing HUD window");
+    debug!("Initializing HUD window");
     unsafe {
         let instance = GetModuleHandleW(None)?;
-        println!("Got module handle");
+        debug!("Got module handle");
         
         // Register window class
         let class_name = w!("KeyMagicHUD");
@@ -67,13 +68,13 @@ pub fn initialize_hud() -> Result<()> {
             return Err(anyhow!("Failed to create HUD window"));
         }
         
-        println!("HUD window created successfully: {:?}", hwnd);
+        debug!("HUD window created successfully: {:?}", hwnd);
 
         // Store window handle
         HUD_INSTANCE.set(Mutex::new(hwnd))
             .map_err(|_| anyhow!("Failed to store HUD window handle"))?;
             
-        println!("HUD initialization complete");
+        debug!("HUD initialization complete");
 
         Ok(())
     }
@@ -81,11 +82,11 @@ pub fn initialize_hud() -> Result<()> {
 
 /// Show the HUD with keyboard name
 pub fn show_keyboard_hud(keyboard_name: &str) -> Result<()> {
-    println!("show_keyboard_hud called with: {}", keyboard_name);
+    debug!("show_keyboard_hud called with: {}", keyboard_name);
     if let Some(hwnd_mutex) = HUD_INSTANCE.get() {
         if let Ok(hwnd) = hwnd_mutex.lock() {
             unsafe {
-                println!("Sending HUD message for: {}", keyboard_name);
+                debug!("Sending HUD message for: {}", keyboard_name);
                 // Allocate and copy string
                 let text_wide: Vec<u16> = keyboard_name.encode_utf16().chain(std::iter::once(0)).collect();
                 let text_ptr = Box::into_raw(Box::new(text_wide));
@@ -93,14 +94,14 @@ pub fn show_keyboard_hud(keyboard_name: &str) -> Result<()> {
                 // Send message to show HUD
                 let result = PostMessageW(*hwnd, WM_SHOW_HUD, WPARAM(0), LPARAM(text_ptr as isize));
                 if result.is_err() {
-                    eprintln!("Failed to post message: {:?}", result);
+                    error!("Failed to post message: {:?}", result);
                 }
             }
         } else {
-            eprintln!("Failed to lock HUD mutex");
+            error!("Failed to lock HUD mutex");
         }
     } else {
-        eprintln!("HUD not initialized");
+        error!("HUD not initialized");
     }
     Ok(())
 }
@@ -120,13 +121,13 @@ extern "system" fn hud_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     unsafe {
         match msg {
             WM_SHOW_HUD => {
-                println!("WM_SHOW_HUD received");
+                debug!("WM_SHOW_HUD received");
                 // Get keyboard name from lparam
                 let text_ptr = lparam.0 as *mut Vec<u16>;
                 if !text_ptr.is_null() {
                     let text_vec = Box::from_raw(text_ptr);
                     let text_str = String::from_utf16_lossy(&text_vec);
-                    println!("Showing HUD for: {}", text_str);
+                    debug!("Showing HUD for: {}", text_str);
                     
                     // Show HUD
                     show_hud_internal(hwnd, &text_vec);
@@ -154,7 +155,7 @@ extern "system" fn hud_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
 
 /// Internal function to show HUD
 fn show_hud_internal(hwnd: HWND, text: &[u16]) {
-    println!("show_hud_internal called");
+    debug!("show_hud_internal called");
     unsafe {
         // First make the window visible
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
@@ -238,7 +239,7 @@ fn show_hud_internal(hwnd: HWND, text: &[u16]) {
 
 /// Update layered window with bitmap
 fn update_layered_window(hwnd: HWND, mem_dc: HDC, width: i32, height: i32) {
-    println!("update_layered_window called with size: {}x{}", width, height);
+    debug!("update_layered_window called with size: {}x{}", width, height);
     unsafe {
         // Get monitor info
         let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY);
