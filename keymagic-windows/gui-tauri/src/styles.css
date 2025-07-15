@@ -214,6 +214,11 @@ body {
   transform: none;
 }
 
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
 /* Keyboard List */
 .keyboard-hotkey {
   font-size: 13px;
@@ -487,6 +492,99 @@ body {
   margin: 5px 0 0 0;
 }
 
+.setting-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+/* Composition Mode Settings */
+.composition-mode-settings {
+  margin-top: 10px;
+}
+
+.process-list-container {
+  margin-top: 16px;
+}
+
+.process-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.process-list-header h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.process-list {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: #f9f9f9;
+  min-height: 150px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.process-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background-color: white;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  transition: all 0.2s;
+}
+
+.process-item:last-child {
+  margin-bottom: 0;
+}
+
+.process-item:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.process-name {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.process-item .btn-remove {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--error-color);
+  background: none;
+  border: 1px solid var(--error-color);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.2s;
+}
+
+.process-item .btn-remove:hover {
+  opacity: 1;
+  background-color: var(--error-color);
+  color: white;
+}
+
+.process-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 150px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
 /* About Page */
 .about-content {
   text-align: center;
@@ -708,6 +806,27 @@ body {
 
 .modal-body {
   padding: 20px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  margin: 12px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.modal-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 8px;
 }
 
 .modal-footer {

@@ -37,6 +37,11 @@ function switchPage(pageName) {
   if (pageName === 'about') {
     loadAboutVersion();
   }
+  
+  // Load composition mode settings for settings page
+  if (pageName === 'settings') {
+    loadCompositionModeProcesses();
+  }
 }
 
 // Keyboard Management
@@ -312,10 +317,135 @@ async function loadSettings() {
     
     // Load current version
     await loadCurrentVersion();
+    
+    // Load composition mode processes
+    await loadCompositionModeProcesses();
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
 }
+
+// Composition Mode Process Management
+async function loadCompositionModeProcesses() {
+  try {
+    const processes = await invoke('get_composition_mode_processes');
+    renderProcessList(processes);
+  } catch (error) {
+    console.error('Failed to load composition mode processes:', error);
+    showError('Failed to load composition mode processes');
+  }
+}
+
+function renderProcessList(processes) {
+  const processList = document.getElementById('composition-mode-process-list');
+  if (!processList) return;
+  
+  processList.innerHTML = '';
+  
+  if (processes.length === 0) {
+    processList.innerHTML = `
+      <div class="process-list-empty">
+        <p>No applications configured for composition mode.<br>
+        All applications will use direct input mode.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  processes.forEach(processName => {
+    const item = document.createElement('div');
+    item.className = 'process-item';
+    item.innerHTML = `
+      <span class="process-name">${processName}</span>
+      <button class="btn-remove" onclick="removeProcessFromCompositionMode('${processName.replace(/'/g, "\\'")}')">Remove</button>
+    `;
+    processList.appendChild(item);
+  });
+}
+
+async function addProcessToCompositionMode() {
+  const processName = await showProcessInputDialog();
+  if (!processName) return;
+  
+  try {
+    await invoke('add_composition_mode_process', { processName });
+    await loadCompositionModeProcesses();
+  } catch (error) {
+    console.error('Failed to add process:', error);
+    showError('Failed to add process to composition mode');
+  }
+}
+
+async function removeProcessFromCompositionMode(processName) {
+  try {
+    await invoke('remove_composition_mode_process', { processName });
+    await loadCompositionModeProcesses();
+  } catch (error) {
+    console.error('Failed to remove process:', error);
+    showError('Failed to remove process from composition mode');
+  }
+}
+
+function showProcessInputDialog() {
+  return new Promise((resolve) => {
+    // Store resolve function for later use
+    window._processInputResolve = resolve;
+    
+    showModal(
+      'Add Application',
+      `
+        <p>Enter the executable name of the application (e.g., "ms-teams.exe"):</p>
+        <input type="text" id="process-name-input" class="modal-input" placeholder="application.exe" 
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <p class="modal-hint">The application will use composition mode (underlined text while typing).</p>
+      `,
+      `
+        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddProcess();">Cancel</button>
+        <button class="btn btn-primary" onclick="window.confirmAddProcess();">Add</button>
+      `
+    );
+    
+    // Focus the input field
+    setTimeout(() => {
+      const input = document.getElementById('process-name-input');
+      if (input) {
+        input.focus();
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            window.confirmAddProcess();
+          } else if (e.key === 'Escape') {
+            hideModal();
+            window.cancelAddProcess();
+          }
+        });
+      }
+    }, 100);
+  });
+}
+
+window.confirmAddProcess = function() {
+  const input = document.getElementById('process-name-input');
+  const processName = input ? input.value.trim() : '';
+  
+  if (processName) {
+    hideModal();
+    if (window._processInputResolve) {
+      window._processInputResolve(processName);
+      delete window._processInputResolve;
+    }
+  }
+};
+
+window.cancelAddProcess = function() {
+  if (window._processInputResolve) {
+    window._processInputResolve(null);
+    delete window._processInputResolve;
+  }
+};
+
+// Make these functions available globally
+window.addProcessToCompositionMode = addProcessToCompositionMode;
+window.removeProcessFromCompositionMode = removeProcessFromCompositionMode;
 
 
 // Modal functions

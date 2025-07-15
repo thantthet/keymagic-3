@@ -667,7 +667,7 @@ pub fn get_composition_mode_processes() -> Result<Vec<String>, RegistryError> {
 
 /// Sets the list of processes that should use composition mode
 pub fn set_composition_mode_processes(processes: &[String]) -> Result<(), RegistryError> {
-    let settings_key = open_registry_key(SETTINGS_KEY)?;
+    let settings_key = create_or_open_registry_key(SETTINGS_KEY)?;
     write_registry_multi_string(settings_key, "CompositionModeProcesses", processes)?;
     notify_registry_change()?;
     Ok(())
