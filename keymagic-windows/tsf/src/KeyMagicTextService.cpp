@@ -5,10 +5,13 @@
 #include "DirectEditSession.h"
 #include "CompositionEditSession.h"
 #include "Composition.h"
+#include "ProcessDetector.h"
 #include <string>
 #include <codecvt>
 #include <locale>
 #include <vector>
+#include <algorithm>
+#include <tlhelp32.h>
 
 // Helper function to convert UTF-8 to UTF-16
 std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
@@ -171,6 +174,21 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
 {
     DEBUG_LOG_FUNC();
     EnterCriticalSection(&m_cs);
+    
+    // Log host process path when service is activated
+    wchar_t processPath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, processPath, MAX_PATH) > 0)
+    {
+        DEBUG_LOG(L"Service activated in host process: " + std::wstring(processPath));
+    }
+    else
+    {
+        DEBUG_LOG(L"Service activated in host process: <unknown>");
+    }
+    
+    // Log the effective process name (what will be used for composition mode decisions)
+    std::wstring effectiveProcessName = ProcessDetector::GetEffectiveProcessName();
+    DEBUG_LOG(L"Effective process name for composition mode: " + effectiveProcessName);
     
     m_pThreadMgr = ptim;
     m_pThreadMgr->AddRef();
@@ -1103,20 +1121,8 @@ void CKeyMagicTextService::ReloadRegistrySettings()
             DEBUG_LOG(L"Read DefaultKeyboard: " + std::wstring(defaultKeyboard));
         }
         
-        // Read UseCompositionEditSession
-        DWORD useCompositionEditSession = 1;  // Default to enabled (use composition)
-        dataSize = sizeof(useCompositionEditSession);
-        if (RegGetValueW(hKey, NULL, L"UseCompositionEditSession", RRF_RT_REG_DWORD, 
-                         NULL, &useCompositionEditSession, &dataSize) == ERROR_SUCCESS)
-        {
-            DEBUG_LOG(L"Read UseCompositionEditSession: " + std::to_wstring(useCompositionEditSession));
-            m_useCompositionEditSession = (useCompositionEditSession != 0);
-        }
-        else
-        {
-            DEBUG_LOG(L"UseCompositionEditSession not found in registry, using default: 1 (composition mode)");
-            m_useCompositionEditSession = true;
-        }
+        // Determine UseCompositionEditSession based on current process
+        m_useCompositionEditSession = ShouldUseCompositionEditSession();
         
         RegCloseKey(hKey);
         
@@ -1127,6 +1133,108 @@ void CKeyMagicTextService::ReloadRegistrySettings()
     {
         DEBUG_LOG(L"Failed to open registry key for reading");
     }
+}
+
+// Composition edit session determination
+bool CKeyMagicTextService::ShouldUseCompositionEditSession()
+{
+    // Get the effective process name (handles parent process detection for WebView2)
+    std::wstring processToCheck = ProcessDetector::GetEffectiveProcessName();
+    
+    DEBUG_LOG(L"Checking composition mode for process: " + processToCheck);
+    
+    // Read the list of executables that should use composition mode from registry
+    HKEY hKey = OpenSettingsKey(KEY_READ);
+    if (hKey)
+    {
+        // Try to read the CompositionModeProcesses value
+        DWORD dataSize = 0;
+        LONG result = RegGetValueW(hKey, NULL, L"CompositionModeProcesses", RRF_RT_REG_MULTI_SZ, NULL, NULL, &dataSize);
+        
+        if (result == ERROR_SUCCESS && dataSize > 0)
+        {
+            // Allocate buffer for the multi-string data
+            std::vector<wchar_t> buffer(dataSize / sizeof(wchar_t));
+            result = RegGetValueW(hKey, NULL, L"CompositionModeProcesses", RRF_RT_REG_MULTI_SZ, NULL, buffer.data(), &dataSize);
+            
+            if (result == ERROR_SUCCESS)
+            {
+                // Parse the multi-string data
+                wchar_t* current = buffer.data();
+                while (*current != L'\0')
+                {
+                    std::wstring processName(current);
+                    
+                    // Convert to lowercase for comparison
+                    std::transform(processName.begin(), processName.end(), processName.begin(), ::towlower);
+                    
+                    if (processToCheck == processName)
+                    {
+                        DEBUG_LOG(L"Process found in composition mode list: " + processToCheck);
+                        RegCloseKey(hKey);
+                        return true;
+                    }
+                    
+                    // Move to next string
+                    current += wcslen(current) + 1;
+                }
+                
+                DEBUG_LOG(L"Process not found in composition mode list: " + processToCheck);
+                RegCloseKey(hKey);
+                return false;  // Not in the list, use direct mode
+            }
+            else
+            {
+                DEBUG_LOG(L"Failed to read CompositionModeProcesses value, using default");
+            }
+        }
+        else
+        {
+            DEBUG_LOG(L"CompositionModeProcesses value not found, creating default list");
+            
+            // Create default list of processes that should use composition mode
+            std::vector<std::wstring> defaultProcesses = {
+                L"ms-teams.exe"
+            };
+            
+            // Write the default list to registry
+            std::wstring multiString;
+            for (const auto& process : defaultProcesses)
+            {
+                multiString += process + L'\0';
+            }
+            multiString += L'\0';  // Double null terminator
+            
+            RegSetValueExW(hKey, L"CompositionModeProcesses", 0, REG_MULTI_SZ, 
+                          reinterpret_cast<const BYTE*>(multiString.c_str()), 
+                          static_cast<DWORD>(multiString.length() * sizeof(wchar_t)));
+            
+            // Check if current process is in the default list
+            for (const auto& process : defaultProcesses)
+            {
+                std::wstring lowerProcess = process;
+                std::transform(lowerProcess.begin(), lowerProcess.end(), lowerProcess.begin(), ::towlower);
+                
+                if (processToCheck == lowerProcess)
+                {
+                    DEBUG_LOG(L"Process found in default composition mode list: " + processToCheck);
+                    RegCloseKey(hKey);
+                    return true;
+                }
+            }
+            
+            DEBUG_LOG(L"Process not found in default composition mode list: " + processToCheck);
+        }
+        
+        RegCloseKey(hKey);
+    }
+    else
+    {
+        DEBUG_LOG(L"Failed to open registry key, defaulting to composition mode");
+        return true;  // Default to composition mode if registry access fails
+    }
+    
+    return false;  // Default to direct mode
 }
 
 // Event monitoring implementation

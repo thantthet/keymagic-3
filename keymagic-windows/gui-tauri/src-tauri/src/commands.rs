@@ -311,3 +311,48 @@ pub fn import_bundled_keyboard(
     
     Ok(keyboard_id)
 }
+
+// Composition mode process list commands
+#[tauri::command]
+pub fn get_composition_mode_processes() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::get_composition_mode_processes().map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(vec![])
+}
+
+#[tauri::command]
+pub fn set_composition_mode_processes(processes: Vec<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::set_composition_mode_processes(&processes).map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(())
+}
+
+#[tauri::command]
+pub fn add_composition_mode_process(process_name: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::add_composition_mode_process(&process_name).map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_composition_mode_process(process_name: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::remove_composition_mode_process(&process_name).map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(())
+}

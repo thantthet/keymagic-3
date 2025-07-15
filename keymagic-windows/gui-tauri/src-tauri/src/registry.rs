@@ -10,8 +10,9 @@ use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
 use windows::Win32::System::Registry::{
     RegCloseKey, RegCreateKeyW, RegDeleteKeyW, RegDeleteValueW, RegEnumKeyExW,
     RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
-    KEY_READ, REG_DWORD, REG_SZ,
+    KEY_READ, REG_DWORD, REG_SZ, REG_MULTI_SZ,
 };
+use crate::registry_notifier::RegistryNotifier;
 
 // Registry key paths
 const KEYMAGIC_ROOT: &str = "Software\\KeyMagic";
@@ -179,6 +180,115 @@ fn write_registry_string(hkey: HKEY, value_name: &str, value: &str) -> Result<()
         
         if result.is_err() {
             Err(RegistryError::WriteValueFailed(format!("Failed to set value: {:?}", result)))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Reads a multi-string value from registry
+fn read_registry_multi_string(hkey: HKEY, value_name: &str) -> Result<Vec<String>, RegistryError> {
+    let wide_name = to_wide_string(value_name);
+    let mut size: u32 = 0;
+    
+    // First call to get the size
+    unsafe {
+        let result = RegQueryValueExW(
+            hkey,
+            PCWSTR(wide_name.as_ptr()),
+            None,
+            None,
+            None,
+            Some(&mut size),
+        );
+        
+        match result {
+            Ok(()) => {},
+            Err(e) if e.code() == ERROR_FILE_NOT_FOUND.to_hresult() => return Err(RegistryError::ValueNotFound),
+            Err(e) => return Err(RegistryError::ReadValueFailed(format!("Error: {:?}", e))),
+        }
+    }
+    
+    if size == 0 {
+        return Ok(Vec::new());
+    }
+    
+    // Allocate buffer and read the actual data
+    let mut buffer = vec![0u16; (size / 2) as usize];
+    
+    unsafe {
+        let result = RegQueryValueExW(
+            hkey,
+            PCWSTR(wide_name.as_ptr()),
+            None,
+            None,
+            Some(buffer.as_mut_ptr() as *mut u8),
+            Some(&mut size),
+        );
+        
+        match result {
+            Ok(()) => {},
+            Err(e) => return Err(RegistryError::ReadValueFailed(format!("Error: {:?}", e))),
+        }
+    }
+    
+    // Parse the multi-string data
+    let mut strings = Vec::new();
+    let mut current_start = 0;
+    
+    for i in 0..buffer.len() {
+        if buffer[i] == 0 {
+            if i > current_start {
+                // Convert UTF-16 to String
+                let utf16_slice = &buffer[current_start..i];
+                if let Ok(s) = String::from_utf16(utf16_slice) {
+                    if !s.is_empty() {
+                        strings.push(s);
+                    }
+                }
+            }
+            current_start = i + 1;
+            
+            // Check for double null terminator
+            if i + 1 < buffer.len() && buffer[i + 1] == 0 {
+                break;
+            }
+        }
+    }
+    
+    Ok(strings)
+}
+
+/// Writes a multi-string value to registry
+fn write_registry_multi_string(hkey: HKEY, value_name: &str, values: &[String]) -> Result<(), RegistryError> {
+    let wide_name = to_wide_string(value_name);
+    
+    // Convert strings to UTF-16 and create multi-string buffer
+    let mut buffer = Vec::new();
+    
+    for value in values {
+        let wide_value: Vec<u16> = value.encode_utf16().collect();
+        buffer.extend(wide_value);
+        buffer.push(0); // Null terminator for each string
+    }
+    buffer.push(0); // Double null terminator at the end
+    
+    unsafe {
+        let value_bytes = std::slice::from_raw_parts(
+            buffer.as_ptr() as *const u8,
+            buffer.len() * 2
+        );
+        
+        let result = RegSetValueExW(
+            hkey,
+            PCWSTR(wide_name.as_ptr()),
+            0,
+            REG_MULTI_SZ,
+            Some(value_bytes),
+        );
+        
+        if result.is_err() {
+            Err(RegistryError::WriteValueFailed(format!("Failed to set multi-string value: {:?}", result)))
         } else {
             Ok(())
         }
@@ -523,6 +633,76 @@ pub fn set_setting_dword(key: &str, value: Option<u32>) -> Result<(), RegistryEr
     Ok(())
 }
 
+// ===== Registry Change Notification =====
+
+/// Notify TSF instances of registry changes
+fn notify_registry_change() -> Result<(), RegistryError> {
+    match RegistryNotifier::notify_registry_changed() {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            eprintln!("Failed to notify registry change: {}", e);
+            // Don't fail the entire operation if notification fails
+            Ok(())
+        }
+    }
+}
+
+// ===== Composition Mode Process Management =====
+
+/// Gets the list of processes that should use composition mode
+pub fn get_composition_mode_processes() -> Result<Vec<String>, RegistryError> {
+    let settings_key = open_registry_key(SETTINGS_KEY)?;
+    
+    match read_registry_multi_string(settings_key, "CompositionModeProcesses") {
+        Ok(processes) => Ok(processes),
+        Err(RegistryError::ValueNotFound) => {
+            // Return default list if not found
+            Ok(vec![
+                "ms-teams.exe".to_string(),
+            ])
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Sets the list of processes that should use composition mode
+pub fn set_composition_mode_processes(processes: &[String]) -> Result<(), RegistryError> {
+    let settings_key = open_registry_key(SETTINGS_KEY)?;
+    write_registry_multi_string(settings_key, "CompositionModeProcesses", processes)?;
+    notify_registry_change()?;
+    Ok(())
+}
+
+/// Adds a process to the composition mode process list
+pub fn add_composition_mode_process(process_name: &str) -> Result<(), RegistryError> {
+    let mut processes = get_composition_mode_processes()?;
+    
+    // Convert to lowercase for case-insensitive comparison
+    let process_name_lower = process_name.to_lowercase();
+    
+    // Check if it already exists (case-insensitive)
+    if !processes.iter().any(|p| p.to_lowercase() == process_name_lower) {
+        processes.push(process_name.to_string());
+        processes.sort(); // Keep the list sorted
+        set_composition_mode_processes(&processes)?;
+    }
+    
+    Ok(())
+}
+
+/// Removes a process from the composition mode process list
+pub fn remove_composition_mode_process(process_name: &str) -> Result<(), RegistryError> {
+    let mut processes = get_composition_mode_processes()?;
+    
+    // Convert to lowercase for case-insensitive comparison
+    let process_name_lower = process_name.to_lowercase();
+    
+    // Remove all matching entries (case-insensitive)
+    processes.retain(|p| p.to_lowercase() != process_name_lower);
+    
+    set_composition_mode_processes(&processes)?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

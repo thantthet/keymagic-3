@@ -87,6 +87,9 @@ private:
     // Settings update notification
     void UpdateSettings(bool enabled, const std::wstring& keyboardId);
     
+    // Composition edit session determination
+    bool ShouldUseCompositionEditSession();
+    
     // Member variables
     LONG m_cRef;
     ITfThreadMgr *m_pThreadMgr;

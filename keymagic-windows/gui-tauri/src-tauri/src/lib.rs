@@ -92,6 +92,10 @@ pub fn run() {
             commands::clear_first_run_scan_keyboards,
             commands::get_bundled_keyboards,
             commands::import_bundled_keyboard,
+            commands::get_composition_mode_processes,
+            commands::set_composition_mode_processes,
+            commands::add_composition_mode_process,
+            commands::remove_composition_mode_process,
         ])
         .setup(|app| {
             // Initialize native HUD window

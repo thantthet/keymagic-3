@@ -19,6 +19,7 @@ set(SOURCES
     src/DisplayAttribute.cpp
     src/Globals.cpp
     src/Registry.cpp
+    src/ProcessDetector.cpp
     src/KeyMagicTSF.rc
 )
 
