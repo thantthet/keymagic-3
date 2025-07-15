@@ -233,6 +233,10 @@ HRESULT CCompositionEditSession::ProcessKey(TfEditCookie ec)
         DEBUG_LOG(L"Engine has no composing text, ending composition");
         if (m_pCompositionManager->IsComposing())
         {
+            if (output.is_processed) {
+                // If the engine processed the key, we should update the composition
+                m_pCompositionManager->UpdateComposition(m_pContext, ec, L"");
+            }
             m_pCompositionManager->EndComposition(ec);
         }
         
