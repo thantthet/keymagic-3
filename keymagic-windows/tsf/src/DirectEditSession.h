@@ -15,8 +15,7 @@ public:
     enum class EditAction
     {
         ProcessKey,
-        SyncEngine,
-        DeleteAndInsert
+        SyncEngine
     };
     
     CDirectEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
@@ -33,7 +32,6 @@ public:
     
     // Set parameters for different actions
     void SetKeyData(WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
-    void SetTextAction(int deleteCount, const std::wstring &insertText);
     
 private:
     LONG m_cRef;
@@ -45,8 +43,6 @@ private:
     WPARAM m_wParam;
     LPARAM m_lParam;
     BOOL *m_pfEaten;
-    int m_deleteCount;
-    std::wstring m_insertText;
 };
 
 #endif // DIRECT_EDIT_SESSION_H

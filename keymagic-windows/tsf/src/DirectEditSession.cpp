@@ -18,7 +18,6 @@ CDirectEditSession::CDirectEditSession(CKeyMagicTextService *pTextService, ITfCo
     m_wParam = 0;
     m_lParam = 0;
     m_pfEaten = nullptr;
-    m_deleteCount = 0;
 }
 
 CDirectEditSession::~CDirectEditSession()
@@ -73,62 +72,14 @@ STDAPI CDirectEditSession::DoEditSession(TfEditCookie ec)
     {
         case EditAction::ProcessKey:
         {
-            // First sync engine with document
-            char* engineComposing = keymagic_engine_get_composition(m_pTextService->GetEngineHandle());
-            if (engineComposing)
-            {
-                std::string engineText(engineComposing);
-                keymagic_free_string(engineComposing);
-                
-                // Read document suffix
-                std::wstring documentText;
-                int compareLength = static_cast<int>(engineText.length());
-                if (compareLength > 0)
-                {
-                    m_pTextService->ReadDocumentSuffix(m_pContext, ec, compareLength, documentText);
-                    
-                    // Compare texts
-                    std::string docUtf8 = ConvertUtf16ToUtf8(documentText);
-                    
-                    DEBUG_LOG(L"Comparing engine text with document");
-                    DEBUG_LOG(L"Engine: \"" + ConvertUtf8ToUtf16(engineText) + L"\"");
-                    DEBUG_LOG(L"Document: \"" + documentText + L"\"");
-                    
-                    if (docUtf8 != engineText)
-                    {
-                        DEBUG_LOG(L"Text mismatch - resetting engine");
-                        // Texts don't match, reset engine
-                        m_pTextService->ResetEngine();
-                    }
-                }
-            }
-            
-            // Process the key
-            m_pTextService->ProcessKeyInput(m_pContext, m_wParam, m_lParam, m_pfEaten);
+            // Process the key using SendInput approach
+            m_pTextService->ProcessKeyWithSendInput(m_pContext, ec, m_wParam, m_lParam, m_pfEaten);
             break;
         }
         
         case EditAction::SyncEngine:
         {
             m_pTextService->SyncEngineWithDocument(m_pContext, ec);
-            break;
-        }
-        
-        case EditAction::DeleteAndInsert:
-        {
-            // Delete characters if needed
-            if (m_deleteCount > 0)
-            {
-                DEBUG_LOG(L"Deleting " + std::to_wstring(m_deleteCount) + L" characters");
-                m_pTextService->DeleteCharsBeforeCursor(m_pContext, ec, m_deleteCount);
-            }
-            
-            // Insert new text
-            if (!m_insertText.empty())
-            {
-                DEBUG_LOG(L"Inserting text: \"" + m_insertText + L"\"");
-                m_pTextService->InsertTextAtCursor(m_pContext, ec, m_insertText);
-            }
             break;
         }
     }
@@ -141,10 +92,4 @@ void CDirectEditSession::SetKeyData(WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
     m_wParam = wParam;
     m_lParam = lParam;
     m_pfEaten = pfEaten;
-}
-
-void CDirectEditSession::SetTextAction(int deleteCount, const std::wstring &insertText)
-{
-    m_deleteCount = deleteCount;
-    m_insertText = insertText;
 }

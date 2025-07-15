@@ -526,8 +526,16 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
     char character = MapVirtualKeyToChar(wParam, lParam);
     DEBUG_LOG_KEY(L"OnKeyDown", wParam, lParam, character);
 
-    // Process key directly without using TSF text manipulation
-    ProcessKeyWithSendInput(pic, wParam, lParam, pfEaten);
+    // Create edit session for key processing
+    CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
+                                                              CDirectEditSession::EditAction::ProcessKey);
+    if (pEditSession)
+    {
+        pEditSession->SetKeyData(wParam, lParam, pfEaten);
+        HRESULT hr;
+        pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+        pEditSession->Release();
+    }
     
     // Clear the processing flag after key is processed
     m_isProcessingKey = false;
@@ -772,7 +780,7 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
 }
 
 
-void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
+void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, TfEditCookie ec, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
     DEBUG_LOG_FUNC();
     EnterCriticalSection(&m_cs);
@@ -811,17 +819,8 @@ void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wPara
             wParam == VK_PRIOR || wParam == VK_NEXT)
         {
             DEBUG_LOG(L"Special key pressed with existing composition - syncing first");
-            if (pic)
-            {
-                CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
-                                                                          CDirectEditSession::EditAction::SyncEngine);
-                if (pEditSession)
-                {
-                    HRESULT hr;
-                    pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
-                    pEditSession->Release();
-                }
-            }
+            // We already have an edit cookie, so sync directly
+            SyncEngineWithDocument(pic, ec);
         }
     }
     else if (currentComposing)
@@ -935,101 +934,6 @@ void CKeyMagicTextService::ProcessKeyWithSendInput(ITfContext *pic, WPARAM wPara
                     *pfEaten = TRUE;
                     break;
             }
-        }
-        
-        // Cleanup
-        if (output.text) keymagic_free_string(output.text);
-        if (output.composing_text) keymagic_free_string(output.composing_text);
-    }
-    else
-    {
-        DEBUG_LOG(L"Engine process_key failed");
-    }
-
-    LeaveCriticalSection(&m_cs);
-}
-
-void CKeyMagicTextService::ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
-{
-    DEBUG_LOG_FUNC();
-    EnterCriticalSection(&m_cs);
-
-    if (!m_pEngine)
-    {
-        DEBUG_LOG(L"No engine available");
-        LeaveCriticalSection(&m_cs);
-        return;
-    }
-    
-    // Check if TSF is disabled
-    if (!m_tsfEnabled)
-    {
-        DEBUG_LOG(L"Key processing is disabled, not processing key");
-        *pfEaten = FALSE;
-        LeaveCriticalSection(&m_cs);
-        return;
-    }
-
-    // Get modifiers
-    int shift = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
-    int ctrl = (GetKeyState(VK_CONTROL) & 0x8000) ? 1 : 0;
-    int alt = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
-    int capsLock = (GetKeyState(VK_CAPITAL) & 0x0001) ? 1 : 0;
-
-    // Translate VK to character
-    char character = MapVirtualKeyToChar(wParam, lParam);
-    
-    // Only pass printable ASCII characters
-    if (!IsPrintableAscii(character))
-    {
-        character = '\0';
-    }
-
-    ProcessKeyOutput output = {0};
-    
-    // Log engine input parameters
-    {
-        std::wostringstream oss;
-        oss << L"Engine Input - VK: 0x" << std::hex << wParam << std::dec;
-        oss << L" (" << wParam << L")";
-        
-        if (character != '\0') {
-            if (character >= 0x20 && character <= 0x7E) {
-                oss << L", Char: '" << (wchar_t)character << L"' (0x" << std::hex << (int)(unsigned char)character << std::dec << L")";
-            } else {
-                oss << L", Char: 0x" << std::hex << (int)(unsigned char)character << std::dec;
-            }
-        } else {
-            oss << L", Char: NULL";
-        }
-        
-        oss << L", Modifiers: ";
-        oss << L"Shift=" << shift;
-        oss << L" Ctrl=" << ctrl;
-        oss << L" Alt=" << alt;
-        oss << L" Caps=" << capsLock;
-        
-        DEBUG_LOG(oss.str());
-    }
-    
-    // Process key with engine
-    KeyMagicResult result = keymagic_engine_process_key_win(
-        m_pEngine, 
-        static_cast<int>(wParam),
-        character,
-        shift, ctrl, alt, capsLock,
-        &output
-    );
-
-    if (result == KeyMagicResult_Success)
-    {
-        DEBUG_LOG_ENGINE(output);
-        *pfEaten = output.is_processed ? TRUE : FALSE;
-        
-        // Execute text action if processed
-        if (output.is_processed)
-        {
-            ExecuteTextAction(pic, output);
         }
         
         // Cleanup
@@ -1222,77 +1126,6 @@ HRESULT CKeyMagicTextService::ReadDocumentSuffix(ITfContext *pic, TfEditCookie e
 
     pRangeStart->Release();
     pRange->Release();
-    
-    return hr;
-}
-
-HRESULT CKeyMagicTextService::DeleteCharsBeforeCursor(ITfContext *pic, TfEditCookie ec, int count)
-{
-    if (count <= 0)
-        return S_OK;
-
-    // Get current selection
-    TF_SELECTION tfSelection;
-    ULONG fetched;
-    if (FAILED(pic->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &tfSelection, &fetched)) || fetched == 0)
-        return E_FAIL;
-
-    ITfRange *pRange = tfSelection.range;
-    
-    // Shift start back by count
-    LONG shifted;
-    pRange->ShiftStart(ec, -count, &shifted, nullptr);
-    
-    // Delete the text
-    HRESULT hr = pRange->SetText(ec, 0, L"", 0);
-    
-    pRange->Release();
-    return hr;
-}
-
-HRESULT CKeyMagicTextService::InsertTextAtCursor(ITfContext *pic, TfEditCookie ec, const std::wstring &text)
-{
-    if (text.empty())
-        return S_OK;
-
-    // Get ITfInsertAtSelection interface
-    ITfInsertAtSelection *pInsertAtSelection;
-    if (FAILED(pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsertAtSelection)))
-        return E_FAIL;
-
-    // Insert text
-    ITfRange *pRange;
-    HRESULT hr = pInsertAtSelection->InsertTextAtSelection(ec, 0, text.c_str(), text.length(), &pRange);
-    
-    if (SUCCEEDED(hr) && pRange)
-    {
-        pRange->Release();
-    }
-    
-    pInsertAtSelection->Release();
-    return hr;
-}
-
-HRESULT CKeyMagicTextService::ExecuteTextAction(ITfContext *pic, const ProcessKeyOutput &output)
-{
-    // Create edit session for text manipulation
-    CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
-                                                              CDirectEditSession::EditAction::DeleteAndInsert);
-    if (!pEditSession)
-        return E_OUTOFMEMORY;
-
-    // Set action parameters based on output
-    std::wstring insertText;
-    if (output.text)
-    {
-        insertText = ConvertUtf8ToUtf16(output.text);
-    }
-    
-    pEditSession->SetTextAction(output.delete_count, insertText);
-    
-    HRESULT hr;
-    pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-    pEditSession->Release();
     
     return hr;
 }

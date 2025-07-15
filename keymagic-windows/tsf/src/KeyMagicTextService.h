@@ -67,8 +67,7 @@ private:
     HKEY OpenSettingsKey(REGSAM samDesired);
     BOOL LoadKeyboard(const std::wstring& km2Path);
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
-    void ProcessKeyInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
-    void ProcessKeyWithSendInput(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
+    void ProcessKeyWithSendInput(ITfContext *pic, TfEditCookie ec, WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
     void ResetEngine();
     void SyncEngineWithDocument(ITfContext *pic, TfEditCookie ec);
     
@@ -77,9 +76,6 @@ private:
     
     // Text manipulation
     HRESULT ReadDocumentSuffix(ITfContext *pic, TfEditCookie ec, int maxChars, std::wstring &text);
-    HRESULT DeleteCharsBeforeCursor(ITfContext *pic, TfEditCookie ec, int count);
-    HRESULT InsertTextAtCursor(ITfContext *pic, TfEditCookie ec, const std::wstring &text);
-    HRESULT ExecuteTextAction(ITfContext *pic, const ProcessKeyOutput &output);
     
     // Key translation
     char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
