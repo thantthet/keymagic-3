@@ -77,6 +77,18 @@ KeyMagicResult keymagic_engine_process_key_win(
     ProcessKeyOutput* output
 );
 
+// Test mode - non-modifying key processing for preview
+KeyMagicResult keymagic_engine_process_key_test_win(
+    EngineHandle* handle,
+    int vk_code,          // Windows VK code (e.g., 0x41 for VK_A)
+    char character,
+    int shift,
+    int ctrl,
+    int alt,
+    int caps_lock,
+    ProcessKeyOutput* output
+);
+
 #ifdef __cplusplus
 }
 #endif

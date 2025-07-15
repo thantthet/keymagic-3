@@ -6,6 +6,7 @@
 #include "CompositionEditSession.h"
 #include "Composition.h"
 #include "ProcessDetector.h"
+#include "KeyProcessingUtils.h"
 #include <string>
 #include <codecvt>
 #include <locale>
@@ -452,27 +453,46 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
             return S_OK;
         }
     }
-    
-    // Mark that we're processing a key to help OnEndEdit
-    m_isProcessingKey = true;
 
-    // We want to process most keys
+    // Use engine test mode to determine if we should consume this key
     if (m_pEngine && m_tsfEnabled)
     {
-        // Let some keys pass through without processing
-        switch (wParam)
+        // Prepare key input using the utility
+        KeyProcessingUtils::KeyInputData keyInput = KeyProcessingUtils::PrepareKeyInput(wParam, lParam);
+        
+        // Skip modifier and function keys
+        if (keyInput.shouldSkip)
         {
-            case VK_SHIFT:
-            case VK_CONTROL:
-            case VK_MENU:
-            case VK_LWIN:
-            case VK_RWIN:
-            case VK_APPS:
-                *pfEaten = FALSE;
-                break;
-            default:
-                *pfEaten = TRUE;
-                break;
+            *pfEaten = FALSE;
+            return S_OK;
+        }
+        
+        // Test key processing without modifying engine state
+        ProcessKeyOutput testOutput = {0};
+        KeyMagicResult result = keymagic_engine_process_key_test_win(
+            m_pEngine,
+            static_cast<int>(wParam),
+            keyInput.character,
+            keyInput.shift,
+            keyInput.ctrl,
+            keyInput.alt,
+            keyInput.capsLock,
+            &testOutput
+        );
+        
+        if (result == KeyMagicResult_Success)
+        {
+            // Use engine's decision on whether to consume the key
+            *pfEaten = testOutput.is_processed ? TRUE : FALSE;
+            
+            // Clean up
+            if (testOutput.text) keymagic_free_string(testOutput.text);
+            if (testOutput.composing_text) keymagic_free_string(testOutput.composing_text);
+        }
+        else
+        {
+            // Fallback: don't consume keys if engine test fails
+            *pfEaten = FALSE;
         }
     }
 
@@ -485,11 +505,12 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         return E_INVALIDARG;
 
     *pfEaten = FALSE;
+    
+    // Mark that we're processing a key to help OnEndEdit
+    m_isProcessingKey = true;
 
     // Check if this is our own SendInput by examining the extra info
     ULONG_PTR extraInfo = GetMessageExtraInfo();
-
-    DEBUG_LOG(L"OnKeyDown: " + std::to_wstring(wParam) + L" " + std::to_wstring(lParam) + L" " + std::to_wstring(extraInfo));
     
     // Special handling for VK_SPACE sent for termination (used to terminate composition when disabling TSF)
     if (wParam == VK_SPACE && m_lastTerminationSpaceTime > 0)
