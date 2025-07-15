@@ -134,6 +134,7 @@ private:
     // Processing state
     bool m_isProcessingKey;
     DWORD m_lastSendInputTime;
+    DWORD m_lastTerminationSpaceTime;  // Timestamp when we send SPACE for composition termination
     
     // Event monitoring
     HANDLE m_hRegistryUpdateEvent;
