@@ -61,8 +61,6 @@ private:
     HRESULT ReadTextBeforeCursor(TfEditCookie ec, int maxChars, std::wstring &text);
     
     // Helper methods
-    char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
-    bool IsPrintableAscii(char c);
     bool ShouldCommitComposition(WPARAM wParam, const std::string& composingText, bool isProcessed);
 };
 

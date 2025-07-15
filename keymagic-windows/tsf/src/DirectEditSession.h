@@ -57,10 +57,6 @@ private:
     
     // Document reading methods
     HRESULT ReadDocumentSuffix(TfEditCookie ec, int maxChars, std::wstring &text);
-    
-    // Helper methods
-    char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
-    bool IsPrintableAscii(char c);
 };
 
 #endif // DIRECT_EDIT_SESSION_H

@@ -2,6 +2,7 @@
 #include "KeyMagicTextService.h"
 #include "Debug.h"
 #include "Globals.h"
+#include "KeyProcessingUtils.h"
 #include "../include/keymagic_ffi.h"
 
 extern std::wstring ConvertUtf8ToUtf16(const std::string &utf8);
@@ -102,15 +103,15 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
         return S_OK;
     }
 
-    // Get character from virtual key
-    char character = MapVirtualKeyToChar(m_wParam, m_lParam);
+    // Use consolidated key processing utility
+    KeyProcessingUtils::KeyInputData keyInput = KeyProcessingUtils::PrepareKeyInput(m_wParam, m_lParam);
     
-    // Skip modifier keys and function keys (let them pass through)
-    if (m_wParam == VK_SHIFT || m_wParam == VK_CONTROL || m_wParam == VK_MENU ||
-        m_wParam == VK_LWIN || m_wParam == VK_RWIN ||
-        (m_wParam >= VK_F1 && m_wParam <= VK_F24))
+    // Log the key event using secure debug macro
+    DEBUG_LOG_KEY(L"ProcessKey Input", m_wParam, m_lParam, keyInput.character);
+    
+    // Skip if needed (modifier/function keys)
+    if (keyInput.shouldSkip)
     {
-        DEBUG_LOG(L"Modifier or function key, passing through");
         *m_pfEaten = FALSE;
         return S_OK;
     }
@@ -118,48 +119,11 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
     // Process with engine
     ProcessKeyOutput output = {0};
     
-    // Get modifiers
-    int shift = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
-    int ctrl = (GetKeyState(VK_CONTROL) & 0x8000) ? 1 : 0;
-    int alt = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
-    int capsLock = (GetKeyState(VK_CAPITAL) & 0x0001) ? 1 : 0;
-
-    // Only pass printable ASCII characters
-    if (!IsPrintableAscii(character))
-    {
-        character = '\0';
-    }
-    
-    // Log engine input parameters
-    {
-        std::wostringstream oss;
-        oss << L"Engine Input - VK: 0x" << std::hex << m_wParam << std::dec;
-        oss << L" (" << m_wParam << L")";
-        
-        if (character != '\0') {
-            if (character >= 0x20 && character <= 0x7E) {
-                oss << L", Char: '" << (wchar_t)character << L"' (0x" << std::hex << (int)(unsigned char)character << std::dec << L")";
-            } else {
-                oss << L", Char: 0x" << std::hex << (int)(unsigned char)character << std::dec;
-            }
-        } else {
-            oss << L", Char: NULL";
-        }
-        
-        oss << L", Modifiers: ";
-        oss << L"Shift=" << shift;
-        oss << L" Ctrl=" << ctrl;
-        oss << L" Alt=" << alt;
-        oss << L" Caps=" << capsLock;
-        
-        DEBUG_LOG(oss.str());
-    }
-    
     KeyMagicResult result = keymagic_engine_process_key_win(
         m_pEngine, 
         static_cast<int>(m_wParam), 
-        character, 
-        shift, ctrl, alt, capsLock, 
+        keyInput.character, 
+        keyInput.shift, keyInput.ctrl, keyInput.alt, keyInput.capsLock, 
         &output
     );
     
@@ -170,9 +134,8 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
         return S_OK;
     }
     
-    // Process the output
-    DEBUG_LOG(L"Engine output - action: " + std::to_wstring(output.action_type) + 
-              L", is_processed: " + std::to_wstring(output.is_processed));
+    // Process the output using secure debug macro
+    DEBUG_LOG_ENGINE(output);
     
     if (output.action_type != 0) // Not None
     {
@@ -440,24 +403,3 @@ HRESULT CDirectEditSession::ReadDocumentSuffix(TfEditCookie ec, int maxChars, st
     return hr;
 }
 
-// Helper methods
-char CDirectEditSession::MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam)
-{
-    BYTE keyState[256];
-    GetKeyboardState(keyState);
-    
-    WCHAR buffer[2] = {0};
-    int result = ToUnicode(static_cast<UINT>(wParam), (lParam >> 16) & 0xFF, keyState, buffer, 2, 0);
-    
-    if (result == 1 && buffer[0] < 128)
-    {
-        return static_cast<char>(buffer[0]);
-    }
-    
-    return '\0';
-}
-
-bool CDirectEditSession::IsPrintableAscii(char c)
-{
-    return c >= 0x20 && c <= 0x7E;
-}

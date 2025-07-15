@@ -20,6 +20,7 @@ set(SOURCES
     src/Globals.cpp
     src/Registry.cpp
     src/ProcessDetector.cpp
+    src/KeyProcessingUtils.cpp
     src/KeyMagicTSF.rc
 )
 
