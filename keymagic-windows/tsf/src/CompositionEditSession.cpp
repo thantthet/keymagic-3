@@ -484,31 +484,22 @@ bool CCompositionEditSession::IsPrintableAscii(char c)
 
 bool CCompositionEditSession::ShouldCommitComposition(WPARAM wParam, const std::string& composingText, bool isProcessed)
 {
+    // If the engine didn't process the key, we should commit the composition
+    if (!isProcessed) {
+        return true;
+    }
+
     // Check special keys that should trigger commit
     switch (wParam)
     {
         case VK_SPACE:
-            // Commit if:
-            // 1. Engine processed space and composing text ends with space, OR
-            // 2. Engine didn't process space (we'll append space during commit)
-            if (isProcessed)
-            {
-                // Check if composing text ends with space
-                return !composingText.empty() && composingText.back() == ' ';
-            }
-            else
-            {
-                // Engine didn't process space - commit current text + space
-                return true;
-            }
-            
+            // Commit if engine processed space and composing text ends with space
+            return !composingText.empty() && composingText.back() == ' ';
         case VK_RETURN:
         case VK_TAB:
         case VK_ESCAPE:
             // Always commit for these keys
             return true;
-            
-            
         default:
             // Don't commit for other keys
             return false;
