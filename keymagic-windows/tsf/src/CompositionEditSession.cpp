@@ -257,120 +257,19 @@ HRESULT CCompositionEditSession::SyncEngineWithDocument(TfEditCookie ec)
                 else
                 {
                     DEBUG_LOG_SYNC_MISMATCH(engineText, documentCompositionText);
+                    // Mismatch detected - reset engine and end composition
+                    DEBUG_LOG(L"Engine and document composition mismatch, resetting engine");
+                    keymagic_engine_reset(m_pEngine);
+                    m_pCompositionManager->EndComposition(ec);
+                    return S_OK;
                 }
             }
         }
     }
 
-    // Read text before cursor to sync with engine
-    std::wstring documentText;
-    const int MAX_COMPOSE_LENGTH = 50; // Maximum reasonable compose length
-    
-    if (SUCCEEDED(ReadTextBeforeCursor(ec, MAX_COMPOSE_LENGTH, documentText)))
-    {
-        if (!documentText.empty())
-        {
-            // Check if text ends with a space - if so, just reset engine
-            if (documentText.back() == L' ')
-            {
-                DEBUG_LOG(L"Text before cursor ends with space, resetting engine instead of syncing");
-                keymagic_engine_reset(m_pEngine);
-                return S_OK;
-            }
-            
-            // Look for a reasonable break point (space, punctuation, etc.)
-            size_t composeStart = documentText.length();
-            
-            // Find the last space or punctuation mark
-            for (size_t i = documentText.length(); i > 0; --i)
-            {
-                wchar_t ch = documentText[i - 1];
-                // Check for word boundaries
-                if (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' ||
-                    ch == L'.' || ch == L',' || ch == L'!' || ch == L'?' ||
-                    ch == L';' || ch == L':' || ch == L'"' || ch == L'\'' ||
-                    ch == L'(' || ch == L')' || ch == L'[' || ch == L']' ||
-                    ch == L'{' || ch == L'}' || ch == L'<' || ch == L'>')
-                {
-                    composeStart = i;
-                    break;
-                }
-            }
-            
-            // Extract potential compose text
-            std::wstring composeText;
-            if (composeStart < documentText.length())
-            {
-                composeText = documentText.substr(composeStart);
-            }
-            else
-            {
-                // No break found, take the last few characters
-                const size_t REASONABLE_COMPOSE_LENGTH = 10;
-                if (documentText.length() > REASONABLE_COMPOSE_LENGTH)
-                {
-                    composeText = documentText.substr(documentText.length() - REASONABLE_COMPOSE_LENGTH);
-                }
-                else
-                {
-                    composeText = documentText;
-                }
-            }
-            
-            // First try to start composition on the existing text
-            if (!composeText.empty())
-            {
-                DEBUG_LOG_TEXT(L"Starting composition on document text", composeText);
-                
-                // Use the new method to compose existing text at cursor position
-                HRESULT hr = m_pCompositionManager->StartCompositionAtSelection(m_pContext, ec, composeText.length(), 0);
-                
-                if (SUCCEEDED(hr))
-                {
-                    DEBUG_LOG(L"Successfully started composition on document text");
-                    
-                    // Only set engine composition if we successfully started document composition
-                    std::string utf8Text = ConvertUtf16ToUtf8(composeText);
-                    KeyMagicResult result = keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());
-                    
-                    if (result == KeyMagicResult_Success)
-                    {
-                        DEBUG_LOG(L"Successfully synced engine with document composition");
-                    }
-                    else
-                    {
-                        DEBUG_LOG(L"Failed to set engine composition, error: " + std::to_wstring(result));
-                        // End the composition since we couldn't sync the engine
-                        m_pCompositionManager->EndComposition(ec);
-                        keymagic_engine_reset(m_pEngine);
-                    }
-                }
-                else
-                {
-                    DEBUG_LOG(L"Failed to start composition on document text");
-                    // Don't set engine composition if we couldn't start document composition
-                    keymagic_engine_reset(m_pEngine);
-                }
-            }
-            else
-            {
-                // No text to compose, just ensure engine is reset
-                DEBUG_LOG(L"No text to compose, resetting engine");
-                keymagic_engine_reset(m_pEngine);
-            }
-        }
-        else
-        {
-            // Empty document, reset engine
-            DEBUG_LOG(L"Document is empty, resetting engine");
-            keymagic_engine_reset(m_pEngine);
-        }
-    }
-    else
-    {
-        DEBUG_LOG(L"Failed to read document text for sync, resetting engine");
-        keymagic_engine_reset(m_pEngine);
-    }
+    // If not composing, just reset the engine
+    DEBUG_LOG(L"Not composing, resetting engine");
+    keymagic_engine_reset(m_pEngine);
     
     return S_OK;
 }
