@@ -142,17 +142,21 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
         // Handle backspace count
         if (output.delete_count > 0)
         {
-            DEBUG_LOG(L"Sending " + std::to_wstring(output.delete_count) + L" backspaces");
-            SendBackspaces(output.delete_count, KEYMAGIC_EXTRAINFO_SIGNATURE, nullptr);
+            DEBUG_LOG(L"Deleting " + std::to_wstring(output.delete_count) + L" characters");
+            DeleteCharactersBefore(ec, output.delete_count);
         }
         
         // Handle text insertion
         if (output.text && strlen(output.text) > 0)
         {
             std::wstring textToInsert = ConvertUtf8ToUtf16(output.text);
-            DEBUG_LOG_TEXT(L"Sending text", textToInsert);
-            SendUnicodeText(textToInsert, KEYMAGIC_EXTRAINFO_SIGNATURE, nullptr);
+            DEBUG_LOG_TEXT(L"Inserting text", textToInsert);
+            InsertTextAtSelection(ec, textToInsert);
         }
+        
+        // Update time tracking
+        DWORD currentTime = GetTickCount();
+        m_pTextService->m_lastSendInputTime = currentTime;
     }
     
     // Handle special keys that might trigger commit
@@ -178,7 +182,9 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
                     // Engine didn't process space - append space and reset
                     if (!composingText.empty())
                     {
-                        SendUnicodeText(L" ", KEYMAGIC_EXTRAINFO_SIGNATURE, nullptr);
+                        InsertTextAtSelection(ec, L" ");
+                        // Update time tracking
+                        m_pTextService->m_lastSendInputTime = GetTickCount();
                     }
                     keymagic_engine_reset(m_pEngine);
                 }
@@ -298,68 +304,115 @@ HRESULT CDirectEditSession::SyncEngineWithDocument(TfEditCookie ec)
     return S_OK;
 }
 
-// Text manipulation methods
-void CDirectEditSession::SendBackspaces(int count, ULONG_PTR dwExtraInfo, DWORD* pLastSendTime)
+
+// New methods that use TSF APIs with edit cookie
+HRESULT CDirectEditSession::DeleteCharactersBefore(TfEditCookie ec, int count)
 {
     if (count <= 0)
-        return;
+        return S_OK;
         
-    std::vector<INPUT> inputs;
-    inputs.reserve(count * 2);
-    
-    for (int i = 0; i < count; i++) {
-        INPUT input = {0};
-        input.type = INPUT_KEYBOARD;
-        input.ki.wVk = VK_BACK;
-        input.ki.dwExtraInfo = dwExtraInfo;
-        inputs.push_back(input);
-        
-        // Key up
-        input.ki.dwFlags = KEYEVENTF_KEYUP;
-        inputs.push_back(input);
+    // Get current selection
+    TF_SELECTION tfSelection;
+    ULONG fetched;
+    HRESULT hr = m_pContext->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &tfSelection, &fetched);
+    if (FAILED(hr) || fetched == 0)
+    {
+        DEBUG_LOG(L"Failed to get selection for deletion");
+        return E_FAIL;
     }
     
-    if (!inputs.empty()) {
-        SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
-        DWORD currentTime = GetTickCount();
-        if (pLastSendTime) {
-            *pLastSendTime = currentTime;
-        }
-        // Update the text service's last send time
-        m_pTextService->m_lastSendInputTime = currentTime;
+    ITfRange *pRange = tfSelection.range;
+    if (!pRange)
+    {
+        DEBUG_LOG(L"No range available for deletion");
+        return E_FAIL;
     }
+    
+    // Collapse to insertion point at end
+    hr = pRange->Collapse(ec, TF_ANCHOR_END);
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Failed to collapse range");
+        pRange->Release();
+        return hr;
+    }
+    
+    // Extend selection backwards by 'count' characters
+    LONG shifted;
+    hr = pRange->ShiftStart(ec, -count, &shifted, nullptr);
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Failed to shift range start");
+        pRange->Release();
+        return hr;
+    }
+    
+    // Delete the selected text by setting empty text
+    hr = pRange->SetText(ec, 0, L"", 0);
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"Failed to delete text");
+    }
+    
+    pRange->Release();
+    
+    return hr;
 }
 
-void CDirectEditSession::SendUnicodeText(const std::wstring& text, ULONG_PTR dwExtraInfo, DWORD* pLastSendTime)
+HRESULT CDirectEditSession::InsertTextAtSelection(TfEditCookie ec, const std::wstring& text)
 {
     if (text.empty())
-        return;
+        return S_OK;
         
-    std::vector<INPUT> inputs;
-    inputs.reserve(text.length() * 2); // Each char needs keydown + keyup
-    
-    for (wchar_t ch : text) {
-        INPUT input = {0};
-        input.type = INPUT_KEYBOARD;
-        input.ki.wScan = ch;
-        input.ki.dwFlags = KEYEVENTF_UNICODE;
-        input.ki.dwExtraInfo = dwExtraInfo;
-        inputs.push_back(input);
-        
-        // Key up
-        input.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
-        inputs.push_back(input);
+    // Use ITfInsertAtSelection to insert text at current position
+    ITfInsertAtSelection *pInsertAtSelection = nullptr;
+    HRESULT hr = m_pContext->QueryInterface(IID_ITfInsertAtSelection, (void **)&pInsertAtSelection);
+    if (FAILED(hr) || !pInsertAtSelection)
+    {
+        DEBUG_LOG(L"Failed to get ITfInsertAtSelection interface");
+        return E_FAIL;
     }
     
-    if (!inputs.empty()) {
-        SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
-        DWORD currentTime = GetTickCount();
-        if (pLastSendTime) {
-            *pLastSendTime = currentTime;
+    ITfRange *pRange = nullptr;
+    // Use 0 flag to get the range back so we can adjust the selection
+    hr = pInsertAtSelection->InsertTextAtSelection(
+        ec, 
+        0,  // Default flags - we'll get the range back
+        text.c_str(), 
+        static_cast<LONG>(text.length()), 
+        &pRange
+    );
+    
+    if (FAILED(hr))
+    {
+        DEBUG_LOG(L"InsertTextAtSelection failed with hr=" + std::to_wstring(hr));
+    }
+    else if (pRange)
+    {
+        // Update the selection - collapse to insertion point just past the inserted text
+        pRange->Collapse(ec, TF_ANCHOR_END);
+        
+        TF_SELECTION tfSelection;
+        tfSelection.range = pRange;
+        tfSelection.style.ase = TF_AE_NONE;
+        tfSelection.style.fInterimChar = FALSE;
+        
+        // Set the selection to move the cursor
+        hr = m_pContext->SetSelection(ec, 1, &tfSelection);
+        if (FAILED(hr))
+        {
+            DEBUG_LOG(L"SetSelection failed with hr=" + std::to_wstring(hr));
         }
-        // Update the text service's last send time
-        m_pTextService->m_lastSendInputTime = currentTime;
     }
+    
+    if (pRange)
+    {
+        pRange->Release();
+    }
+    
+    pInsertAtSelection->Release();
+    
+    return hr;
 }
 
 // Document reading method
