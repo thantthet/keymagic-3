@@ -3,6 +3,8 @@
 #include "Globals.h"
 #include "Debug.h"
 #include "DirectEditSession.h"
+#include "CompositionEditSession.h"
+#include "Composition.h"
 #include <string>
 #include <codecvt>
 #include <locale>
@@ -53,6 +55,10 @@ CKeyMagicTextService::CKeyMagicTextService()
         DEBUG_LOG(L"Failed to create KeyMagic engine");
     }
     m_supportsComposition = FALSE;  // Not using composition anymore
+    m_useCompositionEditSession = true;  // Default to using composition edit session
+    
+    // Create composition manager
+    m_pCompositionMgr = new CCompositionManager(this);
     
     // Initialize display attributes
     m_ppDisplayAttributeInfo = nullptr;
@@ -187,8 +193,8 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
         pKeystrokeMgr->Release();
     }
 
-    // Register display attribute provider and create display attribute info
-    RegisterDisplayAttributeProvider();
+    // Register display attribute GUID and create display attribute info
+    RegisterDisplayAttributeGuid();
     CreateDisplayAttributeInfo();
     
     // Load initial keyboard and settings
@@ -224,7 +230,6 @@ STDAPI CKeyMagicTextService::Deactivate()
     UninitMouseSink();
 
     // Unregister display attribute provider
-    UnregisterDisplayAttributeProvider();
 
     // Release thread manager
     if (m_pThreadMgr)
@@ -287,29 +292,60 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
                 DEBUG_LOG(L"Syncing engine with document on focus change");
                 
                 // Create edit session to read document and sync engine
-                CDirectEditSession *pEditSession = new CDirectEditSession(this, pContext, 
-                                                                          CDirectEditSession::EditAction::SyncEngine,
-                                                                          m_pEngine);
-                if (pEditSession)
+                if (m_useCompositionEditSession)
                 {
-                    HRESULT hr;
-                    pContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
-                    pEditSession->Release();
-                    
-                    if (SUCCEEDED(hr))
+                    CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pContext,
+                                                                                      m_pCompositionMgr,
+                                                                                      CCompositionEditSession::EditAction::SyncEngine,
+                                                                                      m_pEngine);
+                    if (pEditSession)
                     {
-                        DEBUG_LOG(L"Successfully synced engine with document");
+                        HRESULT hr;
+                        pContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                        pEditSession->Release();
+                        
+                        if (SUCCEEDED(hr))
+                        {
+                            DEBUG_LOG(L"Successfully synced engine with document");
+                        }
+                        else
+                        {
+                            DEBUG_LOG(L"Failed to sync engine with document, falling back to reset");
+                            ResetEngine();
+                        }
                     }
                     else
                     {
-                        DEBUG_LOG(L"Failed to sync engine with document, falling back to reset");
+                        DEBUG_LOG(L"Failed to create edit session, falling back to reset");
                         ResetEngine();
                     }
                 }
                 else
                 {
-                    DEBUG_LOG(L"Failed to create edit session, falling back to reset");
-                    ResetEngine();
+                    CDirectEditSession *pEditSession = new CDirectEditSession(this, pContext, 
+                                                                              CDirectEditSession::EditAction::SyncEngine,
+                                                                              m_pEngine);
+                    if (pEditSession)
+                    {
+                        HRESULT hr;
+                        pContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                        pEditSession->Release();
+                        
+                        if (SUCCEEDED(hr))
+                        {
+                            DEBUG_LOG(L"Successfully synced engine with document");
+                        }
+                        else
+                        {
+                            DEBUG_LOG(L"Failed to sync engine with document, falling back to reset");
+                            ResetEngine();
+                        }
+                    }
+                    else
+                    {
+                        DEBUG_LOG(L"Failed to create edit session, falling back to reset");
+                        ResetEngine();
+                    }
                 }
             }
             else
@@ -460,15 +496,34 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
     DEBUG_LOG_KEY(L"OnKeyDown", wParam, lParam, character);
 
     // Create edit session for key processing
-    CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
-                                                              CDirectEditSession::EditAction::ProcessKey,
-                                                              m_pEngine);
-    if (pEditSession)
+    if (m_useCompositionEditSession)
     {
-        pEditSession->SetKeyData(wParam, lParam, pfEaten);
-        HRESULT hr;
-        pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
-        pEditSession->Release();
+        // Use composition-based edit session
+        CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic, 
+                                                                          m_pCompositionMgr,
+                                                                          CCompositionEditSession::EditAction::ProcessKey,
+                                                                          m_pEngine);
+        if (pEditSession)
+        {
+            pEditSession->SetKeyData(wParam, lParam, pfEaten);
+            HRESULT hr;
+            pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+            pEditSession->Release();
+        }
+    }
+    else
+    {
+        // Use direct key event edit session
+        CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
+                                                                  CDirectEditSession::EditAction::ProcessKey,
+                                                                  m_pEngine);
+        if (pEditSession)
+        {
+            pEditSession->SetKeyData(wParam, lParam, pfEaten);
+            HRESULT hr;
+            pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hr);
+            pEditSession->Release();
+        }
     }
     
     // Clear the processing flag after key is processed
@@ -540,14 +595,30 @@ STDAPI CKeyMagicTextService::OnEndEdit(ITfContext *pic, TfEditCookie ecReadOnly,
         {
             // Create edit session to sync engine
             // Note: We cannot use the existing edit cookie from OnEndEdit, we need a new session
-            CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
-                                                                      CDirectEditSession::EditAction::SyncEngine,
-                                                                      m_pEngine);
-            if (pEditSession)
+            if (m_useCompositionEditSession)
             {
-                HRESULT hr;
-                pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
-                pEditSession->Release();
+                CCompositionEditSession *pEditSession = new CCompositionEditSession(this, pic,
+                                                                                  m_pCompositionMgr,
+                                                                                  CCompositionEditSession::EditAction::SyncEngine,
+                                                                                  m_pEngine);
+                if (pEditSession)
+                {
+                    HRESULT hr;
+                    pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                    pEditSession->Release();
+                }
+            }
+            else
+            {
+                CDirectEditSession *pEditSession = new CDirectEditSession(this, pic, 
+                                                                          CDirectEditSession::EditAction::SyncEngine,
+                                                                          m_pEngine);
+                if (pEditSession)
+                {
+                    HRESULT hr;
+                    pic->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                    pEditSession->Release();
+                }
             }
         }
         else
@@ -576,24 +647,50 @@ STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dw
         if (m_pTextEditContext && m_pEngine)
         {
             // Create edit session to sync engine
-            CDirectEditSession *pEditSession = new CDirectEditSession(this, m_pTextEditContext, 
-                                                                      CDirectEditSession::EditAction::SyncEngine,
-                                                                      m_pEngine);
-            if (pEditSession)
+            if (m_useCompositionEditSession)
             {
-                HRESULT hr;
-                m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
-                pEditSession->Release();
-                
-                if (FAILED(hr))
+                CCompositionEditSession *pEditSession = new CCompositionEditSession(this, m_pTextEditContext,
+                                                                                  m_pCompositionMgr,
+                                                                                  CCompositionEditSession::EditAction::SyncEngine,
+                                                                                  m_pEngine);
+                if (pEditSession)
                 {
-                    DEBUG_LOG(L"Failed to sync on mouse click, falling back to reset");
+                    HRESULT hr;
+                    m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                    pEditSession->Release();
+                    
+                    if (FAILED(hr))
+                    {
+                        DEBUG_LOG(L"Failed to sync on mouse click, falling back to reset");
+                        ResetEngine();
+                    }
+                }
+                else
+                {
                     ResetEngine();
                 }
             }
             else
             {
-                ResetEngine();
+                CDirectEditSession *pEditSession = new CDirectEditSession(this, m_pTextEditContext, 
+                                                                          CDirectEditSession::EditAction::SyncEngine,
+                                                                          m_pEngine);
+                if (pEditSession)
+                {
+                    HRESULT hr;
+                    m_pTextEditContext->RequestEditSession(m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READ, &hr);
+                    pEditSession->Release();
+                    
+                    if (FAILED(hr))
+                    {
+                        DEBUG_LOG(L"Failed to sync on mouse click, falling back to reset");
+                        ResetEngine();
+                    }
+                }
+                else
+                {
+                    ResetEngine();
+                }
             }
         }
         else
@@ -918,7 +1015,7 @@ STDAPI CKeyMagicTextService::GetDisplayAttributeInfo(REFGUID guidInfo, ITfDispla
 }
 
 // Display attribute management
-HRESULT CKeyMagicTextService::RegisterDisplayAttributeProvider()
+HRESULT CKeyMagicTextService::RegisterDisplayAttributeGuid()
 {
     DEBUG_LOG_FUNC();
     
@@ -931,56 +1028,21 @@ HRESULT CKeyMagicTextService::RegisterDisplayAttributeProvider()
         return hr;
     }
     
-    // Register as display attribute provider
-    hr = pCategoryMgr->RegisterCategory(CLSID_KeyMagicTextService,
-                                       GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
-                                       CLSID_KeyMagicTextService);
-    if (FAILED(hr))
+    // Register our display attribute GUID and get atom
+    hr = pCategoryMgr->RegisterGUID(GUID_KeyMagicDisplayAttributeInput, &m_inputDisplayAttributeAtom);
+    if (SUCCEEDED(hr))
     {
-        DEBUG_LOG(L"Failed to register display attribute provider");
+        DEBUG_LOG(L"Registered input display attribute GUID, atom: " + std::to_wstring(m_inputDisplayAttributeAtom));
     }
     else
     {
-        DEBUG_LOG(L"Successfully registered display attribute provider");
-        
-        // Register our display attribute GUID and get atom
-        hr = pCategoryMgr->RegisterGUID(GUID_KeyMagicDisplayAttributeInput, &m_inputDisplayAttributeAtom);
-        if (SUCCEEDED(hr))
-        {
-            DEBUG_LOG(L"Registered input display attribute GUID, atom: " + std::to_wstring(m_inputDisplayAttributeAtom));
-        }
-        else
-        {
-            DEBUG_LOG(L"Failed to register input display attribute GUID");
-        }
+        DEBUG_LOG(L"Failed to register input display attribute GUID");
     }
     
     pCategoryMgr->Release();
     return hr;
 }
 
-HRESULT CKeyMagicTextService::UnregisterDisplayAttributeProvider()
-{
-    DEBUG_LOG_FUNC();
-    
-    ITfCategoryMgr *pCategoryMgr;
-    HRESULT hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER,
-                                 IID_ITfCategoryMgr, (void**)&pCategoryMgr);
-    if (FAILED(hr))
-        return hr;
-    
-    // Unregister display attribute provider
-    hr = pCategoryMgr->UnregisterCategory(CLSID_KeyMagicTextService,
-                                         GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
-                                         CLSID_KeyMagicTextService);
-    if (SUCCEEDED(hr))
-    {
-        DEBUG_LOG(L"Successfully unregistered display attribute provider");
-    }
-    
-    pCategoryMgr->Release();
-    return hr;
-}
 
 HRESULT CKeyMagicTextService::CreateDisplayAttributeInfo()
 {
@@ -1075,6 +1137,21 @@ void CKeyMagicTextService::ReloadRegistrySettings()
                          NULL, defaultKeyboard, &dataSize) == ERROR_SUCCESS)
         {
             DEBUG_LOG(L"Read DefaultKeyboard: " + std::wstring(defaultKeyboard));
+        }
+        
+        // Read UseCompositionEditSession
+        DWORD useCompositionEditSession = 1;  // Default to enabled (use composition)
+        dataSize = sizeof(useCompositionEditSession);
+        if (RegGetValueW(hKey, NULL, L"UseCompositionEditSession", RRF_RT_REG_DWORD, 
+                         NULL, &useCompositionEditSession, &dataSize) == ERROR_SUCCESS)
+        {
+            DEBUG_LOG(L"Read UseCompositionEditSession: " + std::to_wstring(useCompositionEditSession));
+            m_useCompositionEditSession = (useCompositionEditSession != 0);
+        }
+        else
+        {
+            DEBUG_LOG(L"UseCompositionEditSession not found in registry, using default: 1 (composition mode)");
+            m_useCompositionEditSession = true;
         }
         
         RegCloseKey(hKey);

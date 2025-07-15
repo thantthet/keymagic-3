@@ -11,13 +11,13 @@ static const GUID* g_SupportedCategories[] = {
     // &GUID_TFCAT_TIP_KEYBOARD,                    // Register as keyboard
     &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,        // Support for Metro/UWP apps
     &GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,          // Support for system tray
+    &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,       // For display attributes
     // Add more categories as needed:
     // &GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,  // For input mode switching
     // &GUID_TFCAT_TIPCAP_COMLESS,               // For COM-less activation
     // &GUID_TFCAT_TIPCAP_WOW16,                 // For 16-bit app support
     // &GUID_TFCAT_TIPCAP_UIELEMENTENABLED,      // For UI elements
     // &GUID_TFCAT_TIPCAP_SECUREMODE,            // For secure desktop
-    // &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,     // For display attributes
 };
 
 static const int g_SupportedCategoriesCount = ARRAYSIZE(g_SupportedCategories);

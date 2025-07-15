@@ -4,27 +4,26 @@
 #include <windows.h>
 #include <msctf.h>
 #include <string>
+#include "../include/keymagic_ffi.h"
 
-// Forward declarations
+// Forward declaration
 class CKeyMagicTextService;
 class CCompositionManager;
 
-// Edit session for composition operations
+// Edit session for composition-based text handling
 class CCompositionEditSession : public ITfEditSession
 {
 public:
-    enum class CompositionAction
+    enum class EditAction
     {
         ProcessKey,
-        UpdateText,
-        Commit,
-        Cancel
+        SyncEngine,
+        CommitAndRecompose
     };
     
-    CCompositionEditSession(CKeyMagicTextService *pTextService, 
-                           ITfContext *pContext,
-                           CCompositionManager *pCompositionMgr,
-                           CompositionAction action);
+    CCompositionEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
+                           CCompositionManager *pCompositionManager,
+                           EditAction action, EngineHandle *pEngine);
     ~CCompositionEditSession();
     
     // IUnknown
@@ -37,22 +36,32 @@ public:
     
     // Set parameters for different actions
     void SetKeyData(WPARAM wParam, LPARAM lParam, BOOL *pfEaten);
-    void SetText(const std::wstring &text);
     
 private:
-    HRESULT ProcessKeyInComposition(TfEditCookie ec);
-    
     LONG m_cRef;
     CKeyMagicTextService *m_pTextService;
     ITfContext *m_pContext;
-    CCompositionManager *m_pCompositionMgr;
-    CompositionAction m_action;
+    CCompositionManager *m_pCompositionManager;
+    EditAction m_action;
+    EngineHandle *m_pEngine;
     
     // Action-specific data
     WPARAM m_wParam;
     LPARAM m_lParam;
     BOOL *m_pfEaten;
-    std::wstring m_text;
+    
+    // Action implementations
+    HRESULT ProcessKey(TfEditCookie ec);
+    HRESULT SyncEngineWithDocument(TfEditCookie ec);
+    HRESULT CommitAndRecomposeAtCursor(TfEditCookie ec);
+    
+    // Document reading methods
+    HRESULT ReadTextBeforeCursor(TfEditCookie ec, int maxChars, std::wstring &text);
+    
+    // Helper methods
+    char MapVirtualKeyToChar(WPARAM wParam, LPARAM lParam);
+    bool IsPrintableAscii(char c);
+    bool ShouldCommitComposition(WPARAM wParam, const std::string& composingText, bool isProcessed);
 };
 
 #endif // COMPOSITION_EDIT_SESSION_H

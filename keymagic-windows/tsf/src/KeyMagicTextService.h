@@ -83,8 +83,7 @@ private:
     HRESULT UninitMouseSink();
     
     // Display attribute management
-    HRESULT RegisterDisplayAttributeProvider();
-    HRESULT UnregisterDisplayAttributeProvider();
+    HRESULT RegisterDisplayAttributeGuid();
     HRESULT CreateDisplayAttributeInfo();
     
     // Settings update notification
@@ -112,11 +111,18 @@ private:
     // Registry settings
     void ReloadRegistrySettings();
     
+    // Configuration methods
+    void SetUseCompositionEditSession(bool useComposition) { m_useCompositionEditSession = useComposition; }
+    bool GetUseCompositionEditSession() const { return m_useCompositionEditSession; }
+    
     // Composition manager
     CCompositionManager *m_pCompositionMgr;
     
     // Application compatibility
     BOOL m_supportsComposition;
+    
+    // Edit session mode flag
+    bool m_useCompositionEditSession;  // If true, use CCompositionEditSession; if false, use CDirectEditSession
     
     // Display attributes
     ITfDisplayAttributeInfo **m_ppDisplayAttributeInfo;

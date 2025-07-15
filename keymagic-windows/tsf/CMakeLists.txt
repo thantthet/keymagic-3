@@ -14,8 +14,8 @@ set(SOURCES
     src/ClassFactory.cpp
     src/KeyMagicTextService.cpp
     src/DirectEditSession.cpp
-    src/Composition.cpp
     src/CompositionEditSession.cpp
+    src/Composition.cpp
     src/DisplayAttribute.cpp
     src/Globals.cpp
     src/Registry.cpp

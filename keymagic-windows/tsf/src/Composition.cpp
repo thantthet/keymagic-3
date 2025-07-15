@@ -1,5 +1,4 @@
 #include "Composition.h"
-#include "CompositionEditSession.h"
 #include "KeyMagicTextService.h"
 #include "Debug.h"
 #include <string>
@@ -118,6 +117,25 @@ HRESULT CCompositionManager::StartComposition(ITfContext *pContext, TfEditCookie
                 m_pContext->Release();
             m_pContext = pContext;
             m_pContext->AddRef();
+            
+            // Move cursor to the end of the range (which should be at insertion point)
+            ITfRange *pSelection;
+            if (SUCCEEDED(pRange->Clone(&pSelection)))
+            {
+                // Collapse to end of range
+                pSelection->Collapse(ec, TF_ANCHOR_END);
+                
+                // Set selection
+                TF_SELECTION tfSelection;
+                tfSelection.range = pSelection;
+                tfSelection.style.ase = TF_AE_NONE;
+                tfSelection.style.fInterimChar = FALSE;
+                
+                pContext->SetSelection(ec, 1, &tfSelection);
+                pSelection->Release();
+                
+                DEBUG_LOG(L"Cursor positioned at composition start point");
+            }
         }
         else
         {
@@ -172,6 +190,25 @@ HRESULT CCompositionManager::UpdateComposition(ITfContext *pContext, TfEditCooki
         
         // Apply display attributes (underline)
         ApplyDisplayAttributes(pContext, ec, pRange);
+        
+        // Move cursor to the end of composition
+        ITfRange *pSelection;
+        if (SUCCEEDED(pRange->Clone(&pSelection)))
+        {
+            // Collapse to end of range
+            pSelection->Collapse(ec, TF_ANCHOR_END);
+            
+            // Set selection
+            TF_SELECTION tfSelection;
+            tfSelection.range = pSelection;
+            tfSelection.style.ase = TF_AE_NONE;
+            tfSelection.style.fInterimChar = FALSE;
+            
+            pContext->SetSelection(ec, 1, &tfSelection);
+            pSelection->Release();
+            
+            DEBUG_LOG(L"Cursor moved to end of composition");
+        }
     }
     
     pRange->Release();
@@ -214,15 +251,9 @@ HRESULT CCompositionManager::CommitComposition(ITfContext *pContext, TfEditCooki
         // Update the text one last time before committing
         if (!text.empty())
         {
-            ITfRange *pRange;
-            if (SUCCEEDED(m_pComposition->GetRange(&pRange)))
-            {
-                pRange->SetText(ec, 0, text.c_str(), static_cast<LONG>(text.length()));
-                
-                // Collapse the range to the end to avoid selection
-                pRange->Collapse(ec, TF_ANCHOR_END);
-                pRange->Release();
-            }
+            // Use UpdateComposition to set the final text
+            // This also handles display attributes and cursor positioning
+            UpdateComposition(pContext, ec, text);
         }
         
         // End the composition
@@ -241,7 +272,24 @@ HRESULT CCompositionManager::CommitComposition(ITfContext *pContext, TfEditCooki
             pInsertAtSelection->InsertTextAtSelection(ec, 0, text.c_str(), 
                                                     static_cast<LONG>(text.length()), &pRange);
             if (pRange)
+            {
+                // Move cursor to end of inserted text
+                ITfRange *pSelection;
+                if (SUCCEEDED(pRange->Clone(&pSelection)))
+                {
+                    pSelection->Collapse(ec, TF_ANCHOR_END);
+                    
+                    TF_SELECTION tfSelection;
+                    tfSelection.range = pSelection;
+                    tfSelection.style.ase = TF_AE_NONE;
+                    tfSelection.style.fInterimChar = FALSE;
+                    
+                    pContext->SetSelection(ec, 1, &tfSelection);
+                    pSelection->Release();
+                }
+                
                 pRange->Release();
+            }
             pInsertAtSelection->Release();
         }
     }
@@ -266,6 +314,163 @@ HRESULT CCompositionManager::CancelComposition(TfEditCookie ec)
     
     // End composition
     return EndComposition(ec);
+}
+
+// Start composition on existing text range
+HRESULT CCompositionManager::StartCompositionOnExistingText(ITfContext *pContext, TfEditCookie ec, ITfRange *pRange)
+{
+    DEBUG_LOG_FUNC();
+    
+    if (m_pComposition)
+    {
+        DEBUG_LOG(L"Composition already active - ending previous composition");
+        EndComposition(ec);
+    }
+    
+    if (!pRange)
+    {
+        DEBUG_LOG(L"Invalid range provided");
+        return E_INVALIDARG;
+    }
+    
+    // Start composition on the provided range
+    ITfContextComposition *pContextComposition;
+    HRESULT hr = pContext->QueryInterface(IID_ITfContextComposition, (void **)&pContextComposition);
+    if (SUCCEEDED(hr))
+    {
+        ITfCompositionSink *pCompositionSink = static_cast<ITfCompositionSink*>(this);
+        hr = pContextComposition->StartComposition(ec, pRange, pCompositionSink, &m_pComposition);
+        pContextComposition->Release();
+        
+        if (SUCCEEDED(hr) && m_pComposition)
+        {
+            DEBUG_LOG(L"Composition started successfully on existing text");
+            
+            // Store context for later use
+            if (m_pContext)
+                m_pContext->Release();
+            m_pContext = pContext;
+            m_pContext->AddRef();
+            
+            // Apply display attributes to show the text as being composed
+            ApplyDisplayAttributes(pContext, ec, pRange);
+            
+            // Move cursor to the end of the composed text
+            ITfRange *pSelection;
+            if (SUCCEEDED(pRange->Clone(&pSelection)))
+            {
+                // Collapse to end of range
+                pSelection->Collapse(ec, TF_ANCHOR_END);
+                
+                // Set selection
+                TF_SELECTION tfSelection;
+                tfSelection.range = pSelection;
+                tfSelection.style.ase = TF_AE_NONE;
+                tfSelection.style.fInterimChar = FALSE;
+                
+                pContext->SetSelection(ec, 1, &tfSelection);
+                pSelection->Release();
+                
+                DEBUG_LOG(L"Cursor moved to end of existing text composition");
+            }
+        }
+        else
+        {
+            DEBUG_LOG(L"StartComposition on existing text failed");
+        }
+    }
+    
+    return hr;
+}
+
+// Start composition at selection, including existing text before/after cursor
+HRESULT CCompositionManager::StartCompositionAtSelection(ITfContext *pContext, TfEditCookie ec, LONG cchBefore, LONG cchAfter)
+{
+    DEBUG_LOG_FUNC();
+    DEBUG_LOG(L"Starting composition with " + std::to_wstring(cchBefore) + L" chars before and " + 
+              std::to_wstring(cchAfter) + L" chars after cursor");
+    
+    // Get current selection
+    TF_SELECTION tfSelection;
+    ULONG fetched;
+    HRESULT hr = pContext->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &tfSelection, &fetched);
+    if (FAILED(hr) || fetched == 0)
+    {
+        DEBUG_LOG(L"Failed to get selection");
+        return E_FAIL;
+    }
+    
+    ITfRange *pRange = tfSelection.range;
+    
+    // Adjust range to include existing text
+    if (cchBefore > 0 || cchAfter > 0)
+    {
+        // Clone the range for manipulation
+        ITfRange *pAdjustedRange;
+        hr = pRange->Clone(&pAdjustedRange);
+        if (SUCCEEDED(hr))
+        {
+            // Expand range backward
+            if (cchBefore > 0)
+            {
+                LONG shifted;
+                pAdjustedRange->ShiftStart(ec, -cchBefore, &shifted, nullptr);
+                DEBUG_LOG(L"Shifted start by " + std::to_wstring(shifted) + L" characters");
+            }
+            
+            // Expand range forward
+            if (cchAfter > 0)
+            {
+                LONG shifted;
+                pAdjustedRange->ShiftEnd(ec, cchAfter, &shifted, nullptr);
+                DEBUG_LOG(L"Shifted end by " + std::to_wstring(shifted) + L" characters");
+            }
+            
+            // Start composition on the adjusted range
+            hr = StartCompositionOnExistingText(pContext, ec, pAdjustedRange);
+            
+            pAdjustedRange->Release();
+        }
+    }
+    else
+    {
+        // Start composition at current position (no existing text)
+        hr = StartComposition(pContext, ec);
+    }
+    
+    pRange->Release();
+    return hr;
+}
+
+HRESULT CCompositionManager::GetCompositionText(TfEditCookie ec, std::wstring &text)
+{
+    text.clear();
+    
+    if (!m_pComposition)
+    {
+        return E_FAIL;  // No active composition
+    }
+    
+    // Get the composition range
+    ITfRange *pRange;
+    HRESULT hr = m_pComposition->GetRange(&pRange);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    
+    // Read the text from the range
+    WCHAR buffer[512];  // Should be enough for most compositions
+    ULONG cch;
+    hr = pRange->GetText(ec, 0, buffer, ARRAYSIZE(buffer) - 1, &cch);
+    if (SUCCEEDED(hr))
+    {
+        buffer[cch] = L'\0';
+        text = buffer;
+    }
+    
+    pRange->Release();
+    return hr;
 }
 
 HRESULT CCompositionManager::ApplyDisplayAttributes(ITfContext *pContext, TfEditCookie ec, ITfRange *pRange)

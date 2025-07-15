@@ -27,8 +27,15 @@ public:
     HRESULT CommitComposition(ITfContext *pContext, TfEditCookie ec, const std::wstring &text);
     HRESULT CancelComposition(TfEditCookie ec);
     
+    // Compose existing text - converts existing document text into composition
+    HRESULT StartCompositionOnExistingText(ITfContext *pContext, TfEditCookie ec, ITfRange *pRange);
+    HRESULT StartCompositionAtSelection(ITfContext *pContext, TfEditCookie ec, LONG cchBefore, LONG cchAfter = 0);
+    
     // Check if composition is active
     BOOL IsComposing() const { return m_pComposition != nullptr; }
+    
+    // Get current composition text
+    HRESULT GetCompositionText(TfEditCookie ec, std::wstring &text);
     
     // ITfCompositionSink
     STDMETHODIMP OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition);
