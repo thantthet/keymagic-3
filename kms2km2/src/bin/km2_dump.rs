@@ -2,6 +2,8 @@ use std::fs::File;
 use std::io::Read;
 use byteorder::{LittleEndian, ReadBytesExt};
 use keymagic_core::km2::Km2Loader;
+use keymagic_core::types::opcodes::*;
+use keymagic_core::types::virtual_keys::VirtualKey;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -175,13 +177,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn dump_rule_elements(file: &mut File, len: u16) -> Result<(), Box<dyn std::error::Error>> {
     let mut remaining = len;
+    let mut last_was_and = false;
     
     while remaining > 0 {
         let opcode = file.read_u16::<LittleEndian>()?;
         remaining -= 1;
         
         match opcode {
-            0x00F0 => { // opSTRING
+            OP_STRING => {
                 let str_len = file.read_u16::<LittleEndian>()?;
                 remaining -= 1;
                 let mut utf16_data = vec![0u16; str_len as usize];
@@ -191,46 +194,68 @@ fn dump_rule_elements(file: &mut File, len: u16) -> Result<(), Box<dyn std::erro
                 }
                 let s = String::from_utf16_lossy(&utf16_data);
                 print!("STRING(\"{}\") ", s);
+                last_was_and = false;
             }
-            0x00F1 => { // opVARIABLE
+            OP_VARIABLE => {
                 let idx = file.read_u16::<LittleEndian>()?;
                 remaining -= 1;
                 print!("VAR({}) ", idx);
+                last_was_and = false;
             }
-            0x00F2 => { // opREFERENCE
+            OP_REFERENCE => {
                 let idx = file.read_u16::<LittleEndian>()?;
                 remaining -= 1;
                 print!("REF({}) ", idx);
+                last_was_and = false;
             }
-            0x00F3 => { // opPREDEFINED
-                let vk = file.read_u16::<LittleEndian>()?;
+            OP_PREDEFINED => {
+                let val = file.read_u16::<LittleEndian>()?;
                 remaining -= 1;
-                print!("VK({}) ", vk);
+                if last_was_and {
+                    // This is a virtual key after AND
+                    if let Some(vk) = VirtualKey::from_raw(val) {
+                        print!("VK({:?}) ", vk);
+                    } else {
+                        print!("VK({}) ", val);
+                    }
+                } else {
+                    // This is a predefined value (not a virtual key)
+                    if val == 1 {
+                        print!("PREDEFINED(NULL) ");
+                    } else {
+                        print!("PREDEFINED({}) ", val);
+                    }
+                }
+                last_was_and = false;
             }
-            0x00F4 => { // opMODIFIER
+            OP_MODIFIER => {
                 let mods = file.read_u16::<LittleEndian>()?;
                 remaining -= 1;
-                print!("MOD({}) ", mods);
+                // Check if this is a known flag
+                match mods {
+                    FLAG_ANYOF => print!("MOD(FLAG_ANYOF) "),
+                    FLAG_NANYOF => print!("MOD(FLAG_NANYOF) "),
+                    _ => print!("MOD({}) ", mods),
+                }
+                last_was_and = false;
             }
-            0x00F5 => { // opANYOF (this is actually FLAG_ANYOF when used with opMODIFIER)
-                print!("ANYOF_FLAG ");
-            }
-            0x00F6 => { // opAND
+            OP_AND => {
                 print!("AND ");
+                last_was_and = true;
             }
-            0x00F7 => { // opNANYOF (this is actually FLAG_NANYOF when used with opMODIFIER)
-                print!("NANYOF_FLAG ");
-            }
-            0x00F8 => { // opANY
+            OP_ANY => {
                 print!("ANY ");
+                last_was_and = false;
             }
-            0x00F9 => { // opSWITCH
+            OP_SWITCH => {
                 let state_idx = file.read_u16::<LittleEndian>()?;
                 remaining -= 1;
                 print!("SWITCH({}) ", state_idx);
+                last_was_and = false;
             }
             _ => {
                 print!("UNKNOWN(0x{:04X}) ", opcode);
+                last_was_and = false;
             }
         }
     }
