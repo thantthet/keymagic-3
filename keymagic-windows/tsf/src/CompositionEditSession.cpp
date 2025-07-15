@@ -307,6 +307,14 @@ HRESULT CCompositionEditSession::SyncEngineWithDocument(TfEditCookie ec)
     {
         if (!documentText.empty())
         {
+            // Check if text ends with a space - if so, just reset engine
+            if (documentText.back() == L' ')
+            {
+                DEBUG_LOG(L"Text before cursor ends with space, resetting engine instead of syncing");
+                keymagic_engine_reset(m_pEngine);
+                return S_OK;
+            }
+            
             // Look for a reasonable break point (space, punctuation, etc.)
             size_t composeStart = documentText.length();
             
