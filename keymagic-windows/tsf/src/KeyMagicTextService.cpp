@@ -75,7 +75,7 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_hRegistryUpdateEvent = nullptr;
     m_hEventThread = nullptr;
     m_bEventThreadRunning = false;
-    m_bIsForeground = false;
+    m_bIsActiveInputProcessor = false;
     m_lastSendInputTime = 0;
     
     
@@ -404,11 +404,11 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
 {
     DEBUG_LOG_FUNC();
     
-    m_bIsForeground = fForeground ? true : false;
+    m_bIsActiveInputProcessor = fForeground ? true : false;
     
     if (fForeground)
     {
-        DEBUG_LOG(L"Window gained focus");
+        DEBUG_LOG(L"Text service became active input processor");
         
         // Start event monitoring when gaining focus
         StartEventMonitoring();
@@ -418,8 +418,8 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
     }
     else
     {
-        DEBUG_LOG(L"Window lost focus");
-        // We keep the monitoring thread running but it won't actively wait when not in foreground
+        DEBUG_LOG(L"Text service no longer active input processor");
+        // We keep the monitoring thread running but it won't actively wait when document focus is lost
     }
     
     return S_OK;
@@ -427,10 +427,14 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
 
 STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
+    DEBUG_LOG_FUNC();
+
     if (pfEaten == nullptr)
         return E_INVALIDARG;
 
     *pfEaten = FALSE;
+
+    DEBUG_LOG_KEY(L"OnTestKeyDown", wParam, lParam, 0);
 
     // Check if this is our own SendInput by examining the extra info
     ULONG_PTR extraInfo = GetMessageExtraInfo();
@@ -496,11 +500,15 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
         }
     }
 
+    DEBUG_LOG(L"OnTestKeyDown result: " + std::to_wstring(*pfEaten));
+
     return S_OK;
 }
 
 STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten)
 {
+    DEBUG_LOG_FUNC();
+    
     if (pfEaten == nullptr)
         return E_INVALIDARG;
 
@@ -1471,8 +1479,8 @@ DWORD WINAPI CKeyMagicTextService::EventMonitorThreadProc(LPVOID lpParam)
     
     while (pThis->m_bEventThreadRunning)
     {
-        // Only wait for events if we're in foreground
-        if (pThis->m_bIsForeground && pThis->m_hRegistryUpdateEvent)
+        // Only wait for events if we have document focus (window is foreground and has focus)
+        if (pThis->m_pDocMgrFocus && pThis->m_hRegistryUpdateEvent)
         {
             DWORD dwResult = WaitForSingleObject(pThis->m_hRegistryUpdateEvent, 500);  // Check every 500ms
             
@@ -1489,7 +1497,7 @@ DWORD WINAPI CKeyMagicTextService::EventMonitorThreadProc(LPVOID lpParam)
         }
         else
         {
-            // Not in foreground, just sleep
+            // No document focus, just sleep
             Sleep(500);
         }
     }

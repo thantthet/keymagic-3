@@ -140,7 +140,7 @@ private:
     HANDLE m_hRegistryUpdateEvent;
     HANDLE m_hEventThread;
     bool m_bEventThreadRunning;
-    bool m_bIsForeground;
+    bool m_bIsActiveInputProcessor;
     static DWORD WINAPI EventMonitorThreadProc(LPVOID lpParam);
     HRESULT StartEventMonitoring();
     HRESULT StopEventMonitoring();
