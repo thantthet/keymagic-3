@@ -22,6 +22,10 @@ pub struct KeyMagicEngine {
     rules: Vec<(Rule, Pattern)>,
     /// Extracted strings for faster access
     strings: Vec<String>,
+    /// History of engine states for undo functionality
+    state_history: Vec<EngineState>,
+    /// Maximum number of states to keep in history
+    max_history_size: usize,
 }
 
 impl KeyMagicEngine {
@@ -41,24 +45,30 @@ impl KeyMagicEngine {
             state: EngineState::new(),
             rules,
             strings,
+            state_history: Vec::new(),
+            max_history_size: 20,
         })
     }
 
     /// Processes a key input and returns the engine output
     pub fn process_key(&mut self, input: KeyInput) -> Result<EngineOutput> {
-        Self::process_key_internal(&self.keyboard, &self.rules, &self.strings, input, &mut self.state)
+        Self::process_key_internal(&self.keyboard, &self.rules, &self.strings, input, &mut self.state, &mut self.state_history, self.max_history_size)
     }
 
     /// Processes a key input without modifying engine state (test/preview mode)
     pub fn process_key_test(&self, input: KeyInput) -> Result<EngineOutput> {
         let mut temp_state = self.state.clone();
-        Self::process_key_internal(&self.keyboard, &self.rules, &self.strings, input, &mut temp_state)
+        let mut temp_history = self.state_history.clone();
+        Self::process_key_internal(&self.keyboard, &self.rules, &self.strings, input, &mut temp_state, &mut temp_history, self.max_history_size)
     }
 
     /// Internal key processing that works with a mutable state reference
-    fn process_key_internal(keyboard: &Km2File, rules: &[(Rule, Pattern)], strings: &[String], input: KeyInput, state: &mut EngineState) -> Result<EngineOutput> {
+    fn process_key_internal(keyboard: &Km2File, rules: &[(Rule, Pattern)], strings: &[String], input: KeyInput, state: &mut EngineState, state_history: &mut Vec<EngineState>, max_history_size: usize) -> Result<EngineOutput> {
         // Store initial state for action generation
         let before_text = state.composing_text().to_string();
+        
+        // Save the state BEFORE processing (for undo functionality)
+        let state_before_processing = state.clone();
 
         // Create match context
         let context = MatchContext::for_key_input(
@@ -111,16 +121,23 @@ impl KeyMagicEngine {
         } else {
             // No rule matched
             
-            // Check if this is a backspace key with auto_bksp enabled
+            // Check if this is a backspace key
             if input.key_code == VirtualKey::Back as u16
                 && !state.composing_text().is_empty() {
                 // Backspace key pressed, and composing buffer is not empty
                 if keyboard.header.layout_options.auto_bksp == 1 {
-                    // TODO: implement composition text history for BACK key to act as undo like behaviour
+                    if !state_history.is_empty() {
+                        // Restore from history (undo-like behavior)
+                        *state = state_history.pop().unwrap();
+                    } else {
+                        // No history, delete one character backward
+                        state.composing_buffer_mut().backspace();
+                    }
+                    is_processed = true;
+                } else {
+                    // auto_bksp is disabled, don't process backspace
+                    is_processed = false;
                 }
-                // Delete one character backward
-                state.composing_buffer_mut().backspace();
-                is_processed = true;
             } else if let Some(ch) = input.character {
                 // if character is available, set is_processed to true
                 is_processed = true;
@@ -144,18 +161,30 @@ impl KeyMagicEngine {
         let after_text = state.composing_text().to_string();
         let action = ActionGenerator::generate_action(&before_text, &after_text, true);
 
+        // Record state in history (but not for backspace operations)
+        if input.key_code != VirtualKey::Back as u16 && is_processed {
+            state_history.push(state_before_processing);
+            
+            // Maintain max history size
+            if state_history.len() > max_history_size {
+                state_history.remove(0);
+            }
+        }
+
         Ok(EngineOutput::new(after_text, action, is_processed))
     }
 
     /// Resets the engine state
     pub fn reset(&mut self) {
         self.state.reset();
+        self.state_history.clear();
     }
 
     /// Sets the composing text and resets states
     /// Used for external synchronization
     pub fn set_composing_text(&mut self, text: String) {
         self.state.set_composing_text(text);
+        self.state_history.clear();
     }
 
     /// Gets the current composing text
@@ -290,4 +319,5 @@ mod tests {
         assert_eq!(test_output.action, normal_output.action);
         assert_eq!(test_output.is_processed, normal_output.is_processed);
     }
+
 }
