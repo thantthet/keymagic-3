@@ -19,8 +19,8 @@ const GUID_KEYMAGIC_PROFILE: GUID = GUID::from_u128(0x87654321_4321_4321_4321_cb
 // Text service description
 const TEXTSERVICE_DESC: &str = "KeyMagic";
 
-// Icon resource ID (negative value for resource)
-const IDI_KEYMAGIC: i32 = 101;
+// Tauri embeds the application icon with the standard Windows IDI_APPLICATION resource ID
+const IDI_APPLICATION: i32 = 32512;
 
 /// Updates TSF language profiles based on the enabled languages in the registry
 #[cfg(target_os = "windows")]
@@ -154,7 +154,7 @@ fn add_language_profile(profiles: &ITfInputProcessorProfiles, langid: u16, modul
             &GUID_KEYMAGIC_PROFILE,
             desc.as_wide(),
             icon_path.as_wide(),
-            -IDI_KEYMAGIC as u32, // Negative for resource ID
+            -IDI_APPLICATION as u32, // Negative for resource ID (Tauri's embedded icon)
         )?;
         
         // Enable the profile
