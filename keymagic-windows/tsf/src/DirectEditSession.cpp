@@ -428,17 +428,6 @@ HRESULT CDirectEditSession::ReadDocumentSuffix(TfEditCookie ec, int maxChars, st
 
     ITfRange *pRange = tfSelection.range;
     
-    // Check if selection is collapsed (no text selected)
-    BOOL fEmpty;
-    HRESULT hr = pRange->IsEmpty(ec, &fEmpty);
-    if (FAILED(hr) || !fEmpty)
-    {
-        // Selection is not collapsed - there is selected text
-        DEBUG_LOG(L"ReadDocumentSuffix: Selection is not collapsed, failing");
-        pRange->Release();
-        return E_FAIL;
-    }
-    
     // Clone range for manipulation
     ITfRange *pRangeStart;
     if (FAILED(pRange->Clone(&pRangeStart)))
@@ -454,7 +443,7 @@ HRESULT CDirectEditSession::ReadDocumentSuffix(TfEditCookie ec, int maxChars, st
     // Read text
     WCHAR buffer[256];
     ULONG cch;
-    hr = pRangeStart->GetText(ec, 0, buffer, ARRAYSIZE(buffer) - 1, &cch);
+    HRESULT hr = pRangeStart->GetText(ec, 0, buffer, ARRAYSIZE(buffer) - 1, &cch);
     if (SUCCEEDED(hr))
     {
         buffer[cch] = L'\0';
