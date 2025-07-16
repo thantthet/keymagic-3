@@ -51,9 +51,9 @@ private:
     HRESULT ProcessKey(TfEditCookie ec);
     HRESULT SyncEngineWithDocument(TfEditCookie ec);
     
-    // TSF-based text manipulation methods
-    HRESULT DeleteCharactersBefore(TfEditCookie ec, int count);
-    HRESULT InsertTextAtSelection(TfEditCookie ec, const std::wstring& text);
+    // Text manipulation methods
+    void SendBackspaces(int count, ULONG_PTR dwExtraInfo = 0, DWORD* pLastSendTime = nullptr);
+    void SendUnicodeText(const std::wstring& text, ULONG_PTR dwExtraInfo = 0, DWORD* pLastSendTime = nullptr);
     
     // Document reading methods
     HRESULT ReadDocumentSuffix(TfEditCookie ec, int maxChars, std::wstring &text);
