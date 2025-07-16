@@ -252,6 +252,44 @@ pub fn clear_first_run_scan_keyboards() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn get_enabled_languages() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::get_enabled_languages().map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(vec!["en-US".to_string()])
+}
+
+#[tauri::command]
+pub fn set_enabled_languages(languages: Vec<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        registry::set_enabled_languages(&languages).map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_supported_languages() -> Result<Vec<(String, String)>, String> {
+    Ok(vec![
+        ("en-US".to_string(), "English (United States)".to_string()),
+        ("my-MM".to_string(), "Myanmar".to_string()),
+        ("th-TH".to_string(), "Thai".to_string()),
+        ("km-KH".to_string(), "Khmer (Cambodia)".to_string()),
+        ("lo-LA".to_string(), "Lao".to_string()),
+        ("vi-VN".to_string(), "Vietnamese".to_string()),
+        ("zh-CN".to_string(), "Chinese (Simplified)".to_string()),
+        ("zh-TW".to_string(), "Chinese (Traditional)".to_string()),
+        ("ja-JP".to_string(), "Japanese".to_string()),
+        ("ko-KR".to_string(), "Korean".to_string()),
+    ])
+}
+
+#[tauri::command]
 pub fn get_bundled_keyboards(state: State<KeyboardManagerState>) -> Result<Vec<KeyboardComparison>, String> {
     let manager = state.lock().map_err(|e| e.to_string())?;
     

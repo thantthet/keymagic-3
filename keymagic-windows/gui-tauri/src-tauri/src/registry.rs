@@ -648,6 +648,88 @@ fn notify_registry_change() -> Result<(), RegistryError> {
     }
 }
 
+// ===== Language Profile Management =====
+
+/// Gets the list of enabled language profiles
+pub fn get_enabled_languages() -> Result<Vec<String>, RegistryError> {
+    match open_registry_key(SETTINGS_KEY) {
+        Ok(settings_key) => {
+            let result = match read_registry_multi_string(settings_key, "EnabledLanguages") {
+                Ok(languages) => Ok(languages),
+                Err(RegistryError::ValueNotFound) => {
+                    // Return default languages if not found
+                    Ok(vec![
+                        "en-US".to_string(),
+                    ])
+                }
+                Err(e) => Err(e),
+            };
+            unsafe { let _ = RegCloseKey(settings_key); }
+            result
+        }
+        Err(RegistryError::KeyNotFound) => {
+            // Return defaults if key doesn't exist
+            Ok(vec![
+                "en-US".to_string(),
+            ])
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Sets the list of enabled language profiles
+pub fn set_enabled_languages(languages: &[String]) -> Result<(), RegistryError> {
+    let settings_key = create_or_open_registry_key(SETTINGS_KEY)?;
+    write_registry_multi_string(settings_key, "EnabledLanguages", languages)?;
+    unsafe { let _ = RegCloseKey(settings_key); }
+    
+    // Notify TSF instances to reload language profiles
+    notify_registry_change()?;
+    Ok(())
+}
+
+/// Adds a language to the enabled language profiles
+pub fn add_enabled_language(language_code: &str) -> Result<(), RegistryError> {
+    let mut languages = get_enabled_languages()?;
+    
+    // Check if it already exists
+    if !languages.iter().any(|l| l == language_code) {
+        languages.push(language_code.to_string());
+        languages.sort(); // Keep the list sorted
+        set_enabled_languages(&languages)?;
+    }
+    
+    Ok(())
+}
+
+/// Removes a language from the enabled language profiles
+pub fn remove_enabled_language(language_code: &str) -> Result<(), RegistryError> {
+    let mut languages = get_enabled_languages()?;
+    
+    // Remove the language
+    languages.retain(|l| l != language_code);
+    
+    set_enabled_languages(&languages)?;
+    Ok(())
+}
+
+/// Maps language code to Windows LANGID
+pub fn language_code_to_langid(language_code: &str) -> Option<u16> {
+    match language_code {
+        "en-US" => Some(0x0409), // English (United States)
+        "my-MM" => Some(0x0455), // Myanmar
+        "th-TH" => Some(0x041E), // Thai
+        "km-KH" => Some(0x0453), // Khmer (Cambodia)
+        "lo-LA" => Some(0x0454), // Lao
+        "vi-VN" => Some(0x042A), // Vietnamese
+        "zh-CN" => Some(0x0804), // Chinese (Simplified)
+        "zh-TW" => Some(0x0404), // Chinese (Traditional)
+        "ja-JP" => Some(0x0411), // Japanese
+        "ko-KR" => Some(0x0412), // Korean
+        _ => None,
+    }
+}
+
 // ===== Composition Mode Process Management =====
 
 /// Gets the list of processes that should use composition mode

@@ -949,6 +949,70 @@ function showUpdateNotification(updateInfo) {
   }, 10000);
 }
 
+// Language profile management
+async function loadLanguageProfiles() {
+  try {
+    // Get supported languages
+    const supportedLanguages = await invoke('get_supported_languages');
+    
+    // Get currently enabled languages
+    const enabledLanguages = await invoke('get_enabled_languages');
+    
+    // Populate language list
+    const languageList = document.getElementById('language-list');
+    languageList.innerHTML = '';
+    
+    supportedLanguages.forEach(([code, name]) => {
+      const item = document.createElement('div');
+      item.className = 'language-item';
+      
+      const label = document.createElement('label');
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = code;
+      checkbox.checked = enabledLanguages.includes(code);
+      checkbox.addEventListener('change', onLanguageToggle);
+      
+      const text = document.createElement('span');
+      text.textContent = name;
+      
+      label.appendChild(checkbox);
+      label.appendChild(text);
+      item.appendChild(label);
+      languageList.appendChild(item);
+    });
+  } catch (error) {
+    console.error('Failed to load language profiles:', error);
+  }
+}
+
+async function onLanguageToggle(event) {
+  try {
+    // Get all checked languages
+    const checkboxes = document.querySelectorAll('#language-list input[type="checkbox"]:checked');
+    const enabledLanguages = Array.from(checkboxes).map(cb => cb.value);
+    
+    // Ensure at least one language is selected
+    if (enabledLanguages.length === 0) {
+      event.target.checked = true;
+      showError('At least one language must be selected');
+      return;
+    }
+    
+    // Update the enabled languages
+    await invoke('set_enabled_languages', { languages: enabledLanguages });
+    
+    // Show success message
+    showSuccess('Language profiles updated successfully');
+  } catch (error) {
+    console.error('Failed to update language profiles:', error);
+    showError('Failed to update language profiles');
+    // Restore checkbox state on error
+    await loadLanguageProfiles();
+  }
+}
+
 // Initialize
 async function init() {
   // Initialize DOM elements
@@ -973,6 +1037,7 @@ async function init() {
     updateStatusIndicator();
     await loadKeyboards();
     await loadSettings();
+    await loadLanguageProfiles();
     
     // Check for first run keyboard scan
     await checkFirstRunImport();

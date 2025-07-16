@@ -8,6 +8,7 @@ BOOL RegisterServer();
 void UnregisterServer();
 BOOL RegisterTextService();
 void UnregisterTextService();
+BOOL UpdateLanguageProfiles(); // Update language profiles dynamically
 
 // Helper functions
 BOOL CreateRegKey(HKEY hKeyParent, LPCWSTR lpszKeyName, LPCWSTR lpszValue = nullptr);

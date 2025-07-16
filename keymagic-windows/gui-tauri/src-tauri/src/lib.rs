@@ -105,6 +105,9 @@ pub fn run() {
             commands::set_composition_mode_processes,
             commands::add_composition_mode_process,
             commands::remove_composition_mode_process,
+            commands::get_enabled_languages,
+            commands::set_enabled_languages,
+            commands::get_supported_languages,
         ])
         .setup(|app| {
             // Initialize native HUD window

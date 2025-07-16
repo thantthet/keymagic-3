@@ -499,6 +499,47 @@ body {
   line-height: 1.6;
 }
 
+/* Language Settings */
+.language-settings {
+  margin: 10px 0;
+}
+
+.language-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.language-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f9f9f9;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.language-item:hover {
+  background-color: #f0f0f0;
+}
+
+.language-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+  font-size: 14px;
+}
+
+.language-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* Composition Mode Settings */
 .composition-mode-settings {
   margin-top: 10px;
