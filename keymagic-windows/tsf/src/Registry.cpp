@@ -10,7 +10,7 @@
 
 // List of categories to register the text service under
 static const GUID* g_SupportedCategories[] = {
-    // &GUID_TFCAT_TIP_KEYBOARD,                    // Register as keyboard
+    &GUID_TFCAT_TIP_KEYBOARD,                    // Register as keyboard
     &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,        // Support for Metro/UWP apps
     &GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,          // Support for system tray
     &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,       // For display attributes
@@ -148,6 +148,10 @@ BOOL RegisterServer()
 
 void UnregisterServer()
 {
+    // Unregister the text service first
+    UnregisterTextService();
+    
+    // Then delete the CLSID registry key
     WCHAR szCLSID[MAX_PATH];
     StringCchPrintf(szCLSID, ARRAYSIZE(szCLSID), L"CLSID\\%s", TEXTSERVICE_CLSID);
 
@@ -169,41 +173,10 @@ BOOL RegisterTextService()
 
         if (SUCCEEDED(hr))
         {
-            // Get module path for icon
-            WCHAR szModule[MAX_PATH] = {0};
-            GetModuleFileName(g_hInst, szModule, ARRAYSIZE(szModule));
-            
-            // Read enabled languages from registry
-            std::vector<LANGID> enabledLanguages = GetEnabledLanguagesFromRegistry();
-            
-            // If no languages specified, use defaults
-            if (enabledLanguages.empty())
+            // Use UpdateLanguageProfiles to handle language profile registration
+            if (!UpdateLanguageProfiles())
             {
-                enabledLanguages.push_back(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); // 0x0409
-            }
-            
-            // Add language profiles for all enabled languages
-            for (size_t i = 0; i < enabledLanguages.size() && SUCCEEDED(hr); i++)
-            {
-                hr = pInputProcessProfiles->AddLanguageProfile(
-                    CLSID_KeyMagicTextService,
-                    enabledLanguages[i],
-                    GUID_KeyMagicProfile,
-                    TEXTSERVICE_DESC,
-                    (ULONG)wcslen(TEXTSERVICE_DESC),
-                    szModule,            // Icon file path
-                    (ULONG)(-IDI_KEYMAGIC), // Icon resource ID (negative for resource)
-                    0);
-                    
-                if (SUCCEEDED(hr))
-                {
-                    // Enable the profile
-                    pInputProcessProfiles->EnableLanguageProfile(
-                        CLSID_KeyMagicTextService,
-                        enabledLanguages[i],
-                        GUID_KeyMagicProfile,
-                        TRUE);
-                }
+                hr = E_FAIL;
             }
         }
 
@@ -231,34 +204,6 @@ BOOL RegisterTextService()
         }
     }
 
-    // Enable the profile by default
-    if (SUCCEEDED(hr))
-    {
-        ITfInputProcessorProfileMgr *pProfileMgr;
-        hr = CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER,
-                             IID_ITfInputProcessorProfileMgr, (void**)&pProfileMgr);
-        
-        if (SUCCEEDED(hr))
-        {
-            // Enable for English language
-            TF_INPUTPROCESSORPROFILE profile = {0};
-            profile.dwProfileType = TF_PROFILETYPE_INPUTPROCESSOR;
-            profile.langid = MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
-            profile.clsid = CLSID_KeyMagicTextService;
-            profile.guidProfile = GUID_KeyMagicProfile;
-            profile.dwFlags = 0;
-            
-            pProfileMgr->ActivateProfile(
-                TF_PROFILETYPE_INPUTPROCESSOR,
-                MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-                CLSID_KeyMagicTextService,
-                GUID_KeyMagicProfile,
-                NULL,
-                TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE);
-                
-            pProfileMgr->Release();
-        }
-    }
 
     return SUCCEEDED(hr);
 }

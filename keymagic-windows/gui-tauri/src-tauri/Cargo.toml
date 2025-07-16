@@ -50,6 +50,7 @@ windows = { version = "0.52", features = [
     "Win32_System_LibraryLoader",
     "Win32_System_Com",
     "Win32_System_Memory",
+    "Win32_UI_TextServices",
 ]}
 winreg = "0.52"
 

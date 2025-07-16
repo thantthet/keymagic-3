@@ -266,7 +266,12 @@ pub fn get_enabled_languages() -> Result<Vec<String>, String> {
 pub fn set_enabled_languages(languages: Vec<String>) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        registry::set_enabled_languages(&languages).map_err(|e| e.to_string())
+        // First update registry
+        registry::set_enabled_languages(&languages).map_err(|e| e.to_string())?;
+        
+        // Then update TSF language profiles
+        crate::language_profiles::update_language_profiles(&languages)
+            .map_err(|e| format!("Failed to update language profiles: {}", e))
     }
     
     #[cfg(not(target_os = "windows"))]

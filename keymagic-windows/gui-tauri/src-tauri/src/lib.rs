@@ -14,6 +14,9 @@ mod keyboard_hook;
 #[cfg(target_os = "windows")]
 mod registry;
 
+#[cfg(target_os = "windows")]
+mod language_profiles;
+
 use std::sync::{Mutex, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use keyboard_manager::KeyboardManager;

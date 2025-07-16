@@ -1241,10 +1241,6 @@ void CKeyMagicTextService::ReloadRegistrySettings()
         
         // Apply settings
         UpdateSettings(keyProcessingEnabled != 0, defaultKeyboard);
-        
-        // Update language profiles (EnabledLanguages might have changed)
-        DEBUG_LOG(L"Updating language profiles after registry change");
-        UpdateLanguageProfiles();
     }
     else
     {
