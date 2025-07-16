@@ -378,6 +378,12 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
             // No valid context, reset engine
             ResetEngine();
         }
+        
+        // Start event monitoring when gaining focus
+        StartEventMonitoring();
+        
+        // Also reload registry settings immediately
+        ReloadRegistrySettings();
     }
     else
     {
@@ -409,12 +415,6 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
     if (fForeground)
     {
         DEBUG_LOG(L"Text service became active input processor");
-        
-        // Start event monitoring when gaining focus
-        StartEventMonitoring();
-        
-        // Also reload registry settings immediately
-        ReloadRegistrySettings();
     }
     else
     {
