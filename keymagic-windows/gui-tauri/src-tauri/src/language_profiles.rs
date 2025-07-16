@@ -17,7 +17,7 @@ const CLSID_KEYMAGIC_TEXT_SERVICE: GUID = GUID::from_u128(0x094a562b_d08b_4caf_8
 const GUID_KEYMAGIC_PROFILE: GUID = GUID::from_u128(0xc29d9340_87aa_4149_a1ce_f6acaa8af30b);
 
 // Text service description
-const TEXTSERVICE_DESC: &str = "KeyMagic";
+const TEXTSERVICE_DESC: &str = "KeyMagic 3";
 
 // Tauri embeds the application icon with the standard Windows IDI_APPLICATION resource ID
 const IDI_APPLICATION: i32 = 32512;
