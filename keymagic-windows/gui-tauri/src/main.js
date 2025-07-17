@@ -697,7 +697,7 @@ window.openWindowsInputSettings = async function() {
     // Use rundll32 to open the language settings
     await invoke('run_command', {
       command: 'rundll32.exe',
-      args: ['Shell32.dll,Control_RunDLL', 'input.dll,,{C07337D3-DB2C-4D0B-9A93-B722A6C106E2}']
+      args: ['Shell32.dll,Control_RunDLL', 'input.dll,,{C07337D3-DB2C-4D0B-9A93-B722A6C106E2}{HOTKEYS}']
     });
   } catch (error) {
     console.error('Failed to open Windows input settings:', error);
