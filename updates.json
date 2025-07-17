@@ -3,28 +3,28 @@
   "platforms": {
     "windows": {
       "aarch64": {
-        "version": "0.0.4",
-        "releaseDate": "2025-07-14T16:48:16Z",
+        "version": "0.0.5",
+        "releaseDate": "2025-07-17T13:27:17Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.4/KeyMagic3-Setup-0.0.4-arm64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.5/KeyMagic3-Setup-0.0.5-arm64.exe",
         "signature": "",
-        "size": 4721828,
-        "sha256": "49825926075758dbaaa67a203cbda9d137fe5c932b8666cf40400838820f4cc4"
+        "size": 4838243,
+        "sha256": "f708e5adc84ecb6fa48c68a43aeed86a5259759672233b5228dbde5728865982"
       },
       "x86_64": {
-        "version": "0.0.4",
-        "releaseDate": "2025-07-14T16:48:16Z",
+        "version": "0.0.5",
+        "releaseDate": "2025-07-17T13:27:17Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.4/KeyMagic3-Setup-0.0.4-x64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.5/KeyMagic3-Setup-0.0.5-x64.exe",
         "signature": "",
-        "size": 4769072,
-        "sha256": "baf1672d661988f13297591003a04ec7f8ba08559619a19faf7e19ccf42828dc"
+        "size": 4893837,
+        "sha256": "b9e68e1c5a222cfd7f977ef634036c78ac033ed26c0ef7a5255a53ac7972af59"
       }
     }
   },
   "releaseNotes": {
-    "0.0.4": {
-      "en": "###  KeyMagic 3 - v0.0.4\n\n  🎉 **What's New**\n\n**⌨️ Better Keyboard Switching**\n- Keyboard hotkeys now work as a toggle - press once to activate KeyMagic, press again to switch back to your system keyboard\n- You can now use modifier-only hotkeys like Ctrl+Shift or Alt+Shift\n\n**📦 Improved Updates**\n- Updates now appear in a dedicated window with properly formatted release notes\n- You can now see which version you're running when the app starts\n\n**💪 More Stable**\n- KeyMagic now prevents multiple copies from running at the same time\n- Fixed several bugs that could cause unexpected behavior\n\n**🐛 Fixes**\n- Fixed keyboard import wizard not registering hotkeys\n- Various small improvements for better performance\n\n---\n\nThank you for using KeyMagic! If you have any issues, please let us know."
+    "0.0.5": {
+      "en": "### KeyMagic 0.0.5\n\n**Major Change: KeyMagic is Now a Windows Keyboard**\n\nKeyMagic has been redesigned as a native Windows keyboard service:\n- **Before:** Toggle button to turn on/off\n- **Now:** Select from Windows language bar (Win + Space)\n\n**New Features**\n- 🌍 Support for 200+ languages with searchable UI\n- 🪟 Better Windows integration - appears in Settings keyboard list\n- 🔤 Composition mode for app compatibility (e.g., Microsoft Teams)\n\n**How to Use**\n1. Press Win + Space and select KeyMagic\n2. Choose your keyboard layout in KeyMagic Configurator\n3. Start typing with your selected layout\n\n**Important:** No more toggle button - KeyMagic is active when selected in Windows, inactive when not selected.\n"
     }
   }
 }
