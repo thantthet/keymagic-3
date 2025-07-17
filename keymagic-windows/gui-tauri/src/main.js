@@ -240,6 +240,8 @@ window.viewKeyboardLayout = async function(keyboardId) {
       title: `${keyboard.name} - Keyboard Layout`,
       width: 1000,
       height: 600,
+      minWidth: 400,
+      minHeight: 200,
       center: true,
       resizable: true,
       minimizable: true,

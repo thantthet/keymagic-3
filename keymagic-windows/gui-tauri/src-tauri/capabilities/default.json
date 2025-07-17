@@ -7,6 +7,7 @@
     "core:default",
     "core:window:default",
     "core:window:allow-close",
+    "core:window:allow-set-always-on-top",
     "core:webview:default",
     "core:webview:allow-create-webview-window",
     "core:event:default",
