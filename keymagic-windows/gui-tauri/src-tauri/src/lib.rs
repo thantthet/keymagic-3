@@ -116,6 +116,7 @@ pub fn run() {
             commands::run_command,
             commands::get_supported_languages,
             commands::search_languages,
+            commands::get_keyboard_layout,
         ])
         .setup(|app| {
             // Initialize native HUD window

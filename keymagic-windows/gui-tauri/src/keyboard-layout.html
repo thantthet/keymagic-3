@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keyboard Layout</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    .layout-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .layout-header h1 {
+      color: #333;
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    
+    .layout-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #2196F3;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1976D2;
+    }
+    
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+    
+    .keyboard-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+    }
+    
+    .keyboard-layout {
+      display: inline-block;
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .keyboard-row {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 5px;
+      justify-content: flex-start;
+    }
+    
+    .key {
+      background: #fafafa;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      position: relative;
+      font-size: 15px;
+      transition: all 0.1s;
+    }
+    
+    .key:hover {
+      background: #f0f0f0;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+    }
+    
+    .key.wide { width: 78px; }
+    .key.wider { width: 104px; }
+    .key.space { width: 364px; }
+    .key.tab { width: 78px; }
+    .key.caps { width: 94px; }
+    .key.shift-left { width: 118px; }
+    .key.shift-right { width: 134px; }
+    .key.enter { width: 108px; }
+    .key.backspace { width: 104px; }
+    
+    .key-shifted {
+      position: absolute;
+      top: 5px;
+      left: 7px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1;
+    }
+    
+    .key-unshifted {
+      font-size: 18px;
+      font-weight: 500;
+      color: #222;
+      line-height: 1;
+    }
+    
+    .key-label {
+      font-size: 11px;
+      color: #888;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    
+    .loading {
+      text-align: center;
+      color: #666;
+    }
+    
+    .error {
+      text-align: center;
+      color: #f44336;
+    }
+    
+    .info-footer {
+      margin-top: 30px;
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      padding: 10px;
+    }
+    
+    .info-footer p {
+      margin: 5px 0;
+    }
+    
+    @media print {
+      body {
+        background: white;
+        padding: 10px;
+      }
+      
+      .layout-actions {
+        display: none;
+      }
+      
+      .keyboard-layout {
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+      
+      .key {
+        box-shadow: none;
+      }
+      
+      .key:hover {
+        background: #fafafa;
+        transform: none;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout-header">
+    <h1 id="keyboard-name">Loading...</h1>
+  </div>
+  
+  <div class="layout-actions">
+    <button class="btn btn-primary" onclick="exportPDF()">Export as PDF</button>
+    <button class="btn btn-secondary" id="close-button">Close</button>
+  </div>
+  
+  <div class="keyboard-container" id="keyboard-container">
+    <div class="loading">Loading keyboard layout...</div>
+  </div>
+
+  <div class="info-footer">
+    <p>Shifted characters are shown in the top-left corner of each key</p>
+    <p>Unshifted characters are shown in the center</p>
+  </div>
+  
+  <script type="module">
+    const { invoke } = window.__TAURI__.core;
+    const { WebviewWindow } = window.__TAURI__.webviewWindow;
+    
+    let layoutData = null;
+    
+    // Get keyboard ID from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyboardId = urlParams.get('keyboardId');
+    
+    // Load keyboard layout data on window load
+    async function loadKeyboardLayout() {
+      if (!keyboardId) {
+        document.getElementById('keyboard-container').innerHTML = '<div class="error">No keyboard ID provided</div>';
+        return;
+      }
+      
+      try {
+        layoutData = await invoke('get_keyboard_layout', { keyboardId });
+        displayKeyboardLayout();
+      } catch (error) {
+        console.error('Failed to load keyboard layout:', error);
+        document.getElementById('keyboard-container').innerHTML = '<div class="error">Failed to load keyboard layout</div>';
+      }
+    }
+    
+    function displayKeyboardLayout() {
+      const container = document.getElementById('keyboard-container');
+      const nameElement = document.getElementById('keyboard-name');
+      
+      if (!layoutData) {
+        container.innerHTML = '<div class="error">Failed to load keyboard layout</div>';
+        return;
+      }
+      
+      nameElement.textContent = `${layoutData.keyboard_name} - Keyboard Layout`;
+      
+      const { keys } = layoutData;
+      
+      container.innerHTML = `
+        <div class="keyboard-layout">
+          <!-- Number row -->
+          <div class="keyboard-row">
+            <div class="key">
+              <span class="key-shifted">${keys['Backquote']?.shifted || '~'}</span>
+              <span class="key-unshifted">${keys['Backquote']?.unshifted || '`'}</span>
+            </div>
+            ${[1,2,3,4,5,6,7,8,9,0].map(n => `
+              <div class="key">
+                <span class="key-shifted">${keys['Digit' + n]?.shifted || ''}</span>
+                <span class="key-unshifted">${keys['Digit' + n]?.unshifted || n}</span>
+              </div>
+            `).join('')}
+            <div class="key">
+              <span class="key-shifted">${keys['Minus']?.shifted || '_'}</span>
+              <span class="key-unshifted">${keys['Minus']?.unshifted || '-'}</span>
+            </div>
+            <div class="key">
+              <span class="key-shifted">${keys['Equal']?.shifted || '+'}</span>
+              <span class="key-unshifted">${keys['Equal']?.unshifted || '='}</span>
+            </div>
+            <div class="key backspace">
+              <span class="key-label">BACKSPACE</span>
+            </div>
+          </div>
+          
+          <!-- Top row -->
+          <div class="keyboard-row">
+            <div class="key tab">
+              <span class="key-label">TAB</span>
+            </div>
+            ${['Q','W','E','R','T','Y','U','I','O','P'].map(letter => `
+              <div class="key">
+                <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
+                <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
+              </div>
+            `).join('')}
+            <div class="key">
+              <span class="key-shifted">${keys['BracketLeft']?.shifted || '{'}</span>
+              <span class="key-unshifted">${keys['BracketLeft']?.unshifted || '['}</span>
+            </div>
+            <div class="key">
+              <span class="key-shifted">${keys['BracketRight']?.shifted || '}'}</span>
+              <span class="key-unshifted">${keys['BracketRight']?.unshifted || ']'}</span>
+            </div>
+            <div class="key">
+              <span class="key-shifted">${keys['Backslash']?.shifted || '|'}</span>
+              <span class="key-unshifted">${keys['Backslash']?.unshifted || '\\\\'}</span>
+            </div>
+          </div>
+          
+          <!-- Home row -->
+          <div class="keyboard-row">
+            <div class="key caps">
+              <span class="key-label">CAPS LOCK</span>
+            </div>
+            ${['A','S','D','F','G','H','J','K','L'].map(letter => `
+              <div class="key">
+                <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
+                <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
+              </div>
+            `).join('')}
+            <div class="key">
+              <span class="key-shifted">${keys['Semicolon']?.shifted || ':'}</span>
+              <span class="key-unshifted">${keys['Semicolon']?.unshifted || ';'}</span>
+            </div>
+            <div class="key">
+              <span class="key-shifted">${keys['Quote']?.shifted || '"'}</span>
+              <span class="key-unshifted">${keys['Quote']?.unshifted || "'"}</span>
+            </div>
+            <div class="key enter">
+              <span class="key-label">ENTER</span>
+            </div>
+          </div>
+          
+          <!-- Bottom row -->
+          <div class="keyboard-row">
+            <div class="key shift-left">
+              <span class="key-label">SHIFT</span>
+            </div>
+            ${['Z','X','C','V','B','N','M'].map(letter => `
+              <div class="key">
+                <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
+                <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
+              </div>
+            `).join('')}
+            <div class="key">
+              <span class="key-shifted">${keys['Comma']?.shifted || '<'}</span>
+              <span class="key-unshifted">${keys['Comma']?.unshifted || ','}</span>
+            </div>
+            <div class="key">
+              <span class="key-shifted">${keys['Period']?.shifted || '>'}</span>
+              <span class="key-unshifted">${keys['Period']?.unshifted || '.'}</span>
+            </div>
+            <div class="key">
+              <span class="key-shifted">${keys['Slash']?.shifted || '?'}</span>
+              <span class="key-unshifted">${keys['Slash']?.unshifted || '/'}</span>
+            </div>
+            <div class="key shift-right">
+              <span class="key-label">SHIFT</span>
+            </div>
+          </div>
+          
+          <!-- Space row -->
+          <div class="keyboard-row">
+            <div class="key wider">
+              <span class="key-label">CTRL</span>
+            </div>
+            <div class="key wide">
+              <span class="key-label">WIN</span>
+            </div>
+            <div class="key wide">
+              <span class="key-label">ALT</span>
+            </div>
+            <div class="key space">
+              <span class="key-unshifted">${keys['Space']?.unshifted || ' '}</span>
+            </div>
+            <div class="key wide">
+              <span class="key-label">ALT</span>
+            </div>
+            <div class="key wide">
+              <span class="key-label">WIN</span>
+            </div>
+            <div class="key wide">
+              <span class="key-label">MENU</span>
+            </div>
+            <div class="key wider">
+              <span class="key-label">CTRL</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    window.exportPDF = function() {
+      window.print();
+    }
+    
+    // Handle close button
+    document.getElementById('close-button').addEventListener('click', async () => {
+      const currentWindow = WebviewWindow.getCurrent();
+      await currentWindow.close();
+    });
+    
+    // Load the keyboard layout when the page loads
+    window.addEventListener('DOMContentLoaded', loadKeyboardLayout);
+  </script>
+</body>
+</html>

@@ -810,7 +810,11 @@ body {
   background-color: var(--card-bg);
   border-radius: 8px;
   width: 90%;
-  max-width: 500px;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
@@ -847,6 +851,8 @@ body {
 
 .modal-body {
   padding: 20px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .modal-input {

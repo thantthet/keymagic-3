@@ -8,6 +8,8 @@ use tauri_plugin_autostart::ManagerExt;
 use std::path::PathBuf;
 use log::error;
 use std::process::Command;
+use std::ffi::{CStr, CString};
+use keymagic_core::ffi::*;
 
 type KeyboardManagerState = Mutex<KeyboardManager>;
 
@@ -464,4 +466,221 @@ pub fn run_command(command: String, args: Vec<String>) -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("Failed to run command: {}", e))?;
     Ok(())
+}
+
+use std::collections::HashMap;
+
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::Input::KeyboardAndMouse::*;
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct KeyboardLayoutData {
+    pub keyboard_name: String,
+    pub keys: HashMap<String, KeyData>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct KeyData {
+    pub unshifted: String,
+    pub shifted: String,
+}
+
+#[tauri::command]
+pub fn get_keyboard_layout(
+    state: State<KeyboardManagerState>,
+    keyboard_id: String,
+) -> Result<KeyboardLayoutData, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("Keyboard layout viewer is only available on Windows".to_string());
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+    let manager = state.lock().map_err(|e| e.to_string())?;
+    
+    // Get keyboard info
+    let keyboards = manager.get_keyboards();
+    let keyboard = keyboards
+        .iter()
+        .find(|kb| kb.id == keyboard_id)
+        .ok_or_else(|| "Keyboard not found".to_string())?;
+    
+    // Create a new engine instance for testing
+    let engine = keymagic_engine_new();
+    if engine.is_null() {
+        return Err("Failed to create engine".to_string());
+    }
+    
+    // Load the keyboard
+    let c_path = CString::new(keyboard.path.to_str().unwrap()).map_err(|e| e.to_string())?;
+    let load_result = keymagic_engine_load_keyboard(engine, c_path.as_ptr());
+    
+    if load_result != KeyMagicResult::Success {
+        keymagic_engine_free(engine);
+        return Err("Failed to load keyboard".to_string());
+    }
+    
+    // Test all standard keys
+    let mut keys = HashMap::new();
+    
+    // Define all standard US QWERTY keys with their VK codes and positions
+    let standard_keys = vec![
+        // Number row
+        ("Backquote", VK_OEM_3.0 as i32, '`', '~'),
+        ("Digit1", VK_1.0 as i32, '1', '!'),
+        ("Digit2", VK_2.0 as i32, '2', '@'),
+        ("Digit3", VK_3.0 as i32, '3', '#'),
+        ("Digit4", VK_4.0 as i32, '4', '$'),
+        ("Digit5", VK_5.0 as i32, '5', '%'),
+        ("Digit6", VK_6.0 as i32, '6', '^'),
+        ("Digit7", VK_7.0 as i32, '7', '&'),
+        ("Digit8", VK_8.0 as i32, '8', '*'),
+        ("Digit9", VK_9.0 as i32, '9', '('),
+        ("Digit0", VK_0.0 as i32, '0', ')'),
+        ("Minus", VK_OEM_MINUS.0 as i32, '-', '_'),
+        ("Equal", VK_OEM_PLUS.0 as i32, '=', '+'),
+        
+        // Top row (QWERTY)
+        ("KeyQ", VK_Q.0 as i32, 'q', 'Q'),
+        ("KeyW", VK_W.0 as i32, 'w', 'W'),
+        ("KeyE", VK_E.0 as i32, 'e', 'E'),
+        ("KeyR", VK_R.0 as i32, 'r', 'R'),
+        ("KeyT", VK_T.0 as i32, 't', 'T'),
+        ("KeyY", VK_Y.0 as i32, 'y', 'Y'),
+        ("KeyU", VK_U.0 as i32, 'u', 'U'),
+        ("KeyI", VK_I.0 as i32, 'i', 'I'),
+        ("KeyO", VK_O.0 as i32, 'o', 'O'),
+        ("KeyP", VK_P.0 as i32, 'p', 'P'),
+        ("BracketLeft", VK_OEM_4.0 as i32, '[', '{'),
+        ("BracketRight", VK_OEM_6.0 as i32, ']', '}'),
+        ("Backslash", VK_OEM_5.0 as i32, '\\', '|'),
+        
+        // Home row
+        ("KeyA", VK_A.0 as i32, 'a', 'A'),
+        ("KeyS", VK_S.0 as i32, 's', 'S'),
+        ("KeyD", VK_D.0 as i32, 'd', 'D'),
+        ("KeyF", VK_F.0 as i32, 'f', 'F'),
+        ("KeyG", VK_G.0 as i32, 'g', 'G'),
+        ("KeyH", VK_H.0 as i32, 'h', 'H'),
+        ("KeyJ", VK_J.0 as i32, 'j', 'J'),
+        ("KeyK", VK_K.0 as i32, 'k', 'K'),
+        ("KeyL", VK_L.0 as i32, 'l', 'L'),
+        ("Semicolon", VK_OEM_1.0 as i32, ';', ':'),
+        ("Quote", VK_OEM_7.0 as i32, '\'', '"'),
+        
+        // Bottom row
+        ("KeyZ", VK_Z.0 as i32, 'z', 'Z'),
+        ("KeyX", VK_X.0 as i32, 'x', 'X'),
+        ("KeyC", VK_C.0 as i32, 'c', 'C'),
+        ("KeyV", VK_V.0 as i32, 'v', 'V'),
+        ("KeyB", VK_B.0 as i32, 'b', 'B'),
+        ("KeyN", VK_N.0 as i32, 'n', 'N'),
+        ("KeyM", VK_M.0 as i32, 'm', 'M'),
+        ("Comma", VK_OEM_COMMA.0 as i32, ',', '<'),
+        ("Period", VK_OEM_PERIOD.0 as i32, '.', '>'),
+        ("Slash", VK_OEM_2.0 as i32, '/', '?'),
+        
+        // Space bar
+        ("Space", VK_SPACE.0 as i32, ' ', ' '),
+    ];
+    
+    // Test each key
+    for (key_id, vk_code, unshifted_char, shifted_char) in standard_keys {
+        let mut key_data = KeyData {
+            unshifted: String::new(),
+            shifted: String::new(),
+        };
+        
+        // Test unshifted state
+        let mut output = ProcessKeyOutput {
+            action_type: 0,
+            text: std::ptr::null_mut(),
+            delete_count: 0,
+            composing_text: std::ptr::null_mut(),
+            is_processed: 0,
+        };
+        
+        let result = keymagic_engine_process_key_test_win(
+            engine,
+            vk_code,
+            unshifted_char as i8,
+            0, // shift
+            0, // ctrl
+            0, // alt
+            0, // caps_lock
+            &mut output,
+        );
+        
+        if result == KeyMagicResult::Success {
+            if output.is_processed != 0 && !output.composing_text.is_null() {
+                let composing = unsafe { CStr::from_ptr(output.composing_text) }
+                    .to_string_lossy()
+                    .to_string();
+                key_data.unshifted = composing;
+            } else {
+                // Key not processed, use default character
+                key_data.unshifted = unshifted_char.to_string();
+            }
+            
+            // Free strings
+            if !output.text.is_null() {
+                keymagic_free_string(output.text);
+            }
+            if !output.composing_text.is_null() {
+                keymagic_free_string(output.composing_text);
+            }
+        }
+        
+        // Test shifted state
+        let mut output = ProcessKeyOutput {
+            action_type: 0,
+            text: std::ptr::null_mut(),
+            delete_count: 0,
+            composing_text: std::ptr::null_mut(),
+            is_processed: 0,
+        };
+        
+        let result = keymagic_engine_process_key_test_win(
+            engine,
+            vk_code,
+            shifted_char as i8,
+            1, // shift
+            0, // ctrl
+            0, // alt
+            0, // caps_lock
+            &mut output,
+        );
+        
+        if result == KeyMagicResult::Success {
+            if output.is_processed != 0 && !output.composing_text.is_null() {
+                let composing = unsafe { CStr::from_ptr(output.composing_text) }
+                    .to_string_lossy()
+                    .to_string();
+                key_data.shifted = composing;
+            } else {
+                // Key not processed, use default character
+                key_data.shifted = shifted_char.to_string();
+            }
+            
+            // Free strings
+            if !output.text.is_null() {
+                keymagic_free_string(output.text);
+            }
+            if !output.composing_text.is_null() {
+                keymagic_free_string(output.composing_text);
+            }
+        }
+        
+        keys.insert(key_id.to_string(), key_data);
+    }
+    
+    // Clean up
+    keymagic_engine_free(engine);
+    
+    Ok(KeyboardLayoutData {
+        keyboard_name: keyboard.name.clone(),
+        keys,
+    })
+    }
 }

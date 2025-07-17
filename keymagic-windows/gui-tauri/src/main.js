@@ -132,6 +132,7 @@ function createKeyboardCard(keyboard) {
         `<button class="btn btn-primary" onclick="activateKeyboard('${keyboard.id}')">Activate</button>` :
         `<button class="btn btn-disabled" disabled>Active</button>`
       }
+      <button class="btn btn-secondary" onclick="viewKeyboardLayout('${keyboard.id}')">View Layout</button>
       <button class="btn btn-secondary" onclick="removeKeyboard('${keyboard.id}')">Remove</button>
     </div>
   `;
@@ -221,6 +222,45 @@ window.removeKeyboard = async function(keyboardId) {
     }
   }
 }
+
+window.viewKeyboardLayout = async function(keyboardId) {
+  const keyboard = keyboards.find(k => k.id === keyboardId);
+  if (!keyboard) return;
+  
+  try {
+    // Create a new window for keyboard layout
+    const { WebviewWindow } = window.__TAURI__.webviewWindow;
+    
+    // Create a unique label for the window (only alphanumeric, -, /, :, _)
+    const windowLabel = `keyboard-layout-${keyboardId.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}`;
+    
+    // Create the window with keyboard ID as URL parameter
+    const layoutWindow = new WebviewWindow(windowLabel, {
+      url: `keyboard-layout.html?keyboardId=${encodeURIComponent(keyboardId)}`,
+      title: `${keyboard.name} - Keyboard Layout`,
+      width: 1000,
+      height: 600,
+      center: true,
+      resizable: true,
+      minimizable: true,
+      maximizable: true,
+      decorations: true,
+      alwaysOnTop: false,
+      skipTaskbar: false
+    });
+    
+    // Handle errors
+    layoutWindow.once('tauri://error', (error) => {
+      console.error('Failed to create keyboard layout window:', error);
+      showError('Failed to open keyboard layout window');
+    });
+    
+  } catch (error) {
+    console.error('Failed to open keyboard layout window:', error);
+    showError('Failed to open keyboard layout window');
+  }
+}
+
 
 // Event listener setup function
 function setupEventListeners() {
