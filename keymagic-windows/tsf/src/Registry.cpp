@@ -1,6 +1,7 @@
 #include "Registry.h"
 #include "Globals.h"
 #include "KeyMagicGuids.h"
+#include "LanguageUtils.h"
 #include "resource.h"
 #include <strsafe.h>
 #include <msctf.h>
@@ -23,22 +24,6 @@ static const GUID* g_SupportedCategories[] = {
 };
 
 static const int g_SupportedCategoriesCount = ARRAYSIZE(g_SupportedCategories);
-
-// Helper function to convert language code to LANGID
-LANGID LanguageCodeToLangId(const std::wstring& languageCode)
-{
-    if (languageCode == L"en-US") return 0x0409; // English (United States)
-    if (languageCode == L"my-MM") return 0x0455; // Myanmar
-    if (languageCode == L"th-TH") return 0x041E; // Thai
-    if (languageCode == L"km-KH") return 0x0453; // Khmer (Cambodia)
-    if (languageCode == L"lo-LA") return 0x0454; // Lao
-    if (languageCode == L"vi-VN") return 0x042A; // Vietnamese
-    if (languageCode == L"zh-CN") return 0x0804; // Chinese (Simplified)
-    if (languageCode == L"zh-TW") return 0x0404; // Chinese (Traditional)
-    if (languageCode == L"ja-JP") return 0x0411; // Japanese
-    if (languageCode == L"ko-KR") return 0x0412; // Korean
-    return 0; // Invalid
-}
 
 // Read enabled languages from KeyMagic registry settings
 std::vector<LANGID> GetEnabledLanguagesFromRegistry()
@@ -271,114 +256,39 @@ BOOL UpdateLanguageProfiles()
     if (FAILED(hr))
         return FALSE;
 
-    // Get current enabled languages from registry
-    std::vector<LANGID> newLanguages = GetEnabledLanguagesFromRegistry();
-    if (newLanguages.empty())
+    // Get enabled languages from registry
+    std::vector<LANGID> enabledLanguages = GetEnabledLanguagesFromRegistry();
+    if (enabledLanguages.empty())
     {
-        newLanguages.push_back(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-    }
-
-    // Get currently registered language profiles
-    std::vector<LANGID> currentLanguages;
-    
-    // We need to check each possible language to see if our profile is registered
-    // This is not ideal but TSF doesn't provide a way to enumerate all profiles for a specific CLSID
-    // We'll check the languages we know about
-    std::vector<LANGID> possibleLanguages;
-    possibleLanguages.push_back(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)); // 0x0409
-    possibleLanguages.push_back(0x0455); // Myanmar
-    possibleLanguages.push_back(0x041E); // Thai
-    possibleLanguages.push_back(0x0453); // Khmer
-    possibleLanguages.push_back(0x0454); // Lao
-    possibleLanguages.push_back(0x042A); // Vietnamese
-    possibleLanguages.push_back(0x0804); // Chinese (Simplified)
-    possibleLanguages.push_back(0x0404); // Chinese (Traditional)
-    possibleLanguages.push_back(0x0411); // Japanese
-    possibleLanguages.push_back(0x0412); // Korean
-    
-    for (LANGID langid : possibleLanguages)
-    {
-        IEnumTfLanguageProfiles *pEnum;
-        hr = pInputProcessProfiles->EnumLanguageProfiles(langid, &pEnum);
-        if (SUCCEEDED(hr))
-        {
-            TF_LANGUAGEPROFILE profile;
-            ULONG fetched;
-            
-            while (pEnum->Next(1, &profile, &fetched) == S_OK && fetched == 1)
-            {
-                if (IsEqualGUID(profile.clsid, CLSID_KeyMagicTextService) &&
-                    IsEqualGUID(profile.guidProfile, GUID_KeyMagicProfile))
-                {
-                    currentLanguages.push_back(langid);
-                    break; // Found our profile for this language
-                }
-            }
-            pEnum->Release();
-        }
+        enabledLanguages.push_back(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
     }
 
     // Get module path for icon
     WCHAR szModule[MAX_PATH] = {0};
     GetModuleFileName(g_hInst, szModule, ARRAYSIZE(szModule));
 
-    // Add new languages that aren't currently registered
-    for (size_t i = 0; i < newLanguages.size(); i++)
+    // Register all enabled languages regardless of current registration status
+    for (size_t i = 0; i < enabledLanguages.size(); i++)
     {
-        bool found = false;
-        for (size_t j = 0; j < currentLanguages.size(); j++)
+        // Add/update this language profile
+        hr = pInputProcessProfiles->AddLanguageProfile(
+            CLSID_KeyMagicTextService,
+            enabledLanguages[i],
+            GUID_KeyMagicProfile,
+            TEXTSERVICE_DESC,
+            (ULONG)wcslen(TEXTSERVICE_DESC),
+            szModule,
+            (ULONG)(-IDI_KEYMAGIC),
+            0);
+            
+        if (SUCCEEDED(hr))
         {
-            if (newLanguages[i] == currentLanguages[j])
-            {
-                found = true;
-                break;
-            }
-        }
-        
-        if (!found)
-        {
-            // Add this language profile
-            hr = pInputProcessProfiles->AddLanguageProfile(
+            // Enable the language profile
+            pInputProcessProfiles->EnableLanguageProfile(
                 CLSID_KeyMagicTextService,
-                newLanguages[i],
+                enabledLanguages[i],
                 GUID_KeyMagicProfile,
-                TEXTSERVICE_DESC,
-                (ULONG)wcslen(TEXTSERVICE_DESC),
-                szModule,
-                (ULONG)(-IDI_KEYMAGIC),
-                0);
-                
-            if (SUCCEEDED(hr))
-            {
-                pInputProcessProfiles->EnableLanguageProfile(
-                    CLSID_KeyMagicTextService,
-                    newLanguages[i],
-                    GUID_KeyMagicProfile,
-                    TRUE);
-            }
-        }
-    }
-
-    // Remove languages that are no longer in the enabled list
-    for (size_t i = 0; i < currentLanguages.size(); i++)
-    {
-        bool found = false;
-        for (size_t j = 0; j < newLanguages.size(); j++)
-        {
-            if (currentLanguages[i] == newLanguages[j])
-            {
-                found = true;
-                break;
-            }
-        }
-        
-        if (!found)
-        {
-            // Remove this language profile
-            pInputProcessProfiles->RemoveLanguageProfile(
-                CLSID_KeyMagicTextService,
-                currentLanguages[i],
-                GUID_KeyMagicProfile);
+                TRUE);
         }
     }
 

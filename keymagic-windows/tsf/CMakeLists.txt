@@ -21,6 +21,7 @@ set(SOURCES
     src/Registry.cpp
     src/ProcessDetector.cpp
     src/KeyProcessingUtils.cpp
+    src/LanguageUtils.cpp
     src/KeyMagicTSF.rc
 )
 
