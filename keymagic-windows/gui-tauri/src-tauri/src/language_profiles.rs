@@ -73,6 +73,9 @@ pub fn update_language_profiles(enabled_languages: &[String]) -> Result<()> {
             }
         }
         
+        // Notify Windows about the language profile changes
+        notify_language_profile_change()?;
+        
         // Uninitialize COM
         CoUninitialize();
         
@@ -196,6 +199,46 @@ fn language_code_to_langid(language_code: &str) -> Option<u16> {
         "ja-JP" => Some(0x0411), // Japanese
         "ko-KR" => Some(0x0412), // Korean
         _ => None,
+    }
+}
+
+/// Notify Windows about language profile changes
+#[cfg(target_os = "windows")]
+fn notify_language_profile_change() -> Result<()> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SendMessageTimeoutW, HWND_BROADCAST, WM_SETTINGCHANGE, 
+        SMTO_ABORTIFHUNG, SMTO_NORMAL
+    };
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    
+    unsafe {
+        // Broadcast WM_SETTINGCHANGE to notify all windows about input method changes
+        let param = HSTRING::from("ImmConfigureIME");
+        
+        let mut result = 0;
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            WPARAM(0),
+            LPARAM(param.as_ptr() as isize),
+            SMTO_ABORTIFHUNG | SMTO_NORMAL,
+            5000, // 5 second timeout
+            Some(&mut result),
+        );
+        
+        // Also try with TsfLanguageProfileNotifySink for better compatibility
+        let param2 = HSTRING::from("TsfLanguageProfileNotifySink");
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            WPARAM(0),
+            LPARAM(param2.as_ptr() as isize),
+            SMTO_ABORTIFHUNG | SMTO_NORMAL,
+            5000,
+            Some(&mut result),
+        );
+        
+        Ok(())
     }
 }
 

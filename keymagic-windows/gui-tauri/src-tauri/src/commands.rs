@@ -7,6 +7,7 @@ use tauri::{State, Manager, AppHandle};
 use tauri_plugin_autostart::ManagerExt;
 use std::path::PathBuf;
 use log::error;
+use std::process::Command;
 
 type KeyboardManagerState = Mutex<KeyboardManager>;
 
@@ -192,34 +193,6 @@ pub fn update_tray_menu(app_handle: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn set_on_off_hotkey(
-    hotkey_manager: State<HotkeyManager>,
-    app_handle: AppHandle,
-    hotkey: Option<String>,
-) -> Result<(), String> {
-    // Set the hotkey
-    hotkey_manager.set_on_off_hotkey(&app_handle, hotkey.as_deref()).map_err(|e| e.to_string())?;
-    
-    // Save to registry
-    #[cfg(target_os = "windows")]
-    {
-        registry::set_on_off_hotkey(hotkey.as_deref()).map_err(|e| e.to_string())?;
-    }
-    
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_on_off_hotkey() -> Result<Option<String>, String> {
-    #[cfg(target_os = "windows")]
-    {
-        registry::get_on_off_hotkey().map_err(|e| e.to_string())
-    }
-    
-    #[cfg(not(target_os = "windows"))]
-    Ok(None)
-}
 
 #[tauri::command]
 pub async fn check_for_update() -> Result<UpdateInfo, String> {
@@ -398,5 +371,14 @@ pub fn remove_composition_mode_process(process_name: String) -> Result<(), Strin
     }
     
     #[cfg(not(target_os = "windows"))]
+    Ok(())
+}
+
+#[tauri::command]
+pub fn run_command(command: String, args: Vec<String>) -> Result<(), String> {
+    Command::new(command)
+        .args(args)
+        .spawn()
+        .map_err(|e| format!("Failed to run command: {}", e))?;
     Ok(())
 }

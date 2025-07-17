@@ -39,16 +39,6 @@
           </li>
         </ul>
         
-        <div class="sidebar-footer">
-          <button class="toggle-button" id="toggle-keymagic">
-            <span class="status-dot"></span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-              <line x1="12" y1="2" x2="12" y2="12"></line>
-            </svg>
-            <span>Disable KeyMagic</span>
-          </button>
-        </div>
       </nav>
       
       <!-- Main Content Area -->
@@ -90,17 +80,12 @@
             </section>
             
             <section class="settings-section">
-              <h2>Hotkey Settings</h2>
-              <div class="setting-item">
-                <div class="hotkey-setting">
-                  <label for="on-off-hotkey">On/Off Toggle Hotkey</label>
-                  <div class="hotkey-input-group">
-                    <input type="text" id="on-off-hotkey" class="hotkey-input-field" 
-                           placeholder="Press key combination..." readonly>
-                    <button class="btn btn-secondary" onclick="configureOnOffHotkey()">Configure</button>
-                  </div>
-                  <p class="setting-hint">Global hotkey to enable/disable KeyMagic</p>
-                </div>
+              <h2>KeyMagic Activation</h2>
+              <div class="info-box">
+                <p><strong>How to use KeyMagic:</strong></p>
+                <p>KeyMagic appears as a keyboard option in your Windows language bar. To activate or deactivate KeyMagic, simply switch between input methods using the language bar or the Windows+Space keyboard shortcut.</p>
+                <p>Keyboard-specific hotkeys configured in the Keyboards page will activate KeyMagic with that keyboard. To switch between different KeyMagic keyboards, use the GUI or system tray menu.</p>
+                <button class="btn btn-secondary" onclick="openWindowsInputSettings()">Open Windows Language Settings</button>
               </div>
             </section>
             

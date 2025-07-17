@@ -1178,3 +1178,25 @@ a {
   background-color: rgba(0, 0, 0, 0.05);
   color: var(--text-primary);
 }
+
+/* Info Box */
+.info-box {
+  background-color: #e8f4fd;
+  border: 1px solid #bbdefb;
+  border-radius: 4px;
+  padding: 16px;
+  margin: 10px 0;
+}
+
+.info-box p {
+  margin: 0 0 8px 0;
+  color: #1565c0;
+}
+
+.info-box p:last-child {
+  margin-bottom: 0;
+}
+
+.info-box button {
+  margin-top: 12px;
+}

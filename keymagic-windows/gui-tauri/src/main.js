@@ -5,11 +5,7 @@ const { listen } = window.__TAURI__.event;
 let keyboards = [];
 let activeKeyboardId = null;
 let selectedKeyboardId = null;
-let keyProcessingEnabled = true;
-
 // DOM Elements
-let toggleButton;
-let statusDot;
 let keyboardList;
 let addKeyboardBtn;
 let modal;
@@ -253,20 +249,6 @@ function setupEventListeners() {
     }
   });
 
-  // Toggle KeyMagic
-  toggleButton.addEventListener('click', async () => {
-    try {
-      const newState = !keyProcessingEnabled;
-      await invoke('set_key_processing_enabled', { enabled: newState });
-      keyProcessingEnabled = newState;
-      updateStatusIndicator();
-      await updateTrayMenu();
-      showSuccess(newState ? 'KeyMagic enabled' : 'KeyMagic disabled');
-    } catch (error) {
-      console.error('Failed to toggle KeyMagic:', error);
-      showError('Failed to toggle KeyMagic');
-    }
-  });
   
   // Setting change handlers
   document.getElementById('start-with-windows').addEventListener('change', async (e) => {
@@ -290,17 +272,6 @@ function setupEventListeners() {
   });
 }
 
-function updateStatusIndicator() {
-  if (!statusDot || !toggleButton) return;
-  
-  if (keyProcessingEnabled) {
-    statusDot.classList.remove('disabled');
-    toggleButton.querySelector('span:last-child').textContent = 'Disable KeyMagic';
-  } else {
-    statusDot.classList.add('disabled');
-    toggleButton.querySelector('span:last-child').textContent = 'Enable KeyMagic';
-  }
-}
 
 // Settings
 async function loadSettings() {
@@ -309,11 +280,6 @@ async function loadSettings() {
     
     document.getElementById('start-with-windows').checked = startWithWindows === '1';
     
-    // Load on/off hotkey
-    const onOffHotkey = await invoke('get_on_off_hotkey');
-    if (onOffHotkey) {
-      document.getElementById('on-off-hotkey').value = onOffHotkey;
-    }
     
     // Load current version
     await loadCurrentVersion();
@@ -725,89 +691,18 @@ window.saveHotkey = async function() {
   hideModal();
 }
 
-// On/Off hotkey configuration
-let currentOnOffHotkey = null;
-
-window.configureOnOffHotkey = function() {
-  recordedKeys = [];
-  
-  // Get current hotkey
-  const currentValue = document.getElementById('on-off-hotkey').value;
-  if (currentValue) {
-    recordedKeys = currentValue.split('+');
-  }
-  
-  showModal(
-    'Configure On/Off Hotkey',
-    `
-      <p>Configure global hotkey to enable/disable KeyMagic</p>
-      <div class="hotkey-input-container">
-        <input type="text" id="hotkey-input" class="hotkey-input" 
-               placeholder="Press key combination or leave empty..." 
-               value="${currentValue}"
-               readonly>
-        <button class="btn btn-secondary" onclick="clearHotkey()">Clear</button>
-      </div>
-      <p class="hotkey-hint">Press the desired key combination (e.g., Ctrl+Shift+Space) or click Clear to remove hotkey</p>
-    `,
-    `
-      <button class="btn btn-secondary" onclick="cancelOnOffHotkeyConfig()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveOnOffHotkey()">Save</button>
-    `
-  );
-  
-  // Focus on the input and set up key listeners
-  setTimeout(() => {
-    const input = document.getElementById('hotkey-input');
-    input.focus();
-    input.addEventListener('keydown', recordHotkey);
-  }, 100);
-}
-
-window.cancelOnOffHotkeyConfig = function() {
-  const input = document.getElementById('hotkey-input');
-  if (input) {
-    input.removeEventListener('keydown', recordHotkey);
-  }
-  recordedKeys = [];
-  hideModal();
-}
-
-window.saveOnOffHotkey = async function() {
-  const input = document.getElementById('hotkey-input');
-  if (input) {
-    input.removeEventListener('keydown', recordHotkey);
-  }
-  
+// Function to open Windows input settings
+window.openWindowsInputSettings = async function() {
   try {
-    let hotkeyValue;
-    let successMessage;
-    
-    if (recordedKeys.length === 0) {
-      // User cleared the hotkey - send null to remove it
-      hotkeyValue = null;
-      successMessage = 'On/Off hotkey removed';
-    } else {
-      // User set a hotkey
-      hotkeyValue = recordedKeys.join('+');
-      successMessage = 'On/Off hotkey configured';
-    }
-    
-    await invoke('set_on_off_hotkey', {
-      hotkey: hotkeyValue
+    // Use rundll32 to open the language settings
+    await invoke('run_command', {
+      command: 'rundll32.exe',
+      args: ['Shell32.dll,Control_RunDLL', 'input.dll,,{C07337D3-DB2C-4D0B-9A93-B722A6C106E2}']
     });
-    
-    // Update the display
-    document.getElementById('on-off-hotkey').value = hotkeyValue || '';
-    
-    showSuccess(successMessage);
   } catch (error) {
-    console.error('Failed to save on/off hotkey:', error);
-    showError('Failed to save on/off hotkey');
+    console.error('Failed to open Windows input settings:', error);
+    showError('Failed to open Windows input settings');
   }
-  
-  recordedKeys = [];
-  hideModal();
 }
 
 // Update checking functionality
@@ -1016,8 +911,6 @@ async function onLanguageToggle(event) {
 // Initialize
 async function init() {
   // Initialize DOM elements
-  toggleButton = document.getElementById('toggle-keymagic');
-  statusDot = document.querySelector('.toggle-button .status-dot');
   keyboardList = document.getElementById('keyboard-list');
   addKeyboardBtn = document.getElementById('add-keyboard-btn');
   modal = document.getElementById('modal');
@@ -1033,8 +926,6 @@ async function init() {
   });
   
   try {
-    keyProcessingEnabled = await invoke('is_key_processing_enabled');
-    updateStatusIndicator();
     await loadKeyboards();
     await loadSettings();
     await loadLanguageProfiles();
@@ -1062,12 +953,6 @@ async function setupTrayEventListeners() {
   await listen('navigate', (event) => {
     const page = event.payload;
     switchPage(page);
-  });
-  
-  // Listen for key processing state changes from tray
-  await listen('key_processing_changed', async (event) => {
-    keyProcessingEnabled = event.payload;
-    updateStatusIndicator();
   });
   
   // Listen for active keyboard changes from tray

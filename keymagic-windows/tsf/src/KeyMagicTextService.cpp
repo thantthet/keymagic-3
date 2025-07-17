@@ -49,7 +49,6 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_dwMouseSinkCookie = TF_INVALID_COOKIE;
     m_pDocMgrFocus = nullptr;
     m_pTextEditContext = nullptr;
-    m_tsfEnabled = false;  // Default to disabled
     m_pCompositionMgr = nullptr;
     m_lastSendInputTime = 0;
     
@@ -460,7 +459,7 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
     }
 
     // Use engine test mode to determine if we should consume this key
-    if (m_pEngine && m_tsfEnabled)
+    if (m_pEngine)
     {
         // Prepare key input using the utility
         KeyProcessingUtils::KeyInputData keyInput = KeyProcessingUtils::PrepareKeyInput(wParam, lParam);
@@ -498,6 +497,16 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
         {
             // Fallback: don't consume keys if engine test fails
             *pfEaten = FALSE;
+        }
+    }
+    else
+    {
+        // No engine loaded - eat all printable characters
+        char character = MapVirtualKeyToChar(wParam, lParam);
+        *pfEaten = IsPrintableAscii(character) ? TRUE : FALSE;
+        if (*pfEaten)
+        {
+            DEBUG_LOG(L"No keyboard loaded - eating printable character");
         }
     }
 
@@ -561,12 +570,8 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         }
     }
     
-    // Check if TSF is disabled (value is now updated by registry monitor thread)
-    if (!m_tsfEnabled)
-    {
-        DEBUG_LOG(L"Key processing is disabled, not processing key");
-        return S_OK;
-    }
+    // TSF is now always enabled when selected - no need to check m_tsfEnabled
+    // The service is only active when user selects it from language bar
     
     // Skip other keys with our signature
     if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
@@ -1142,56 +1147,11 @@ HRESULT CKeyMagicTextService::CreateDisplayAttributeInfo()
 
 
 // Settings update method
-void CKeyMagicTextService::UpdateSettings(bool enabled, const std::wstring& keyboardId)
+void CKeyMagicTextService::UpdateSettings(const std::wstring& keyboardId)
 {
-    DEBUG_LOG(L"UpdateSettings: enabled=" + std::to_wstring(enabled) + L", keyboard=" + keyboardId);
+    DEBUG_LOG(L"UpdateSettings: keyboard=" + keyboardId);
     
     EnterCriticalSection(&m_cs);
-    
-    // Update TSF enabled state
-    if (enabled != m_tsfEnabled)
-    {
-        DEBUG_LOG(L"KeyProcessingEnabled changed from " + std::to_wstring(m_tsfEnabled) + L" to " + std::to_wstring(enabled));
-        
-        // If disabling TSF and using composition edit session, record timestamp and simulate SPACE to terminate composition
-        if (!enabled && m_useCompositionEditSession)
-        {
-            DEBUG_LOG(L"TSF being disabled - recording timestamp and simulating SPACE key to terminate composition");
-            
-            // Record the timestamp before sending the key
-            m_lastTerminationSpaceTime = GetTickCount();
-            
-            // Prepare INPUT structures for SPACE key down and up
-            INPUT inputs[2] = {0};
-            
-            // SPACE key down
-            inputs[0].type = INPUT_KEYBOARD;
-            inputs[0].ki.wVk = VK_SPACE;
-            inputs[0].ki.dwFlags = 0;
-            inputs[0].ki.dwExtraInfo = KEYMAGIC_EXTRAINFO_SIGNATURE;
-            
-            // SPACE key up
-            inputs[1].type = INPUT_KEYBOARD;
-            inputs[1].ki.wVk = VK_SPACE;
-            inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
-            inputs[1].ki.dwExtraInfo = KEYMAGIC_EXTRAINFO_SIGNATURE;
-            
-            // Send the input
-            UINT sent = SendInput(2, inputs, sizeof(INPUT));
-            if (sent == 2)
-            {
-                DEBUG_LOG(L"Successfully sent SPACE key to terminate composition");
-            }
-            else
-            {
-                DEBUG_LOG(L"Failed to send SPACE key, sent=" + std::to_wstring(sent));
-                // Clear the timestamp if we failed to send the key
-                m_lastTerminationSpaceTime = 0;
-            }
-        }
-        
-        m_tsfEnabled = enabled;
-    }
     
     // Update keyboard if changed
     if (!keyboardId.empty() && keyboardId != m_currentKeyboardId)
@@ -1212,22 +1172,9 @@ void CKeyMagicTextService::ReloadRegistrySettings()
     HKEY hKey = OpenSettingsKey(KEY_READ);
     if (hKey)
     {
-        // Read KeyProcessingEnabled
-        DWORD keyProcessingEnabled = 0;  // Default to disabled
-        DWORD dataSize = sizeof(keyProcessingEnabled);
-        if (RegGetValueW(hKey, NULL, L"KeyProcessingEnabled", RRF_RT_REG_DWORD, 
-                         NULL, &keyProcessingEnabled, &dataSize) == ERROR_SUCCESS)
-        {
-            DEBUG_LOG(L"Read KeyProcessingEnabled: " + std::to_wstring(keyProcessingEnabled));
-        }
-        else
-        {
-            DEBUG_LOG(L"KeyProcessingEnabled not found in registry, using default: 0 (disabled)");
-        }
-        
         // Read DefaultKeyboard
         wchar_t defaultKeyboard[256] = {0};
-        dataSize = sizeof(defaultKeyboard);
+        DWORD dataSize = sizeof(defaultKeyboard);
         if (RegGetValueW(hKey, NULL, L"DefaultKeyboard", RRF_RT_REG_SZ, 
                          NULL, defaultKeyboard, &dataSize) == ERROR_SUCCESS)
         {
@@ -1240,7 +1187,7 @@ void CKeyMagicTextService::ReloadRegistrySettings()
         RegCloseKey(hKey);
         
         // Apply settings
-        UpdateSettings(keyProcessingEnabled != 0, defaultKeyboard);
+        UpdateSettings(defaultKeyboard);
     }
     else
     {

@@ -67,14 +67,6 @@ pub fn create_tray_menu(app: &AppHandle, keyboard_manager: &KeyboardManager) -> 
         menu = menu.separator();
     }
     
-    // Add Enable/Disable toggle
-    let is_enabled = keyboard_manager.is_key_processing_enabled();
-    let toggle_text = if is_enabled { "Disable" } else { "Enable" };
-    let toggle_item = MenuItemBuilder::new(toggle_text)
-        .id("toggle_enable")
-        .build(app)?;
-    menu = menu.item(&toggle_item);
-    
     menu = menu.separator();
     
     // Add action items
@@ -126,27 +118,7 @@ pub fn handle_menu_event(app: &AppHandle, menu_id: &str) {
                 let _ = window.emit("check_for_updates", ());
             }
         }
-        "toggle_enable" => {
-            let keyboard_manager = app.state::<Mutex<KeyboardManager>>();
-            let mut manager = keyboard_manager.lock().unwrap();
-            let current_state = manager.is_key_processing_enabled();
-            let _ = manager.set_key_processing_enabled(!current_state);
-            
-            // Update tray menu and icon
-            update_tray_menu(app, &manager);
-            update_tray_icon(app, &manager);
-            
-            // Emit event to update UI
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.emit("key_processing_changed", !current_state);
-            }
-        }
         "quit" => {
-            // Disable key processing before exiting
-            let keyboard_manager = app.state::<Mutex<KeyboardManager>>();
-            if let Ok(mut manager) = keyboard_manager.lock() {
-                let _ = manager.set_key_processing_enabled(false);
-            }
             app.exit(0);
         }
         id if id.starts_with("keyboard_") => {
@@ -190,51 +162,46 @@ pub fn update_tray_menu(app: &AppHandle, keyboard_manager: &KeyboardManager) {
     }
 }
 
-/// Updates the tray icon and tooltip based on key processing state
-/// - When disabled: Shows default app icon with "KeyMagic" tooltip
-/// - When enabled: Shows active keyboard icon with "KeyMagic - {KEYBOARD-NAME}" tooltip
+/// Updates the tray icon and tooltip to always show the active keyboard
+/// - Shows active keyboard icon with "KeyMagic - {KEYBOARD-NAME}" tooltip
+/// - Falls back to default app icon if no keyboard is active
 pub fn update_tray_icon(app: &AppHandle, keyboard_manager: &KeyboardManager) {
     if let Some(tray) = app.tray_by_id("main") {
-        let (icon, tooltip) = if keyboard_manager.is_key_processing_enabled() {
-            // Key processing enabled - try to use active keyboard icon and name
-            if let Some(keyboard_id) = keyboard_manager.get_active_keyboard() {
-                if let Some(keyboard) = keyboard_manager.get_keyboards()
-                    .iter()
-                    .find(|k| k.id == keyboard_id) 
-                {
-                    let icon = if let Some(icon_data) = &keyboard.icon_data {
-                        // Try to create icon from keyboard data
-                        if let Ok(icon) = create_icon_from_data(icon_data) {
-                            icon
-                        } else {
-                            // Fall back to default icon
-                            app.default_window_icon().unwrap().clone()
-                        }
-                    } else if let Some(color) = &keyboard.color {
-                        // No icon data but has color - create colored icon
-                        if let Ok(icon) = create_icon_from_color(color, &keyboard.name) {
-                            icon
-                        } else {
-                            // Fall back to default icon
-                            app.default_window_icon().unwrap().clone()
-                        }
+        let (icon, tooltip) = if let Some(keyboard_id) = keyboard_manager.get_active_keyboard() {
+            // Try to use active keyboard icon and name
+            if let Some(keyboard) = keyboard_manager.get_keyboards()
+                .iter()
+                .find(|k| k.id == keyboard_id) 
+            {
+                let icon = if let Some(icon_data) = &keyboard.icon_data {
+                    // Try to create icon from keyboard data
+                    if let Ok(icon) = create_icon_from_data(icon_data) {
+                        icon
                     } else {
-                        // No icon data or color, use default
+                        // Fall back to default icon
                         app.default_window_icon().unwrap().clone()
-                    };
-                    
-                    let tooltip = format!("KeyMagic - {}", keyboard.name);
-                    (icon, tooltip)
+                    }
+                } else if let Some(color) = &keyboard.color {
+                    // No icon data but has color - create colored icon
+                    if let Ok(icon) = create_icon_from_color(color, &keyboard.name) {
+                        icon
+                    } else {
+                        // Fall back to default icon
+                        app.default_window_icon().unwrap().clone()
+                    }
                 } else {
-                    // Keyboard not found, use default
-                    (app.default_window_icon().unwrap().clone(), "KeyMagic".to_string())
-                }
+                    // No icon data or color, use default
+                    app.default_window_icon().unwrap().clone()
+                };
+                
+                let tooltip = format!("KeyMagic - {}", keyboard.name);
+                (icon, tooltip)
             } else {
-                // No active keyboard, use default
+                // Keyboard not found, use default
                 (app.default_window_icon().unwrap().clone(), "KeyMagic".to_string())
             }
         } else {
-            // Key processing disabled - use default app icon and simple tooltip
+            // No active keyboard, use default
             (app.default_window_icon().unwrap().clone(), "KeyMagic".to_string())
         };
         

@@ -99,7 +99,13 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
     if (!m_pEngine)
     {
         DEBUG_LOG(L"No engine available");
-        *m_pfEaten = FALSE;
+        // Eat all printable characters when no keyboard is loaded
+        char character = KeyProcessingUtils::MapVirtualKeyToChar(m_wParam, m_lParam);
+        *m_pfEaten = KeyProcessingUtils::IsPrintableAscii(character) ? TRUE : FALSE;
+        if (*m_pfEaten)
+        {
+            DEBUG_LOG(L"Eating printable character with no keyboard loaded");
+        }
         return S_OK;
     }
 

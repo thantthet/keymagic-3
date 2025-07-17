@@ -23,7 +23,6 @@ const SETTINGS_KEY: &str = "Software\\KeyMagic\\Settings";
 // Registry value names
 const DEFAULT_KEYBOARD_VALUE: &str = "DefaultKeyboard";
 const KEY_PROCESSING_ENABLED_VALUE: &str = "KeyProcessingEnabled";
-const ON_OFF_HOTKEY_VALUE: &str = "OnOffHotkey";
 
 // Keyboard entry value names
 const KEYBOARD_PATH_VALUE: &str = "Path";
@@ -553,33 +552,6 @@ pub fn set_key_processing_enabled(enabled: bool) -> Result<(), RegistryError> {
     Ok(())
 }
 
-/// Gets the on/off hotkey
-pub fn get_on_off_hotkey() -> Result<Option<String>, RegistryError> {
-    match open_registry_key(SETTINGS_KEY) {
-        Ok(settings_key) => {
-            let result = read_registry_string(settings_key, ON_OFF_HOTKEY_VALUE).ok();
-            unsafe { let _ = RegCloseKey(settings_key); }
-            Ok(result)
-        }
-        Err(RegistryError::KeyNotFound) => Ok(None),
-        Err(e) => Err(e),
-    }
-}
-
-/// Sets the on/off hotkey
-pub fn set_on_off_hotkey(hotkey: Option<&str>) -> Result<(), RegistryError> {
-    let settings_key = create_or_open_registry_key(SETTINGS_KEY)?;
-    
-    if let Some(hk) = hotkey {
-        write_registry_string(settings_key, ON_OFF_HOTKEY_VALUE, hk)?;
-    } else {
-        delete_registry_value(settings_key, ON_OFF_HOTKEY_VALUE)?;
-    }
-    
-    unsafe { let _ = RegCloseKey(settings_key); }
-    Ok(())
-}
-
 /// Gets a generic setting value
 pub fn get_setting(key: &str) -> Result<Option<String>, RegistryError> {
     match open_registry_key(SETTINGS_KEY) {
@@ -835,10 +807,6 @@ mod tests {
         // Test key processing enabled
         assert!(set_key_processing_enabled(false).is_ok());
         assert_eq!(get_key_processing_enabled().unwrap(), false);
-
-        // Test on/off hotkey
-        assert!(set_on_off_hotkey(Some("Ctrl+Space")).is_ok());
-        assert_eq!(get_on_off_hotkey().unwrap(), Some("Ctrl+Space".to_string()));
 
         // Test generic settings
         assert!(set_setting("TestSetting", Some("TestValue")).is_ok());

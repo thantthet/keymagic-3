@@ -97,8 +97,6 @@ pub fn run() {
             commands::set_setting,
             commands::set_keyboard_hotkey,
             commands::update_tray_menu,
-            commands::set_on_off_hotkey,
-            commands::get_on_off_hotkey,
             commands::check_for_update,
             commands::check_first_run_scan_keyboards,
             commands::clear_first_run_scan_keyboards,
@@ -110,6 +108,7 @@ pub fn run() {
             commands::remove_composition_mode_process,
             commands::get_enabled_languages,
             commands::set_enabled_languages,
+            commands::run_command,
             commands::get_supported_languages,
         ])
         .setup(|app| {
@@ -162,10 +161,6 @@ pub fn run() {
                     error!("Failed to register hotkeys: {}", e);
                 }
                 
-                // Load and register on/off hotkey
-                if let Err(e) = hotkey_manager.load_on_off_hotkey(&app.app_handle()) {
-                    error!("Failed to load on/off hotkey: {}", e);
-                }
                 
                 drop(manager);
                 
