@@ -17,6 +17,9 @@ mod registry;
 #[cfg(target_os = "windows")]
 mod language_profiles;
 
+#[cfg(target_os = "windows")]
+mod windows_languages;
+
 use std::sync::{Mutex, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use keyboard_manager::KeyboardManager;
@@ -110,6 +113,7 @@ pub fn run() {
             commands::set_enabled_languages,
             commands::run_command,
             commands::get_supported_languages,
+            commands::search_languages,
         ])
         .setup(|app| {
             // Initialize native HUD window

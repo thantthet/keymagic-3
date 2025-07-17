@@ -80,12 +80,39 @@
             </section>
             
             <section class="settings-section">
-              <h2>KeyMagic Activation</h2>
-              <div class="info-box">
-                <p><strong>How to use KeyMagic:</strong></p>
-                <p>KeyMagic appears as a keyboard option in your Windows language bar. To activate or deactivate KeyMagic, simply switch between input methods using the language bar or the Windows+Space keyboard shortcut.</p>
-                <p>Keyboard-specific hotkeys configured in the Keyboards page will activate KeyMagic with that keyboard. To switch between different KeyMagic keyboards, use the GUI or system tray menu.</p>
-                <button class="btn btn-secondary" onclick="openWindowsInputSettings()">Open Windows Language Settings</button>
+              <h2>KeyMagic Language Settings</h2>
+              <div class="setting-item">
+                <div class="language-settings">
+                  <p class="setting-description">Manage which languages KeyMagic appears under in Windows language settings.</p>
+                  
+                  <div class="language-selector-container">
+                    <div class="language-search-section">
+                      <input type="text" 
+                             id="language-search" 
+                             class="language-search-input" 
+                             placeholder="Search languages (e.g., English, Myanmar, 中文)..."
+                             autocomplete="off">
+                      <div id="language-search-results" class="language-search-results hidden">
+                        <!-- Search results will be inserted here -->
+                      </div>
+                    </div>
+                    
+                    <div class="enabled-languages-section">
+                      <h3>Enabled Languages</h3>
+                      <div id="enabled-languages-list" class="enabled-languages-list">
+                        <!-- Enabled languages will be listed here -->
+                      </div>
+                      <p class="setting-hint">KeyMagic will be available as an input method for these languages. Changes may require a restart of Windows.</p>
+                    </div>
+                  </div>
+                  
+                  <div class="info-box" style="margin-top: 20px;">
+                    <p><strong>How to activate KeyMagic:</strong></p>
+                    <p>KeyMagic appears as a keyboard option in your Windows language bar. To activate or deactivate KeyMagic, simply switch between input methods using the language bar or the Windows+Space keyboard shortcut.</p>
+                    <button class="btn btn-secondary" onclick="openWindowsInputSettings()">Open Windows Settings</button>
+                    <p>To switch between different KeyMagic keyboards, use system tray menu or keyboard-specific hotkeys configured in the Keyboards page.</p>
+                  </div>
+                </div>
               </div>
             </section>
             
@@ -109,19 +136,6 @@
                     </div>
                     <p class="setting-hint">These applications will show text with an underline while typing. All other applications will use direct text input.</p>
                   </div>
-                </div>
-              </div>
-            </section>
-            
-            <section class="settings-section">
-              <h2>Language Profiles</h2>
-              <div class="setting-item">
-                <div class="language-settings">
-                  <p class="setting-description">Select which languages KeyMagic should appear under in Windows language settings.</p>
-                  <div class="language-list" id="language-list">
-                    <!-- Language checkboxes will be inserted here -->
-                  </div>
-                  <p class="setting-hint">KeyMagic will be available as an input method for the selected languages. Changes take effect immediately.</p>
                 </div>
               </div>
             </section>

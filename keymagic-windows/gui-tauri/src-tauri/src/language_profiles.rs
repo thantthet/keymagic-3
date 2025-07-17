@@ -106,19 +106,15 @@ fn get_registered_language_profiles(profiles: &ITfInputProcessorProfiles) -> Res
     
     let mut registered_langids = Vec::new();
     
-    // Check known possible languages
-    let possible_langids = vec![
-        0x0409, // English (United States)
-        0x0455, // Myanmar
-        0x041E, // Thai
-        0x0453, // Khmer (Cambodia)
-        0x0454, // Lao
-        0x042A, // Vietnamese
-        0x0804, // Chinese (Simplified)
-        0x0404, // Chinese (Traditional)
-        0x0411, // Japanese
-        0x0412, // Korean
-    ];
+    // Get all unique LCIDs from the comprehensive language list
+    let mut possible_langids: Vec<u16> = crate::windows_languages::WINDOWS_LANGUAGES
+        .values()
+        .map(|lang| lang.lcid)
+        .collect();
+    
+    // Remove duplicates
+    possible_langids.sort();
+    possible_langids.dedup();
     
     unsafe {
         for langid in possible_langids {
@@ -187,19 +183,7 @@ fn remove_language_profile(profiles: &ITfInputProcessorProfiles, langid: u16) ->
 
 #[cfg(target_os = "windows")]
 fn language_code_to_langid(language_code: &str) -> Option<u16> {
-    match language_code {
-        "en-US" => Some(0x0409), // English (United States)
-        "my-MM" => Some(0x0455), // Myanmar
-        "th-TH" => Some(0x041E), // Thai
-        "km-KH" => Some(0x0453), // Khmer (Cambodia)
-        "lo-LA" => Some(0x0454), // Lao
-        "vi-VN" => Some(0x042A), // Vietnamese
-        "zh-CN" => Some(0x0804), // Chinese (Simplified)
-        "zh-TW" => Some(0x0404), // Chinese (Traditional)
-        "ja-JP" => Some(0x0411), // Japanese
-        "ko-KR" => Some(0x0412), // Korean
-        _ => None,
-    }
+    crate::windows_languages::language_code_to_lcid(language_code)
 }
 
 /// Notify Windows about language profile changes

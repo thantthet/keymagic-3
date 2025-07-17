@@ -53,4 +53,5 @@ windows = { version = "0.52", features = [
     "Win32_UI_TextServices",
 ]}
 winreg = "0.52"
+once_cell = "1.20"
 

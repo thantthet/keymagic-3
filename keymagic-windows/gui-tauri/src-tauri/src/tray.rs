@@ -67,8 +67,6 @@ pub fn create_tray_menu(app: &AppHandle, keyboard_manager: &KeyboardManager) -> 
         menu = menu.separator();
     }
     
-    menu = menu.separator();
-    
     // Add action items
     let open_item = MenuItemBuilder::new("Open")
         .id("open")

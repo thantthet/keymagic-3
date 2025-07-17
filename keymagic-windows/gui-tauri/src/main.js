@@ -845,66 +845,204 @@ function showUpdateNotification(updateInfo) {
 }
 
 // Language profile management
+let allLanguages = [];
+let enabledLanguageCodes = new Set();
+let languageSearchTimeout = null;
+
 async function loadLanguageProfiles() {
   try {
-    // Get supported languages
-    const supportedLanguages = await invoke('get_supported_languages');
+    // Get all supported languages
+    allLanguages = await invoke('get_supported_languages');
     
     // Get currently enabled languages
     const enabledLanguages = await invoke('get_enabled_languages');
+    enabledLanguageCodes = new Set(enabledLanguages);
     
-    // Populate language list
-    const languageList = document.getElementById('language-list');
-    languageList.innerHTML = '';
+    // Render enabled languages
+    renderEnabledLanguages();
     
-    supportedLanguages.forEach(([code, name]) => {
-      const item = document.createElement('div');
-      item.className = 'language-item';
-      
-      const label = document.createElement('label');
-      
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = code;
-      checkbox.checked = enabledLanguages.includes(code);
-      checkbox.addEventListener('change', onLanguageToggle);
-      
-      const text = document.createElement('span');
-      text.textContent = name;
-      
-      label.appendChild(checkbox);
-      label.appendChild(text);
-      item.appendChild(label);
-      languageList.appendChild(item);
-    });
+    // Setup search functionality
+    setupLanguageSearch();
   } catch (error) {
     console.error('Failed to load language profiles:', error);
   }
 }
 
-async function onLanguageToggle(event) {
-  try {
-    // Get all checked languages
-    const checkboxes = document.querySelectorAll('#language-list input[type="checkbox"]:checked');
-    const enabledLanguages = Array.from(checkboxes).map(cb => cb.value);
+function renderEnabledLanguages() {
+  const enabledList = document.getElementById('enabled-languages-list');
+  enabledList.innerHTML = '';
+  
+  if (enabledLanguageCodes.size === 0) {
+    enabledList.innerHTML = '<div class="enabled-languages-empty">No languages enabled. Search above to add languages.</div>';
+    return;
+  }
+  
+  // Sort enabled languages by name
+  const enabledLanguages = allLanguages
+    .filter(([code]) => enabledLanguageCodes.has(code))
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  
+  enabledLanguages.forEach(([code, name]) => {
+    const tag = document.createElement('div');
+    tag.className = 'enabled-language-tag';
     
-    // Ensure at least one language is selected
-    if (enabledLanguages.length === 0) {
-      event.target.checked = true;
-      showError('At least one language must be selected');
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = name;
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'enabled-language-remove';
+    removeBtn.innerHTML = '×';
+    removeBtn.title = `Remove ${name}`;
+    removeBtn.onclick = () => removeLanguage(code);
+    
+    tag.appendChild(nameSpan);
+    tag.appendChild(removeBtn);
+    
+    enabledList.appendChild(tag);
+  });
+}
+
+function setupLanguageSearch() {
+  const searchInput = document.getElementById('language-search');
+  const searchResults = document.getElementById('language-search-results');
+  
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(languageSearchTimeout);
+    const query = e.target.value.trim();
+    
+    if (query.length === 0) {
+      searchResults.classList.add('hidden');
       return;
     }
     
-    // Update the enabled languages
-    await invoke('set_enabled_languages', { languages: enabledLanguages });
+    // Debounce search
+    languageSearchTimeout = setTimeout(async () => {
+      await performLanguageSearch(query);
+    }, 300);
+  });
+  
+  searchInput.addEventListener('focus', async (e) => {
+    if (e.target.value.trim().length > 0) {
+      await performLanguageSearch(e.target.value.trim());
+    }
+  });
+  
+  // Close search results when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.add('hidden');
+    }
+  });
+}
+
+async function performLanguageSearch(query) {
+  const searchResults = document.getElementById('language-search-results');
+  
+  try {
+    // Use the search command for better performance
+    const results = await invoke('search_languages', { query });
     
-    // Show success message
-    showSuccess('Language profiles updated successfully');
+    if (results.length === 0) {
+      searchResults.innerHTML = '<div class="language-search-no-results">No languages found</div>';
+      searchResults.classList.remove('hidden');
+      return;
+    }
+    
+    searchResults.innerHTML = '';
+    
+    // Show up to 10 results
+    results.slice(0, 10).forEach(([code, name]) => {
+      const isEnabled = enabledLanguageCodes.has(code);
+      
+      const resultDiv = document.createElement('div');
+      resultDiv.className = 'language-search-result' + (isEnabled ? ' selected' : '');
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'language-search-result-name';
+      nameSpan.textContent = name;
+      
+      const codeSpan = document.createElement('span');
+      codeSpan.className = 'language-search-result-code';
+      codeSpan.textContent = code;
+      
+      const actionSpan = document.createElement('span');
+      actionSpan.className = 'language-search-result-action';
+      actionSpan.textContent = isEnabled ? 'Added' : 'Add';
+      
+      resultDiv.appendChild(nameSpan);
+      resultDiv.appendChild(codeSpan);
+      resultDiv.appendChild(actionSpan);
+      
+      if (!isEnabled) {
+        resultDiv.onclick = () => addLanguage(code);
+      }
+      
+      searchResults.appendChild(resultDiv);
+    });
+    
+    searchResults.classList.remove('hidden');
   } catch (error) {
-    console.error('Failed to update language profiles:', error);
-    showError('Failed to update language profiles');
-    // Restore checkbox state on error
-    await loadLanguageProfiles();
+    console.error('Language search failed:', error);
+    searchResults.innerHTML = '<div class="language-search-no-results">Search failed</div>';
+    searchResults.classList.remove('hidden');
+  }
+}
+
+async function addLanguage(code) {
+  try {
+    enabledLanguageCodes.add(code);
+    
+    // Update the enabled languages
+    await invoke('set_enabled_languages', { 
+      languages: Array.from(enabledLanguageCodes) 
+    });
+    
+    // Update UI
+    renderEnabledLanguages();
+    
+    // Hide search results and clear search
+    document.getElementById('language-search-results').classList.add('hidden');
+    document.getElementById('language-search').value = '';
+    
+    // Find language name for notification
+    const language = allLanguages.find(([c]) => c === code);
+    if (language) {
+      showSuccess(`Added ${language[1]}`);
+    }
+  } catch (error) {
+    console.error('Failed to add language:', error);
+    enabledLanguageCodes.delete(code); // Revert on error
+    showError('Failed to add language');
+  }
+}
+
+async function removeLanguage(code) {
+  // Ensure at least one language remains
+  if (enabledLanguageCodes.size === 1) {
+    showError('At least one language must be enabled');
+    return;
+  }
+  
+  try {
+    enabledLanguageCodes.delete(code);
+    
+    // Update the enabled languages
+    await invoke('set_enabled_languages', { 
+      languages: Array.from(enabledLanguageCodes) 
+    });
+    
+    // Update UI
+    renderEnabledLanguages();
+    
+    // Find language name for notification
+    const language = allLanguages.find(([c]) => c === code);
+    if (language) {
+      showSuccess(`Removed ${language[1]}`);
+    }
+  } catch (error) {
+    console.error('Failed to remove language:', error);
+    enabledLanguageCodes.add(code); // Revert on error
+    showError('Failed to remove language');
   }
 }
 
