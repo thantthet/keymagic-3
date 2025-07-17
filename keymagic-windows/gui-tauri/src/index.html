@@ -111,11 +111,21 @@
                     </div>
                   </div>
                   
-                  <div class="info-box" style="margin-top: 20px;">
-                    <p><strong>How to activate KeyMagic:</strong></p>
-                    <p>KeyMagic appears as a keyboard option in your Windows language bar. To activate or deactivate KeyMagic, simply switch between input methods using the language bar or the Windows+Space keyboard shortcut.</p>
-                    <button class="btn btn-secondary" onclick="openWindowsInputSettings()">Open Windows Settings</button>
-                    <p>To switch between different KeyMagic keyboards, use system tray menu or keyboard-specific hotkeys configured in the Keyboards page.</p>
+                  <div class="info-box collapsible-section collapsed" style="margin-top: 20px;">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                      <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4.646 5.646a.5.5 0 01.708 0L8 8.293l2.646-2.647a.5.5 0 01.708.708l-3 3a.5.5 0 01-.708 0l-3-3a.5.5 0 010-.708z"/>
+                      </svg>
+                      <strong>How to activate KeyMagic</strong>
+                    </div>
+                    <div class="collapsible-content">
+                      <p>KeyMagic appears as a keyboard option in your Windows language bar. To activate or deactivate KeyMagic, simply switch between input methods using the language bar or the Windows+Space keyboard shortcut.</p>
+                      <div class="screenshot-container">
+                        <img src="assets/keymagic-in-system-tray.png" alt="KeyMagic in Windows system tray" class="help-screenshot">
+                      </div>
+                      <button class="btn btn-secondary" onclick="openWindowsInputSettings()">Open Windows Settings</button>
+                      <p>To switch between different KeyMagic keyboards, use system tray menu or keyboard-specific hotkeys configured in the <a href="#" onclick="switchPage('keyboards'); return false;">Keyboards page</a>.</p>
+                    </div>
                   </div>
                 </div>
               </div>

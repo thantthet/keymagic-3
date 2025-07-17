@@ -1202,6 +1202,18 @@ a {
   margin-bottom: 24px;
 }
 
+.info-box a {
+  color: #0073e6;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.info-box a:hover {
+  color: #0052cc;
+  text-decoration: underline;
+}
+
 /* Language Selector Styles */
 .language-selector-container {
   display: flex;
@@ -1380,4 +1392,59 @@ a {
 
 .language-changes-actions .btn {
   margin: 0;
+}
+
+/* Collapsible Sections */
+.collapsible-section {
+  overflow: hidden;
+}
+
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 0;
+}
+
+.collapsible-header:hover {
+  opacity: 0.8;
+}
+
+.collapse-icon {
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.collapsible-section.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.collapsible-content {
+  max-height: 1000px;
+  opacity: 1;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+  padding-top: 8px;
+}
+
+.collapsible-section.collapsed .collapsible-content {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  overflow: hidden;
+}
+
+/* Screenshot Container */
+.screenshot-container {
+  margin: 16px 0;
+  text-align: center;
+}
+
+.help-screenshot {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
 }

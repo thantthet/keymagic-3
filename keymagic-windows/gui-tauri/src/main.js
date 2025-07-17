@@ -18,7 +18,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
   });
 });
 
-function switchPage(pageName) {
+window.switchPage = function(pageName) {
   // Update navigation
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === pageName);
@@ -28,6 +28,12 @@ function switchPage(pageName) {
   document.querySelectorAll('.page').forEach(page => {
     page.classList.toggle('active', page.id === `${pageName}-page`);
   });
+  
+  // Reset scroll position to top for the main content area
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    mainContent.scrollTop = 0;
+  }
   
   // Load version for about page
   if (pageName === 'about') {
@@ -703,6 +709,12 @@ window.openWindowsInputSettings = async function() {
     console.error('Failed to open Windows input settings:', error);
     showError('Failed to open Windows input settings');
   }
+}
+
+// Function to toggle collapsible sections
+window.toggleCollapsible = function(header) {
+  const section = header.parentElement;
+  section.classList.toggle('collapsed');
 }
 
 // Update checking functionality
