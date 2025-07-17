@@ -847,7 +847,9 @@ function showUpdateNotification(updateInfo) {
 // Language profile management
 let allLanguages = [];
 let enabledLanguageCodes = new Set();
+let originalEnabledLanguageCodes = new Set();
 let languageSearchTimeout = null;
+let hasPendingLanguageChanges = false;
 
 async function loadLanguageProfiles() {
   try {
@@ -857,6 +859,8 @@ async function loadLanguageProfiles() {
     // Get currently enabled languages
     const enabledLanguages = await invoke('get_enabled_languages');
     enabledLanguageCodes = new Set(enabledLanguages);
+    originalEnabledLanguageCodes = new Set(enabledLanguages);
+    hasPendingLanguageChanges = false;
     
     // Render enabled languages
     renderEnabledLanguages();
@@ -868,12 +872,40 @@ async function loadLanguageProfiles() {
   }
 }
 
+function checkForPendingChanges() {
+  // Check if the sets are different
+  if (enabledLanguageCodes.size !== originalEnabledLanguageCodes.size) {
+    return true;
+  }
+  
+  // Check if all elements in enabledLanguageCodes are in originalEnabledLanguageCodes
+  for (const code of enabledLanguageCodes) {
+    if (!originalEnabledLanguageCodes.has(code)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+function updateLanguageChangesUI() {
+  hasPendingLanguageChanges = checkForPendingChanges();
+  const actionsDiv = document.getElementById('language-changes-actions');
+  
+  if (hasPendingLanguageChanges) {
+    actionsDiv.classList.remove('hidden');
+  } else {
+    actionsDiv.classList.add('hidden');
+  }
+}
+
 function renderEnabledLanguages() {
   const enabledList = document.getElementById('enabled-languages-list');
   enabledList.innerHTML = '';
   
   if (enabledLanguageCodes.size === 0) {
     enabledList.innerHTML = '<div class="enabled-languages-empty">No languages enabled. Search above to add languages.</div>';
+    updateLanguageChangesUI();
     return;
   }
   
@@ -900,6 +932,8 @@ function renderEnabledLanguages() {
     
     enabledList.appendChild(tag);
   });
+  
+  updateLanguageChangesUI();
 }
 
 function setupLanguageSearch() {
@@ -989,30 +1023,19 @@ async function performLanguageSearch(query) {
 }
 
 async function addLanguage(code) {
-  try {
-    enabledLanguageCodes.add(code);
-    
-    // Update the enabled languages
-    await invoke('set_enabled_languages', { 
-      languages: Array.from(enabledLanguageCodes) 
-    });
-    
-    // Update UI
-    renderEnabledLanguages();
-    
-    // Hide search results and clear search
-    document.getElementById('language-search-results').classList.add('hidden');
-    document.getElementById('language-search').value = '';
-    
-    // Find language name for notification
-    const language = allLanguages.find(([c]) => c === code);
-    if (language) {
-      showSuccess(`Added ${language[1]}`);
-    }
-  } catch (error) {
-    console.error('Failed to add language:', error);
-    enabledLanguageCodes.delete(code); // Revert on error
-    showError('Failed to add language');
+  enabledLanguageCodes.add(code);
+  
+  // Update UI
+  renderEnabledLanguages();
+  
+  // Hide search results and clear search
+  document.getElementById('language-search-results').classList.add('hidden');
+  document.getElementById('language-search').value = '';
+  
+  // Find language name for notification
+  const language = allLanguages.find(([c]) => c === code);
+  if (language) {
+    showSuccess(`Added ${language[1]} (pending)`);
   }
 }
 
@@ -1023,27 +1046,68 @@ async function removeLanguage(code) {
     return;
   }
   
-  try {
-    enabledLanguageCodes.delete(code);
-    
-    // Update the enabled languages
-    await invoke('set_enabled_languages', { 
-      languages: Array.from(enabledLanguageCodes) 
-    });
-    
-    // Update UI
-    renderEnabledLanguages();
-    
-    // Find language name for notification
-    const language = allLanguages.find(([c]) => c === code);
-    if (language) {
-      showSuccess(`Removed ${language[1]}`);
-    }
-  } catch (error) {
-    console.error('Failed to remove language:', error);
-    enabledLanguageCodes.add(code); // Revert on error
-    showError('Failed to remove language');
+  enabledLanguageCodes.delete(code);
+  
+  // Update UI
+  renderEnabledLanguages();
+  
+  // Find language name for notification
+  const language = allLanguages.find(([c]) => c === code);
+  if (language) {
+    showSuccess(`Removed ${language[1]} (pending)`);
   }
+}
+
+// Apply language changes
+window.applyLanguageChanges = async function() {
+  const languages = Array.from(enabledLanguageCodes);
+  
+  try {
+    // First try to update directly
+    await invoke('set_enabled_languages', { languages });
+    
+    // If successful, update the original set
+    originalEnabledLanguageCodes = new Set(languages);
+    hasPendingLanguageChanges = false;
+    updateLanguageChangesUI();
+    showSuccess('Language changes applied successfully');
+  } catch (error) {
+    console.error('Failed to apply language changes:', error);
+    
+    if (error.includes && error.includes('ELEVATION_REQUIRED')) {
+      // Need elevation, launch elevated process
+      try {
+        await invoke('apply_language_changes_elevated', { languages });
+        
+        // If successful, update the original set
+        originalEnabledLanguageCodes = new Set(languages);
+        hasPendingLanguageChanges = false;
+        updateLanguageChangesUI();
+        showSuccess('Language changes applied successfully');
+      } catch (elevatedError) {
+        if (elevatedError === 'ELEVATION_CANCELLED') {
+          // User cancelled UAC prompt, keep changes pending
+          showError('Administrator privileges required. Changes not applied.');
+        } else {
+          console.error('Failed to apply changes with elevation:', elevatedError);
+          showError('Failed to apply language changes');
+        }
+      }
+    } else {
+      showError('Failed to apply language changes');
+    }
+  }
+}
+
+// Cancel language changes
+window.cancelLanguageChanges = function() {
+  // Restore original languages
+  enabledLanguageCodes = new Set(originalEnabledLanguageCodes);
+  hasPendingLanguageChanges = false;
+  
+  // Update UI
+  renderEnabledLanguages();
+  showSuccess('Changes cancelled');
 }
 
 // Initialize

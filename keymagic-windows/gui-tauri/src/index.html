@@ -102,7 +102,12 @@
                       <div id="enabled-languages-list" class="enabled-languages-list">
                         <!-- Enabled languages will be listed here -->
                       </div>
-                      <p class="setting-hint">KeyMagic will be available as an input method for these languages. Changes may require a restart of Windows.</p>
+                      <div id="language-changes-actions" class="language-changes-actions hidden">
+                        <p class="pending-changes-hint">You have pending changes. Click Apply to save them.</p>
+                        <button class="btn btn-primary" onclick="applyLanguageChanges()">Apply Changes</button>
+                        <button class="btn btn-secondary" onclick="cancelLanguageChanges()">Cancel</button>
+                      </div>
+                      <p class="setting-hint">KeyMagic will be available as an input method for these languages. Changes may require administrator privileges.</p>
                     </div>
                   </div>
                   

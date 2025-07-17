@@ -242,9 +242,62 @@ pub fn set_enabled_languages(languages: Vec<String>) -> Result<(), String> {
         // First update registry
         registry::set_enabled_languages(&languages).map_err(|e| e.to_string())?;
         
-        // Then update TSF language profiles
-        crate::language_profiles::update_language_profiles(&languages)
-            .map_err(|e| format!("Failed to update language profiles: {}", e))
+        // Try to update TSF language profiles directly first
+        match crate::language_profiles::update_language_profiles(&languages) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // If it fails (likely due to permissions), return a special error
+                Err(format!("ELEVATION_REQUIRED: {}", e))
+            }
+        }
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(())
+}
+
+#[tauri::command]
+pub fn apply_language_changes_elevated(languages: Vec<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::env;
+        
+        // Get the path to our own executable
+        let exe_path = env::current_exe()
+            .map_err(|e| format!("Failed to get executable path: {}", e))?;
+        
+        // Join languages with commas
+        let languages_str = languages.join(",");
+        
+        // Launch elevated process with hidden window
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        
+        let output = Command::new("powershell")
+            .args(&[
+                "-WindowStyle", "Hidden",
+                "-Command",
+                &format!(
+                    "Start-Process '{}' -ArgumentList '--update-languages','{}' -Verb RunAs -Wait -WindowStyle Hidden",
+                    exe_path.display(),
+                    languages_str
+                ),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("Failed to launch elevated process: {}", e))?;
+        
+        if output.status.success() {
+            Ok(())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("The operation was canceled by the user") {
+                Err("ELEVATION_CANCELLED".to_string())
+            } else {
+                Err(format!("Failed to apply language changes: {}", stderr))
+            }
+        }
     }
     
     #[cfg(not(target_os = "windows"))]

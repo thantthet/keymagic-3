@@ -27,6 +27,7 @@ use hotkey::HotkeyManager;
 use tauri::{Manager, Emitter};
 use tauri_plugin_autostart::ManagerExt;
 use log::{error, info};
+use anyhow::{Result, anyhow};
 
 // Cleanup handler that disables key processing on drop
 struct CleanupHandler {
@@ -111,6 +112,7 @@ pub fn run() {
             commands::remove_composition_mode_process,
             commands::get_enabled_languages,
             commands::set_enabled_languages,
+            commands::apply_language_changes_elevated,
             commands::run_command,
             commands::get_supported_languages,
             commands::search_languages,
@@ -220,4 +222,28 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Update language profiles when running with elevated privileges
+#[cfg(target_os = "windows")]
+pub fn update_languages_elevated(languages_str: &str) -> Result<()> {
+    // Parse comma-separated language codes
+    let languages: Vec<String> = languages_str
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    
+    if languages.is_empty() {
+        return Err(anyhow!("No languages provided"));
+    }
+    
+    // Update the language profiles
+    language_profiles::update_language_profiles(&languages)
+        .map_err(|e| anyhow!("Failed to update language profiles: {}", e))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn update_languages_elevated(_languages_str: &str) -> Result<()> {
+    Ok(())
 }

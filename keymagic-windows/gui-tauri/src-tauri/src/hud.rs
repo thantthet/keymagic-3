@@ -106,10 +106,6 @@ pub fn show_keyboard_hud(keyboard_name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Show the HUD with status message (e.g., "KeyMagic Enabled/Disabled")
-pub fn show_status_hud(status: &str) -> Result<()> {
-    show_keyboard_hud(status)
-}
 
 /// Show tray minimize notification
 pub fn show_tray_minimize_notification() -> Result<()> {

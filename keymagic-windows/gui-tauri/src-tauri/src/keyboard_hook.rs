@@ -252,11 +252,6 @@ impl KeyboardHook {
         Ok(())
     }
 
-    pub fn unregister_hotkey(&self, hotkey_str: &str) -> Result<()> {
-        let mut hotkeys = self.hotkeys.lock().unwrap();
-        hotkeys.remove(hotkey_str);
-        Ok(())
-    }
 
     pub fn unregister_all_hotkeys(&self) -> Result<()> {
         let mut hotkeys = self.hotkeys.lock().unwrap();

@@ -1354,3 +1354,30 @@ a {
   font-size: 14px;
   padding: 8px;
 }
+
+.language-changes-actions {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: rgba(33, 150, 243, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(33, 150, 243, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.language-changes-actions.hidden {
+  display: none;
+}
+
+.pending-changes-hint {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.language-changes-actions .btn {
+  margin: 0;
+}
