@@ -72,29 +72,26 @@
       justify-content: center;
       align-items: center;
       min-height: 400px;
+      padding: 20px;
     }
     
     .keyboard-layout {
-      display: inline-block;
-      background: white;
+      max-width: 1085px;
+      width: 100%;
+      background: #e5e5e5;
       border-radius: 16px;
       padding: 20px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    }
-    
-    .keyboard-row {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(30, 1fr);
+      grid-template-rows: repeat(5, 60px);
       gap: 5px;
-      margin-bottom: 5px;
-      justify-content: flex-start;
     }
     
     .key {
       background: #fafafa;
-      border: 1px solid #ddd;
+      border: 2px solid #ddd;
       border-radius: 8px;
-      width: 52px;
-      height: 52px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -103,23 +100,30 @@
       position: relative;
       font-size: 15px;
       transition: all 0.1s;
+      grid-column: span 2;
+      min-width: 0; /* Prevent grid blowout */
     }
     
     .key:hover {
       background: #f0f0f0;
       transform: translateY(-1px);
       box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+      border-color: #bbb;
     }
     
-    .key.wide { width: 78px; }
-    .key.wider { width: 104px; }
-    .key.space { width: 364px; }
-    .key.tab { width: 78px; }
-    .key.caps { width: 94px; }
-    .key.shift-left { width: 118px; }
-    .key.shift-right { width: 134px; }
-    .key.enter { width: 108px; }
-    .key.backspace { width: 104px; }
+    /* Key size modifiers using grid spans */
+    .key.backspace { grid-column: span 4; }
+    .key.tab { grid-column: span 3; }
+    .key.backslash { grid-column: span 3; }
+    .key.caps { grid-column: span 4; }
+    .key.enter { grid-column: span 4; }
+    .key.shift-left { grid-column: span 5; }
+    .key.shift-right { grid-column: span 5; }
+    .key.ctrl { grid-column: span 3; }
+    .key.alt { grid-column: span 3; }
+    .key.win { grid-column: span 3; }
+    .key.menu { grid-column: span 3; }
+    .key.space { grid-column: span 9; }
     
     .key-shifted {
       position: absolute;
@@ -142,6 +146,48 @@
       color: #888;
       font-weight: 500;
       text-transform: uppercase;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 1200px) {
+      .keyboard-layout {
+        grid-template-columns: repeat(30, minmax(0, 1fr));
+        grid-template-rows: repeat(5, max(50px, 5vw));
+      }
+      
+      .key-shifted {
+        font-size: 10px;
+      }
+      
+      .key-unshifted {
+        font-size: 14px;
+      }
+      
+      .key-label {
+        font-size: 9px;
+      }
+    }
+    
+    @media (max-width: 800px) {
+      .keyboard-layout {
+        grid-template-rows: repeat(5, max(40px, 4vw));
+        gap: 3px;
+        padding: 10px;
+      }
+      
+      .key-shifted {
+        font-size: 8px;
+        top: 3px;
+        left: 4px;
+      }
+      
+      .key-unshifted {
+        font-size: 12px;
+      }
+      
+      .key-label {
+        font-size: 8px;
+      }
     }
     
     .loading {
@@ -176,13 +222,22 @@
         display: none;
       }
       
+      .keyboard-container {
+        padding: 0;
+      }
+      
       .keyboard-layout {
         box-shadow: none;
         border: 1px solid #ddd;
+        background: white;
+        max-width: 100%;
+        grid-template-columns: repeat(30, 1fr);
+        grid-template-rows: repeat(5, 45px);
       }
       
       .key {
         box-shadow: none;
+        border: 1px solid #999;
       }
       
       .key:hover {
@@ -254,133 +309,123 @@
       container.innerHTML = `
         <div class="keyboard-layout">
           <!-- Number row -->
-          <div class="keyboard-row">
+          <div class="key">
+            <span class="key-shifted">${keys['Backquote']?.shifted || '~'}</span>
+            <span class="key-unshifted">${keys['Backquote']?.unshifted || '`'}</span>
+          </div>
+          ${[1,2,3,4,5,6,7,8,9,0].map(n => `
             <div class="key">
-              <span class="key-shifted">${keys['Backquote']?.shifted || '~'}</span>
-              <span class="key-unshifted">${keys['Backquote']?.unshifted || '`'}</span>
+              <span class="key-shifted">${keys['Digit' + n]?.shifted || ''}</span>
+              <span class="key-unshifted">${keys['Digit' + n]?.unshifted || n}</span>
             </div>
-            ${[1,2,3,4,5,6,7,8,9,0].map(n => `
-              <div class="key">
-                <span class="key-shifted">${keys['Digit' + n]?.shifted || ''}</span>
-                <span class="key-unshifted">${keys['Digit' + n]?.unshifted || n}</span>
-              </div>
-            `).join('')}
-            <div class="key">
-              <span class="key-shifted">${keys['Minus']?.shifted || '_'}</span>
-              <span class="key-unshifted">${keys['Minus']?.unshifted || '-'}</span>
-            </div>
-            <div class="key">
-              <span class="key-shifted">${keys['Equal']?.shifted || '+'}</span>
-              <span class="key-unshifted">${keys['Equal']?.unshifted || '='}</span>
-            </div>
-            <div class="key backspace">
-              <span class="key-label">BACKSPACE</span>
-            </div>
+          `).join('')}
+          <div class="key">
+            <span class="key-shifted">${keys['Minus']?.shifted || '_'}</span>
+            <span class="key-unshifted">${keys['Minus']?.unshifted || '-'}</span>
+          </div>
+          <div class="key">
+            <span class="key-shifted">${keys['Equal']?.shifted || '+'}</span>
+            <span class="key-unshifted">${keys['Equal']?.unshifted || '='}</span>
+          </div>
+          <div class="key backspace">
+            <span class="key-label">BACKSPACE</span>
           </div>
           
           <!-- Top row -->
-          <div class="keyboard-row">
-            <div class="key tab">
-              <span class="key-label">TAB</span>
-            </div>
-            ${['Q','W','E','R','T','Y','U','I','O','P'].map(letter => `
-              <div class="key">
-                <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
-                <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
-              </div>
-            `).join('')}
+          <div class="key tab">
+            <span class="key-label">TAB</span>
+          </div>
+          ${['Q','W','E','R','T','Y','U','I','O','P'].map(letter => `
             <div class="key">
-              <span class="key-shifted">${keys['BracketLeft']?.shifted || '{'}</span>
-              <span class="key-unshifted">${keys['BracketLeft']?.unshifted || '['}</span>
+              <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
+              <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
             </div>
-            <div class="key">
-              <span class="key-shifted">${keys['BracketRight']?.shifted || '}'}</span>
-              <span class="key-unshifted">${keys['BracketRight']?.unshifted || ']'}</span>
-            </div>
-            <div class="key">
-              <span class="key-shifted">${keys['Backslash']?.shifted || '|'}</span>
-              <span class="key-unshifted">${keys['Backslash']?.unshifted || '\\\\'}</span>
-            </div>
+          `).join('')}
+          <div class="key">
+            <span class="key-shifted">${keys['BracketLeft']?.shifted || '{'}</span>
+            <span class="key-unshifted">${keys['BracketLeft']?.unshifted || '['}</span>
+          </div>
+          <div class="key">
+            <span class="key-shifted">${keys['BracketRight']?.shifted || '}'}</span>
+            <span class="key-unshifted">${keys['BracketRight']?.unshifted || ']'}</span>
+          </div>
+          <div class="key backslash">
+            <span class="key-shifted">${keys['Backslash']?.shifted || '|'}</span>
+            <span class="key-unshifted">${keys['Backslash']?.unshifted || '\\\\'}</span>
           </div>
           
           <!-- Home row -->
-          <div class="keyboard-row">
-            <div class="key caps">
-              <span class="key-label">CAPS LOCK</span>
-            </div>
-            ${['A','S','D','F','G','H','J','K','L'].map(letter => `
-              <div class="key">
-                <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
-                <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
-              </div>
-            `).join('')}
+          <div class="key caps">
+            <span class="key-label">CAPS LOCK</span>
+          </div>
+          ${['A','S','D','F','G','H','J','K','L'].map(letter => `
             <div class="key">
-              <span class="key-shifted">${keys['Semicolon']?.shifted || ':'}</span>
-              <span class="key-unshifted">${keys['Semicolon']?.unshifted || ';'}</span>
+              <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
+              <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
             </div>
-            <div class="key">
-              <span class="key-shifted">${keys['Quote']?.shifted || '"'}</span>
-              <span class="key-unshifted">${keys['Quote']?.unshifted || "'"}</span>
-            </div>
-            <div class="key enter">
-              <span class="key-label">ENTER</span>
-            </div>
+          `).join('')}
+          <div class="key">
+            <span class="key-shifted">${keys['Semicolon']?.shifted || ':'}</span>
+            <span class="key-unshifted">${keys['Semicolon']?.unshifted || ';'}</span>
+          </div>
+          <div class="key">
+            <span class="key-shifted">${keys['Quote']?.shifted || '"'}</span>
+            <span class="key-unshifted">${keys['Quote']?.unshifted || "'"}</span>
+          </div>
+          <div class="key enter">
+            <span class="key-label">ENTER</span>
           </div>
           
           <!-- Bottom row -->
-          <div class="keyboard-row">
-            <div class="key shift-left">
-              <span class="key-label">SHIFT</span>
-            </div>
-            ${['Z','X','C','V','B','N','M'].map(letter => `
-              <div class="key">
-                <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
-                <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
-              </div>
-            `).join('')}
+          <div class="key shift-left">
+            <span class="key-label">SHIFT</span>
+          </div>
+          ${['Z','X','C','V','B','N','M'].map(letter => `
             <div class="key">
-              <span class="key-shifted">${keys['Comma']?.shifted || '<'}</span>
-              <span class="key-unshifted">${keys['Comma']?.unshifted || ','}</span>
+              <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
+              <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
             </div>
-            <div class="key">
-              <span class="key-shifted">${keys['Period']?.shifted || '>'}</span>
-              <span class="key-unshifted">${keys['Period']?.unshifted || '.'}</span>
-            </div>
-            <div class="key">
-              <span class="key-shifted">${keys['Slash']?.shifted || '?'}</span>
-              <span class="key-unshifted">${keys['Slash']?.unshifted || '/'}</span>
-            </div>
-            <div class="key shift-right">
-              <span class="key-label">SHIFT</span>
-            </div>
+          `).join('')}
+          <div class="key">
+            <span class="key-shifted">${keys['Comma']?.shifted || '<'}</span>
+            <span class="key-unshifted">${keys['Comma']?.unshifted || ','}</span>
+          </div>
+          <div class="key">
+            <span class="key-shifted">${keys['Period']?.shifted || '>'}</span>
+            <span class="key-unshifted">${keys['Period']?.unshifted || '.'}</span>
+          </div>
+          <div class="key">
+            <span class="key-shifted">${keys['Slash']?.shifted || '?'}</span>
+            <span class="key-unshifted">${keys['Slash']?.unshifted || '/'}</span>
+          </div>
+          <div class="key shift-right">
+            <span class="key-label">SHIFT</span>
           </div>
           
           <!-- Space row -->
-          <div class="keyboard-row">
-            <div class="key wider">
-              <span class="key-label">CTRL</span>
-            </div>
-            <div class="key wide">
-              <span class="key-label">WIN</span>
-            </div>
-            <div class="key wide">
-              <span class="key-label">ALT</span>
-            </div>
-            <div class="key space">
-              <span class="key-unshifted">${keys['Space']?.unshifted || ' '}</span>
-            </div>
-            <div class="key wide">
-              <span class="key-label">ALT</span>
-            </div>
-            <div class="key wide">
-              <span class="key-label">WIN</span>
-            </div>
-            <div class="key wide">
-              <span class="key-label">MENU</span>
-            </div>
-            <div class="key wider">
-              <span class="key-label">CTRL</span>
-            </div>
+          <div class="key ctrl">
+            <span class="key-label">CTRL</span>
+          </div>
+          <div class="key win">
+            <span class="key-label">WIN</span>
+          </div>
+          <div class="key alt">
+            <span class="key-label">ALT</span>
+          </div>
+          <div class="key space">
+            <span class="key-unshifted">${keys['Space']?.unshifted || ' '}</span>
+          </div>
+          <div class="key alt">
+            <span class="key-label">ALT</span>
+          </div>
+          <div class="key win">
+            <span class="key-label">WIN</span>
+          </div>
+          <div class="key menu">
+            <span class="key-label">MENU</span>
+          </div>
+          <div class="key ctrl">
+            <span class="key-label">CTRL</span>
           </div>
         </div>
       `;
