@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="windowskey" version="1.1" width="10" height="11" viewBox="0 0 10 11" xmlns="http://www.w3.org/2000/svg">
+ <rect id="canvas" width="10" height="11" style="fill:none;stroke-width:0"/>
+ <g id="g26" transform="matrix(.947 0 0 .949 -.19 .354)">
+  <path id="rbyll" d="m10.7 5.95v4.85l-5.57-0.87v-3.99z" style="fill:#2f3032;stroke-width:0"/>
+  <path id="rtgrn" d="m5.13 1.13 5.57-0.804v4.774h-5.57z" style="fill:#2f3032;stroke-width:0"/>
+  <path id="lbblu" d="m4.39 5.91v3.95l-4.126-0.57v-3.4z" style="fill:#2f3032;stroke-width:0"/>
+  <path id="ltred" d="m0.261 1.77 4.129-0.57v3.95h-4.127z" style="fill:#2f3032;stroke-width:0"/>
+ </g>
+</svg>

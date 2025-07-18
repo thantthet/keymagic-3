@@ -336,7 +336,7 @@
   
   <div class="layout-actions">
     <button class="btn btn-pin" id="pin-button" onclick="togglePin()">
-      <span id="pin-text">📌 Pin</span>
+      <span id="pin-text">📌 Pin window to top</span>
     </button>
     <button class="btn btn-primary" onclick="exportPDF()">Export as PDF</button>
   </div>
@@ -534,10 +534,10 @@
         
         if (isPinned) {
           pinButton.classList.add('pinned');
-          pinText.textContent = '📌 Unpin';
+          pinText.textContent = '📌 Unpin window';
         } else {
           pinButton.classList.remove('pinned');
-          pinText.textContent = '📌 Pin';
+          pinText.textContent = '📌 Pin window to top';
         }
       } catch (error) {
         console.error('Failed to toggle pin state:', error);
