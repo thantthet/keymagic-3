@@ -7,6 +7,7 @@ mod registry_notifier;
 mod updater;
 mod app_paths;
 mod windows_event;
+mod keyboard_icon;
 
 #[cfg(target_os = "windows")]
 mod keyboard_hook;

@@ -4,7 +4,6 @@ use anyhow::{anyhow, Result};
 use windows::{
     core::{GUID, HSTRING},
     Win32::{
-        Foundation::HMODULE,
         System::Com::{CoInitializeEx, CoCreateInstance, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED},
         UI::TextServices::{ITfInputProcessorProfiles, CLSID_TF_InputProcessorProfiles, TF_LANGUAGEPROFILE},
     },
@@ -19,8 +18,8 @@ const GUID_KEYMAGIC_PROFILE: GUID = GUID::from_u128(0xc29d9340_87aa_4149_a1ce_f6
 // Text service description
 const TEXTSERVICE_DESC: &str = "KeyMagic 3";
 
-// Tauri embeds the application icon with the standard Windows IDI_APPLICATION resource ID
-const IDI_APPLICATION: i32 = 32512;
+// Icon index for extracted .ico file (0 for first icon in the file)
+const ICON_INDEX: i32 = 0;
 
 /// Updates TSF language profiles based on the enabled languages in the registry
 #[cfg(target_os = "windows")]
@@ -39,9 +38,9 @@ pub fn update_language_profiles(enabled_languages: &[String]) -> Result<()> {
             CLSCTX_INPROC_SERVER,
         ).map_err(|e| anyhow!("Failed to create ITfInputProcessorProfiles: {:?}", e))?;
         
-        // Get module handle for icon
-        let h_module = windows::Win32::System::LibraryLoader::GetModuleHandleW(None)?;
-        let module_path = get_module_path(h_module)?;
+        // Get the keyboard icon path
+        let icon_path = crate::keyboard_icon::get_keyboard_icon_path()
+            .map_err(|e| anyhow!("Failed to get keyboard icon path: {:?}", e))?;
         
         // Convert enabled languages to LANGIDs
         let mut new_langids = Vec::new();
@@ -62,7 +61,7 @@ pub fn update_language_profiles(enabled_languages: &[String]) -> Result<()> {
         // Add new languages that aren't currently registered
         for langid in &new_langids {
             if !current_langids.contains(langid) {
-                add_language_profile(&profiles, *langid, &module_path)?;
+                add_language_profile(&profiles, *langid, &icon_path)?;
             }
         }
         
@@ -83,22 +82,6 @@ pub fn update_language_profiles(enabled_languages: &[String]) -> Result<()> {
     }
 }
 
-#[cfg(target_os = "windows")]
-fn get_module_path(h_module: HMODULE) -> Result<String> {
-    use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
-    
-    unsafe {
-        let mut buffer = vec![0u16; 260]; // MAX_PATH
-        let len = GetModuleFileNameW(h_module, &mut buffer);
-        
-        if len == 0 {
-            return Err(anyhow!("Failed to get module path"));
-        }
-        
-        buffer.truncate(len as usize);
-        Ok(String::from_utf16_lossy(&buffer))
-    }
-}
 
 #[cfg(target_os = "windows")]
 fn get_registered_language_profiles(profiles: &ITfInputProcessorProfiles) -> Result<Vec<u16>> {
@@ -142,18 +125,18 @@ fn get_registered_language_profiles(profiles: &ITfInputProcessorProfiles) -> Res
 }
 
 #[cfg(target_os = "windows")]
-fn add_language_profile(profiles: &ITfInputProcessorProfiles, langid: u16, module_path: &str) -> Result<()> {
+fn add_language_profile(profiles: &ITfInputProcessorProfiles, langid: u16, icon_path: &std::path::Path) -> Result<()> {
     unsafe {
         let desc = HSTRING::from(TEXTSERVICE_DESC);
-        let icon_path = HSTRING::from(module_path);
+        let icon_path_str = HSTRING::from(icon_path.to_string_lossy().as_ref());
         
         profiles.AddLanguageProfile(
             &CLSID_KEYMAGIC_TEXT_SERVICE,
             langid,
             &GUID_KEYMAGIC_PROFILE,
             desc.as_wide(),
-            icon_path.as_wide(),
-            -IDI_APPLICATION as u32, // Negative for resource ID (Tauri's embedded icon)
+            icon_path_str.as_wide(),
+            ICON_INDEX as u32, // Icon index in the .ico file
         )?;
         
         // Enable the profile
