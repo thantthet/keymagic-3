@@ -1443,6 +1443,62 @@ a {
   opacity: 0.8;
 }
 
+/* Make "How to activate" section prominent with yellow theme */
+.info-box.collapsible-section {
+  background-color: #fff3cd;
+  border-color: #ffc107;
+}
+
+.info-box.collapsible-section .collapsible-header {
+  color: #856404;
+  font-size: 16px;
+  padding: 12px 0;
+}
+
+.info-box.collapsible-section .collapsible-header strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-box.collapsible-section .collapsible-content p {
+  color: #856404;
+}
+
+.info-box.collapsible-section .collapsible-content a {
+  color: #d39e00;
+  font-weight: 600;
+}
+
+.info-box.collapsible-section .collapsible-content a:hover {
+  color: #856404;
+}
+
+/* Additional styling when collapsed */
+.info-box.collapsible-section.collapsed {
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+.info-box.collapsible-section.collapsed .collapsible-header strong::after {
+  content: "Click to expand";
+  font-size: 12px;
+  font-weight: normal;
+  color: #856404;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+  }
+  50% {
+    transform: scale(1.005);
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.1);
+  }
+}
+
 .collapse-icon {
   transition: transform 0.3s ease;
   flex-shrink: 0;
