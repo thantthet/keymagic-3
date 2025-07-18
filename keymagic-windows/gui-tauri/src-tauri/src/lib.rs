@@ -49,6 +49,10 @@ impl Drop for CleanupHandler {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    run_with_file(None)
+}
+
+pub fn run_with_file(km2_file: Option<std::path::PathBuf>) {
     // Ensure registry structure exists
     #[cfg(target_os = "windows")]
     {
@@ -67,12 +71,20 @@ pub fn run() {
         .expect("Failed to initialize keyboard manager");
     
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // When another instance tries to start, bring the existing window to front
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
+            }
+            
+            // Check if a .km2 file was passed in the arguments
+            if let Some(file_path) = args.get(1) {
+                if file_path.ends_with(".km2") && std::path::Path::new(file_path).exists() {
+                    // Emit event to the frontend to handle the file
+                    let _ = app.emit("open-keyboard-file", file_path);
+                }
             }
         }))
         .plugin(tauri_plugin_log::Builder::new()
@@ -152,6 +164,20 @@ pub fn run() {
                 app_handle: app.app_handle().clone(),
             };
             app.manage(cleanup_handler);
+            
+            // If a .km2 file was provided on startup, handle it after window is ready
+            if let Some(km2_path) = km2_file {
+                let app_handle = app.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Wait a bit for the frontend to initialize
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    
+                    // Emit event to the frontend to handle the file
+                    if let Some(path_str) = km2_path.to_str() {
+                        let _ = app_handle.emit("open-keyboard-file", path_str);
+                    }
+                });
+            }
             
             // Setup system tray
             #[cfg(desktop)]

@@ -1,28 +1,25 @@
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 use std::fs;
-use std::sync::Once;
+use std::sync::{OnceLock, Mutex};
 
 // Embed the keyboard icon at compile time
 const KEYBOARD_ICON_BYTES: &[u8] = include_bytes!("../resources/keymagic-keyboard.ico");
 
-// One-time initialization for icon extraction
-static INIT: Once = Once::new();
-static mut ICON_PATH: Option<PathBuf> = None;
+// Thread-safe one-time initialization using OnceLock
+static ICON_PATH: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
 /// Get the path to the keyboard icon file, extracting it if necessary
 pub fn get_keyboard_icon_path() -> Result<PathBuf> {
-    unsafe {
-        INIT.call_once(|| {
-            if let Ok(path) = extract_keyboard_icon() {
-                ICON_PATH = Some(path);
-            }
-        });
-        
-        ICON_PATH.as_ref()
-            .cloned()
-            .ok_or_else(|| anyhow!("Failed to extract keyboard icon"))
-    }
+    let icon_path_mutex = ICON_PATH.get_or_init(|| {
+        let path = extract_keyboard_icon().ok();
+        Mutex::new(path)
+    });
+    
+    let icon_path = icon_path_mutex.lock().unwrap();
+    icon_path.as_ref()
+        .cloned()
+        .ok_or_else(|| anyhow!("Failed to extract keyboard icon"))
 }
 
 /// Extract the embedded keyboard icon to app data directory

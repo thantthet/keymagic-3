@@ -1181,6 +1181,30 @@ async function init() {
     await loadKeyboards();
   });
   
+  // Listen for open keyboard file events (when .km2 file is opened)
+  listen('open-keyboard-file', async (event) => {
+    console.log('Open keyboard file event received:', event);
+    const filePath = event.payload;
+    
+    try {
+      // Add the keyboard
+      const keyboardId = await invoke('add_keyboard', { path: filePath });
+      await loadKeyboards();
+      await updateTrayMenu();
+      showSuccess('Keyboard added successfully');
+      
+      // Show the main window if it's hidden
+      const { getCurrentWindow } = window.__TAURI__.window;
+      const mainWindow = getCurrentWindow();
+      await mainWindow.show();
+      await mainWindow.unminimize();
+      await mainWindow.setFocus();
+    } catch (error) {
+      console.error('Failed to add keyboard from file:', error);
+      showError('Failed to add keyboard: ' + error);
+    }
+  });
+  
   try {
     await loadKeyboards();
     await loadSettings();

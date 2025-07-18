@@ -36,6 +36,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 MinVersion=10.0
 UninstallRestartComputer=yes
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -86,6 +87,12 @@ Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: dword; ValueName: "
 
 ; Add to Windows Run registry for auto-start
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue
+
+; File association for .km2 files
+Root: HKCR; Subkey: ".km2"; ValueType: string; ValueName: ""; ValueData: "KeyMagicKeyboard"; Flags: uninsdeletevalue
+Root: HKCR; Subkey: "KeyMagicKeyboard"; ValueType: string; ValueName: ""; ValueData: "KeyMagic Keyboard Layout"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "KeyMagicKeyboard\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\resources\icons\keymagic-file.ico"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "KeyMagicKeyboard\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
 
 [Run]
 ; Download and install WebView2 if needed
