@@ -372,6 +372,31 @@ body {
   margin-bottom: 4px;
 }
 
+.keyboard-badge-new {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background-color: #4CAF50;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 12px;
+  text-transform: uppercase;
+  animation: fadeIn 0.3s ease-in-out;
+  vertical-align: middle;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .keyboard-description {
   font-size: 14px;
   color: var(--text-secondary);

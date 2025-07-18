@@ -5,6 +5,7 @@ const { listen } = window.__TAURI__.event;
 let keyboards = [];
 let activeKeyboardId = null;
 let selectedKeyboardId = null;
+let recentlyAddedKeyboardIds = new Set(); // Track recently added keyboards
 // DOM Elements
 let keyboardList;
 let addKeyboardBtn;
@@ -61,7 +62,12 @@ async function loadKeyboards() {
 function renderKeyboardList() {
   keyboardList.innerHTML = '';
   
-  keyboards.forEach(keyboard => {
+  // Sort keyboards by name (case-insensitive)
+  const sortedKeyboards = [...keyboards].sort((a, b) => 
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+  
+  sortedKeyboards.forEach(keyboard => {
     const card = createKeyboardCard(keyboard);
     keyboardList.appendChild(card);
   });
@@ -79,6 +85,7 @@ function renderKeyboardList() {
 function createKeyboardCard(keyboard) {
   const isActive = keyboard.id === activeKeyboardId;
   const isSelected = keyboard.id === selectedKeyboardId;
+  const isRecentlyAdded = recentlyAddedKeyboardIds.has(keyboard.id);
   
   const card = document.createElement('div');
   card.className = `keyboard-card ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`;
@@ -92,7 +99,10 @@ function createKeyboardCard(keyboard) {
           createDefaultIcon()}
       </div>
       <div class="keyboard-info">
-        <div class="keyboard-name">${keyboard.name}</div>
+        <div class="keyboard-name">
+          ${keyboard.name}
+          ${isRecentlyAdded ? '<span class="keyboard-badge-new">Just Added</span>' : ''}
+        </div>
         <div class="keyboard-description">${keyboard.description || 'No description'}</div>
       </div>
     </div>
@@ -283,9 +293,16 @@ function setupEventListeners() {
       if (selected) {
         try {
           const keyboardId = await invoke('add_keyboard', { path: selected });
+          // Mark this keyboard as recently added
+          recentlyAddedKeyboardIds.add(keyboardId);
           await loadKeyboards();
           await updateTrayMenu();
           showSuccess('Keyboard added successfully');
+          // Remove "just added" label after 60 seconds (1 minute)
+          setTimeout(() => {
+            recentlyAddedKeyboardIds.delete(keyboardId);
+            renderKeyboardList();
+          }, 60000);
         } catch (error) {
           console.error('Failed to add keyboard:', error);
           showError('Failed to add keyboard: ' + error);
@@ -1189,6 +1206,8 @@ async function init() {
     try {
       // Add the keyboard
       const keyboardId = await invoke('add_keyboard', { path: filePath });
+      // Mark this keyboard as recently added
+      recentlyAddedKeyboardIds.add(keyboardId);
       await loadKeyboards();
       await updateTrayMenu();
       showSuccess('Keyboard added successfully');
@@ -1199,6 +1218,12 @@ async function init() {
       await mainWindow.show();
       await mainWindow.unminimize();
       await mainWindow.setFocus();
+      
+      // Remove "just added" label after 60 seconds (1 minute)
+      setTimeout(() => {
+        recentlyAddedKeyboardIds.delete(keyboardId);
+        renderKeyboardList();
+      }, 60000);
     } catch (error) {
       console.error('Failed to add keyboard from file:', error);
       showError('Failed to add keyboard: ' + error);
