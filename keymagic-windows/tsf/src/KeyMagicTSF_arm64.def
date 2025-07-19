@@ -1,0 +1,5 @@
+EXPORTS
+    DllGetClassObject   = KeyMagicTSF_arm64.DllGetClassObject
+    DllCanUnloadNow     = KeyMagicTSF_arm64.DllCanUnloadNow
+    DllRegisterServer   = KeyMagicTSF_arm64.DllRegisterServer
+    DllUnregisterServer = KeyMagicTSF_arm64.DllUnregisterServer

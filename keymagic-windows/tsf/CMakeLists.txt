@@ -28,6 +28,13 @@ set(SOURCES
 # Create the DLL
 add_library(KeyMagicTSF SHARED ${SOURCES})
 
+# Set output name based on architecture for ARM64X support
+if(CMAKE_GENERATOR_PLATFORM STREQUAL "x64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "X64")
+    set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_x64")
+elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
+    set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_arm64")
+endif()
+
 # Include directories
 target_include_directories(KeyMagicTSF PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
