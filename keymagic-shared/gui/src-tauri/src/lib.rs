@@ -4,6 +4,7 @@ mod hotkey;
 mod notification;
 mod platform;
 mod tray;
+mod updater;
 
 #[cfg(target_os = "windows")]
 mod hud_win32;
@@ -140,6 +141,28 @@ pub fn run() {
             // Initialize hotkeys after all plugins are loaded
             hotkey_manager.initialize(app.handle(), keyboard_manager.clone())
                 .expect("Failed to initialize hotkey manager");
+            
+            // Check for updates on startup (async)
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Wait a bit for the app to fully initialize
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                
+                // Check for updates silently
+                match crate::updater::check_for_updates_async().await {
+                    Ok(update_info) => {
+                        if update_info.update_available {
+                            // Emit event to notify UI about available update
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.emit("update_available", update_info);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to check for updates on startup: {}", e);
+                    }
+                }
+            });
             
             Ok(())
         })

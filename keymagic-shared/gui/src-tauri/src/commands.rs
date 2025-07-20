@@ -11,12 +11,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 pub type AppState = Arc<KeyboardManager>;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UpdateInfo {
-    pub version: String,
-    pub download_url: String,
-    pub release_notes: String,
-}
+// Re-export UpdateInfo from updater module
+pub use crate::updater::UpdateInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeyMapping {
@@ -296,9 +292,15 @@ pub fn get_system_languages(_state: State<AppState>) -> Result<Vec<Language>, St
 }
 
 #[tauri::command]
-pub fn check_for_updates() -> Result<Option<UpdateInfo>, String> {
-    // TODO: Implement update checking
-    Ok(None)
+pub async fn check_for_updates() -> Result<Option<UpdateInfo>, String> {
+    match crate::updater::check_for_updates_async().await {
+        Ok(update_info) => Ok(Some(update_info)),
+        Err(e) => {
+            log::error!("Failed to check for updates: {}", e);
+            // Return None instead of error to allow graceful degradation
+            Ok(None)
+        }
+    }
 }
 
 #[tauri::command]
@@ -736,12 +738,10 @@ pub fn apply_language_changes_elevated(
     }
 }
 
-// Update checking - return the existing UpdateInfo type
+// Update checking - legacy alias for check_for_updates
 #[tauri::command]
-pub fn check_for_update() -> Result<Option<UpdateInfo>, String> {
-    // TODO: Implement actual update checking
-    // For now, return None (no update available)
-    Ok(None)
+pub async fn check_for_update() -> Result<Option<UpdateInfo>, String> {
+    check_for_updates().await
 }
 
 #[derive(Debug, Serialize, Deserialize)]
