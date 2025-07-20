@@ -352,18 +352,6 @@ impl Platform for WindowsBackend {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         
         match key {
-            "StartWithWindows" => {
-                // Check StartWithSystem in Settings key
-                if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
-                    if let Ok(start_with_system) = settings_key.get_value::<u32, _>("StartWithSystem") {
-                        Ok(Some(if start_with_system != 0 { "1" } else { "0" }.to_string()))
-                    } else {
-                        Ok(Some("0".to_string()))
-                    }
-                } else {
-                    Ok(Some("0".to_string()))
-                }
-            }
             _ => {
                 // Read from Settings key
                 if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
@@ -386,12 +374,6 @@ impl Platform for WindowsBackend {
             .context("Failed to create Settings key")?;
         
         match key {
-            "StartWithWindows" => {
-                // Save StartWithSystem to registry for TSF to read
-                let val = if value == "1" || value.to_lowercase() == "true" { 1u32 } else { 0u32 };
-                settings_key.set_value("StartWithSystem", &val)?;
-                Ok(())
-            }
             _ => {
                 // Save to Settings key
                 settings_key.set_value(key, &value)?;

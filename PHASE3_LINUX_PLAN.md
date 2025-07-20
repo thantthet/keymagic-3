@@ -78,17 +78,30 @@ Phase 3 involves two major components:
    - ✅ Icon updates automatically when switching keyboards
    - ✅ Supports BMP, PNG, and JPEG icon formats from KM2 files
 
+4. **Version Checking and Update System**
+   - ✅ Implemented automatic update checking on startup (5-second delay)
+   - ✅ GitHub releases integration with platform-specific manifests
+   - ✅ Remind me later functionality (24-hour delay)
+   - ✅ Dynamic version display from Cargo.toml
+   - ✅ Cross-platform update notification UI
+
+5. **System Integration Features**
+   - ✅ Start with system using Tauri autostart plugin
+   - ✅ Works across Windows (registry), macOS (Launch Agent), Linux (XDG autostart)
+   - ✅ HUD notification when keyboard switched (already implemented)
+   - ✅ Windows TSF notification for keyboard changes
+   - ✅ First minimize notification to tray
+
 #### ⏳ Remaining Tasks for Full Feature Parity:
 
 1. **Keyboard Features**
    - Import wizard full implementation
-   - Update checking with GitHub releases
    - Keyboard validation improvements
 
 2. **Platform Integrations**
    - D-Bus communication for IBus (Linux)
-   - Language profile management (Windows TSF)
-   - Registry notification system (Windows)
+   - Language profile management (Windows TSF - partially done)
+   - macOS IMK integration
 
 ### Part 2: IBus Integration - ⏳ **NOT STARTED**
 
@@ -121,10 +134,10 @@ The IBus engine implementation has not been started yet. This will be the next m
 - [x] Global hotkey support (COMPLETED - July 20, 2025)
 - [x] Keyboard metadata extraction (COMPLETED - July 20, 2025)
 
-### ⏳ Week 7-8: Missing Features Implementation
-- [ ] Implement HUD/notification system
+### ✅ Week 7-8: Missing Features Implementation (COMPLETED - January 20, 2025)
+- [x] Implement HUD/notification system (was already done)
 - [ ] Add file association support (.km2 files)
-- [ ] Implement automatic update checking
+- [x] Implement automatic update checking
 - [ ] Add keyboard validation command
 - [ ] Create bundled keyboard import
 
@@ -197,10 +210,10 @@ After comparing the new cross-platform GUI with the original Windows implementat
 
 ### Critical Features
 
-1. **HUD (Heads-Up Display) Notifications**
+1. **HUD (Heads-Up Display) Notifications** ✅ **COMPLETED**
    - Visual feedback when switching keyboards
    - Notification when minimizing to tray
-   - Platform-specific implementation needed (Linux: libnotify, macOS: NSUserNotification)
+   - Platform-specific implementation (Windows: native HUD, others: Tauri window)
 
 2. **File Association Support**
    - Handle .km2 files opened via double-click
@@ -212,11 +225,12 @@ After comparing the new cross-platform GUI with the original Windows implementat
    - Linux: IBus language profile management
    - macOS: Input source management
 
-4. **Update System**
+4. **Update System** ✅ **COMPLETED**
    - Automatic update checking on startup (5-second delay)
    - Platform-specific update manifests
-   - Update signature verification
    - Silent background checking
+   - Remind me later functionality
+   - [ ] Update signature verification (not yet implemented)
 
 ### Important Features
 
@@ -226,7 +240,7 @@ After comparing the new cross-platform GUI with the original Windows implementat
    - Key processing enable/disable at runtime
 
 6. **System Integration**
-   - Windows: Registry notification system for TSF instances
+   - Windows: Registry notification system for TSF instances ✅ **COMPLETED**
    - Linux: D-Bus signals for IBus instances
    - Inter-process communication for IME synchronization
 
@@ -250,25 +264,25 @@ After comparing the new cross-platform GUI with the original Windows implementat
 10. **Linux-Specific**
    - IBus engine integration
    - Desktop notification integration
-   - XDG autostart support
+   - XDG autostart support ✅ **COMPLETED** (via Tauri plugin)
 
 ## Next Steps
 
 1. ✅ **Implement Global Hotkeys** - Critical for keyboard switching (COMPLETED)
 2. ✅ **Keyboard Metadata Support** - Icons, descriptions from KM2 files (COMPLETED)
-3. **Implement HUD/Notifications** - Critical for user feedback
+3. ✅ **Implement HUD/Notifications** - Critical for user feedback (COMPLETED)
 4. **Add File Association Support** - Important for user workflow
 5. **Begin IBus Engine Development** - Start with basic engine skeleton
-6. **Implement Update System** - Automatic checking and platform manifests
+6. ✅ **Implement Update System** - Automatic checking and platform manifests (COMPLETED)
 7. **Create Installation Packages** - .deb and .rpm for distribution
 8. **Add Missing Keyboard Management Features** - Validation, icon extraction
-9. **Implement Language Profile Management** - Platform-specific integration
+9. **Implement Language Profile Management** - Platform-specific integration (partially done for Windows)
 
 ## Success Criteria Progress
 
 - [x] GUI runs on Linux without Windows-specific errors
 - [ ] IBus engine loads and processes keyboard input
-- [ ] Keyboard switching works via hotkeys
+- [x] Keyboard switching works via hotkeys
 - [x] Configuration persists across restarts
 - [x] System tray integration works
 - [ ] Preedit text displays correctly

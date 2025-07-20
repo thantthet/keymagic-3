@@ -110,24 +110,13 @@ pub trait Platform: Send + Sync {
     }
     
     // Settings management
-    fn get_setting(&self, key: &str) -> Result<Option<String>> {
+    fn get_setting(&self, _key: &str) -> Result<Option<String>> {
         // Default implementation - can be overridden by platforms
-        match key {
-            "StartWithWindows" => {
-                let config = self.load_config()?;
-                Ok(Some(if config.general.start_with_system { "1" } else { "0" }.to_string()))
-            }
-            _ => Ok(None),
-        }
+        Ok(None)
     }
     
-    fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+    fn set_setting(&self, _key: &str, _value: &str) -> Result<()> {
         // Default implementation - can be overridden by platforms
-        if key == "StartWithWindows" {
-            let mut config = self.load_config()?;
-            config.general.start_with_system = value == "1";
-            self.save_config(&config)?;
-        }
         Ok(())
     }
     
