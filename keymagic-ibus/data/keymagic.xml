@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    KeyMagic IBus Component Definition
+    
+    This file defines the KeyMagic input method component for IBus.
+    It should be installed to /usr/share/ibus/component/keymagic.xml
+-->
+<component>
+    <name>org.freedesktop.IBus.KeyMagic</name>
+    <description>KeyMagic Input Method</description>
+    <exec>/usr/lib/ibus-keymagic/ibus-engine-keymagic --ibus</exec>
+    <version>1.0.0</version>
+    <author>KeyMagic Team</author>
+    <license>GPL-3.0</license>
+    <homepage>https://github.com/keymagic/keymagic</homepage>
+    <textdomain>keymagic</textdomain>
+    
+    <engines>
+        <engine>
+            <name>keymagic</name>
+            <language>my</language>
+            <license>GPL-3.0</license>
+            <author>KeyMagic Team</author>
+            <icon>keymagic.png</icon>
+            <layout>us</layout>
+            <layout_variant></layout_variant>
+            <layout_option></layout_option>
+            <longname>KeyMagic</longname>
+            <description>KeyMagic Input Method for Myanmar and other languages</description>
+            <rank>50</rank>
+            <symbol>၀</symbol>
+            <setup>/usr/bin/keymagic-gui</setup>
+            <icon_prop_key>InputMode</icon_prop_key>
+            <version>1.0.0</version>
+            <textdomain>keymagic</textdomain>
+        </engine>
+    </engines>
+</component>

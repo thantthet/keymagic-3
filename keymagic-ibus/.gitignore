@@ -1,0 +1,32 @@
+# Build artifacts
+build/
+ibus-engine-keymagic
+
+# Test files
+test_ibus_engine.py
+test-config/
+test-keyboards/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Debug files
+*.log
+core
+core.*
+
+# Temporary files
+*.tmp
+*.bak
+.DS_Store
+
+# Installation artifacts
+install_manifest.txt
+
+# Dependencies (if any local libs downloaded)
+lib/
+deps/
