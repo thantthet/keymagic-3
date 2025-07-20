@@ -1354,17 +1354,11 @@ async function setupTrayEventListeners() {
     switchPage(page);
   });
   
-  // Listen for active keyboard changes from tray
+  // Listen for active keyboard changes from any source (tray, hotkey, or command)
   await listen('active_keyboard_changed', async (event) => {
     activeKeyboardId = event.payload;
     renderKeyboardList();
-  });
-  
-  // Listen for keyboard switched events from hotkeys
-  await listen('keyboard-switched', async (event) => {
-    activeKeyboardId = event.payload;
-    await loadKeyboards(); // Reload to get latest state
-    // TODO: Show HUD notification when implemented
+    // TODO: Show HUD notification when keyboard switched via hotkey
   });
   
   // Listen for check for updates event from tray

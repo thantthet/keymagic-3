@@ -117,7 +117,7 @@ fn handle_tray_event<R: Runtime>(app: &AppHandle<R>, menu_id: &str) {
                 let _ = update_tray_menu(app);
                 
                 // Notify frontend about the change
-                let _ = app.emit("keyboard-changed", keyboard_id);
+                let _ = app.emit("active_keyboard_changed", keyboard_id);
             }
         }
     }

@@ -26,6 +26,11 @@
       "csp": null
     }
   },
+  "plugins": {
+    "globalShortcut": {
+      "all": true
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

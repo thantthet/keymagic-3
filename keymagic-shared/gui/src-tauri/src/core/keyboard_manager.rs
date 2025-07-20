@@ -162,6 +162,7 @@ impl KeyboardManager {
                 let name = metadata.name().unwrap_or(id.clone());
                 let description = metadata.description().map(|s| s.to_string());
                 let icon_data = metadata.icon().map(|data| data.to_vec());
+                let default_hotkey = metadata.hotkey();
                 let hash = self.calculate_file_hash(&path)?;
                 
                 found_keyboards.push(KeyboardInfo {
@@ -169,7 +170,7 @@ impl KeyboardManager {
                     name,
                     filename,
                     path: path.clone(),
-                    hotkey: None,
+                    hotkey: default_hotkey,
                     hash,
                     is_active: false,
                     description,
@@ -294,6 +295,7 @@ impl KeyboardManager {
         let name = metadata.name().unwrap_or(id.clone());
         let description = metadata.description().map(|s| s.to_string());
         let icon_data = metadata.icon().map(|data| data.to_vec());
+        let default_hotkey = metadata.hotkey();
         let hash = self.calculate_file_hash(file_path)?;
         
         // Copy to keyboards directory
@@ -308,7 +310,7 @@ impl KeyboardManager {
             name,
             filename,
             path: dest_path,
-            hotkey: None,
+            hotkey: default_hotkey,
             hash,
             is_active: false,
             description,

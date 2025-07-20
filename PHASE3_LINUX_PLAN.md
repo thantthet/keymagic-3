@@ -58,20 +58,28 @@ Phase 3 involves two major components:
    - Platform-specific features properly abstracted
    - Windows features hidden on non-Windows platforms
 
-#### ⏳ Remaining Tasks for Full Feature Parity:
+#### ✅ Additional Features Completed (July 20, 2025):
 
 1. **Global Hotkey Implementation**
-   - Linux: Integrate `global-hotkey` crate
-   - Platform-specific hotkey registration
-   - Hotkey conflict detection
+   - ✅ Integrated Tauri v2 `global-shortcut` plugin for all platforms
+   - ✅ Hotkey registration with keyboard switching
+   - ✅ Default hotkey extraction from KM2 files
+   - ✅ User hotkey preferences preserved (including explicit None)
+   - ✅ Event-based hotkey handling with proper state synchronization
 
-2. **Keyboard Features**
-   - Icon extraction from KM2 files
-   - Keyboard validation and hash checking
+2. **State Synchronization**
+   - ✅ Fixed keyboard activation state sync between UI components
+   - ✅ Unified event system (`active_keyboard_changed`)
+   - ✅ Consistent updates across keyboard list, tray menu, and hotkeys
+
+#### ⏳ Remaining Tasks for Full Feature Parity:
+
+1. **Keyboard Features**
    - Import wizard full implementation
    - Update checking with GitHub releases
+   - Keyboard validation improvements
 
-3. **Platform Integrations**
+2. **Platform Integrations**
    - D-Bus communication for IBus (Linux)
    - Language profile management (Windows TSF)
    - Registry notification system (Windows)
@@ -104,24 +112,34 @@ The IBus engine implementation has not been started yet. This will be the next m
 - [x] First-run detection
 - [x] All Tauri commands implemented
 - [x] Frontend platform detection
-- [ ] Global hotkey support (moved to next phase)
+- [x] Global hotkey support (COMPLETED - July 20, 2025)
 - [x] Keyboard metadata extraction (COMPLETED - July 20, 2025)
 
-### ⏳ Week 7-8: IBus Engine Development
+### ⏳ Week 7-8: Missing Features Implementation
+- [ ] Implement HUD/notification system
+- [ ] Add file association support (.km2 files)
+- [ ] Implement automatic update checking
+- [ ] Add keyboard validation command
+- [ ] Create bundled keyboard import
+
+### ⏳ Week 9-10: IBus Engine Development
 - [ ] Create IBus engine skeleton
 - [ ] Implement FFI bridge to keymagic-core
 - [ ] Add preedit text handling
 - [ ] Implement keyboard switching
+- [ ] D-Bus integration for GUI communication
 
-### ⏳ Week 9-10: Integration and Testing
+### ⏳ Week 11-12: Integration and Testing
 - [ ] Connect GUI with IBus via D-Bus
+- [ ] Implement language profile management
 - [ ] Test keyboard switching flow
 - [ ] Fix platform-specific bugs
 - [ ] Performance optimization
 
-### ⏳ Week 11-12: Packaging and Documentation
-- [ ] Create .deb package
-- [ ] Create .rpm package
+### ⏳ Week 13-14: Packaging and Documentation
+- [ ] Create .deb package with file associations
+- [ ] Create .rpm package with file associations
+- [ ] Set up automatic update infrastructure
 - [ ] Write installation guide
 - [ ] Document API for developers
 
@@ -167,12 +185,78 @@ installed = [
 ]
 ```
 
+## Missing Features from Windows GUI
+
+After comparing the new cross-platform GUI with the original Windows implementation, the following features need to be implemented for feature parity:
+
+### Critical Features
+
+1. **HUD (Heads-Up Display) Notifications**
+   - Visual feedback when switching keyboards
+   - Notification when minimizing to tray
+   - Platform-specific implementation needed (Linux: libnotify, macOS: NSUserNotification)
+
+2. **File Association Support**
+   - Handle .km2 files opened via double-click
+   - Command-line file argument parsing
+   - Drag-and-drop file import to main window
+
+3. **Language Profile Management**
+   - Windows: TSF integration for system language profiles
+   - Linux: IBus language profile management
+   - macOS: Input source management
+
+4. **Update System**
+   - Automatic update checking on startup (5-second delay)
+   - Platform-specific update manifests
+   - Update signature verification
+   - Silent background checking
+
+### Important Features
+
+5. **Advanced Keyboard Management**
+   - `validate_keyboards` command to check/remove invalid keyboards
+   - Keyboard icon extraction from embedded resources
+   - Key processing enable/disable at runtime
+
+6. **System Integration**
+   - Windows: Registry notification system for TSF instances
+   - Linux: D-Bus signals for IBus instances
+   - Inter-process communication for IME synchronization
+
+7. **Import/Export Enhancements**
+   - `import_bundled_keyboard` command
+   - Bundled keyboard status tracking (New/Updated/Modified)
+   - SHA-256 hash comparison for updates
+
+8. **First-Run Experience**
+   - First minimize notification
+   - Guided setup for new users
+   - Platform-specific onboarding
+
+### Platform-Specific Features
+
+9. **Windows-Specific**
+   - Low-level keyboard hook (currently using Tauri plugin)
+   - Registry-based settings (currently using TOML/registry hybrid)
+   - Elevated permissions for language profile updates
+
+10. **Linux-Specific**
+   - IBus engine integration
+   - Desktop notification integration
+   - XDG autostart support
+
 ## Next Steps
 
-1. **Implement Global Hotkeys** - Critical for keyboard switching
+1. ✅ **Implement Global Hotkeys** - Critical for keyboard switching (COMPLETED)
 2. ✅ **Keyboard Metadata Support** - Icons, descriptions from KM2 files (COMPLETED)
-3. **Begin IBus Engine Development** - Start with basic engine skeleton
-4. **Create Installation Packages** - .deb and .rpm for distribution
+3. **Implement HUD/Notifications** - Critical for user feedback
+4. **Add File Association Support** - Important for user workflow
+5. **Begin IBus Engine Development** - Start with basic engine skeleton
+6. **Implement Update System** - Automatic checking and platform manifests
+7. **Create Installation Packages** - .deb and .rpm for distribution
+8. **Add Missing Keyboard Management Features** - Validation, icon extraction
+9. **Implement Language Profile Management** - Platform-specific integration
 
 ## Success Criteria Progress
 
