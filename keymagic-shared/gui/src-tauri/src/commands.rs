@@ -344,24 +344,19 @@ pub fn open_keyboards_folder(_state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_composition_mode_processes(_state: State<AppState>) -> Result<Vec<String>, String> {
-    // This would need access to the platform config
-    // For now, return a default set
-    Ok(vec![
-        "firefox".to_string(),
-        "chrome".to_string(),
-        "code".to_string(),
-    ])
+pub fn get_composition_mode_processes(state: State<AppState>) -> Result<Vec<String>, String> {
+    let config = state.get_config();
+    Ok(config.composition_mode.enabled_processes.clone())
 }
 
 #[tauri::command]
 pub fn set_composition_mode_processes(
-    _state: State<AppState>,
-    _processes: Vec<String>,
+    state: State<AppState>,
+    processes: Vec<String>,
 ) -> Result<(), String> {
-    // This would update the platform config
-    // TODO: Implement when we have proper config access
-    Ok(())
+    let mut config = state.get_config();
+    config.composition_mode.enabled_processes = processes;
+    state.save_config(&config).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -601,76 +596,143 @@ pub fn remove_composition_mode_process(
 // Language profile commands (Windows-specific features)
 #[tauri::command]
 pub fn get_supported_languages(_state: State<AppState>) -> Result<Vec<(String, String)>, String> {
-    // TODO: Return list of supported languages
-    // For now, return a basic set
-    Ok(vec![
-        ("en".to_string(), "English".to_string()),
-        ("my".to_string(), "Myanmar (Burmese)".to_string()),
-        ("zh".to_string(), "Chinese".to_string()),
-        ("ja".to_string(), "Japanese".to_string()),
-        ("ko".to_string(), "Korean".to_string()),
-        ("th".to_string(), "Thai".to_string()),
-    ])
+    #[cfg(target_os = "windows")]
+    {
+        Ok(crate::windows_languages::get_all_languages())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Fallback for non-Windows platforms
+        Ok(vec![
+            ("en-US".to_string(), "English (United States)".to_string()),
+            ("my-MM".to_string(), "Myanmar".to_string()),
+            ("th-TH".to_string(), "Thai".to_string()),
+            ("km-KH".to_string(), "Khmer (Cambodia)".to_string()),
+            ("lo-LA".to_string(), "Lao".to_string()),
+            ("vi-VN".to_string(), "Vietnamese".to_string()),
+            ("id-ID".to_string(), "Indonesian".to_string()),
+            ("ms-MY".to_string(), "Malay".to_string()),
+            ("fil-PH".to_string(), "Filipino".to_string()),
+            ("zh-CN".to_string(), "Chinese (Simplified)".to_string()),
+            ("zh-TW".to_string(), "Chinese (Traditional)".to_string()),
+            ("ja-JP".to_string(), "Japanese".to_string()),
+            ("ko-KR".to_string(), "Korean".to_string()),
+        ])
+    }
 }
 
 #[tauri::command]
-pub fn get_enabled_languages(_state: State<AppState>) -> Result<Vec<String>, String> {
-    // TODO: Return list of currently enabled language codes
-    Ok(vec!["en".to_string()])
+pub fn get_enabled_languages(state: State<AppState>) -> Result<Vec<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        state.get_platform()
+            .get_enabled_languages()
+            .map_err(|e| e.to_string())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    Ok(vec!["en-US".to_string()])
 }
 
 #[tauri::command]
 pub fn search_languages(_state: State<AppState>, query: String) -> Result<Vec<(String, String)>, String> {
-    // TODO: Implement language search
-    // For now, just filter the basic set
-    let all_languages = vec![
-        ("en", "English"),
-        ("my", "Myanmar (Burmese)"),
-        ("zh", "Chinese"),
-        ("ja", "Japanese"),
-        ("ko", "Korean"),
-        ("th", "Thai"),
-    ];
+    #[cfg(target_os = "windows")]
+    {
+        Ok(crate::windows_languages::search_languages(&query))
+    }
     
-    let query_lower = query.to_lowercase();
-    let results: Vec<(String, String)> = all_languages
-        .into_iter()
-        .filter(|(code, name)| {
-            code.to_lowercase().contains(&query_lower) || 
-            name.to_lowercase().contains(&query_lower)
-        })
-        .map(|(code, name)| (code.to_string(), name.to_string()))
-        .collect();
-    
-    Ok(results)
+    #[cfg(not(target_os = "windows"))]
+    {
+        // For non-Windows, just filter the default list
+        let all_languages = get_supported_languages(_state)?;
+        let query_lower = query.to_lowercase();
+        Ok(all_languages.into_iter()
+            .filter(|(code, name)| {
+                code.to_lowercase().contains(&query_lower) || 
+                name.to_lowercase().contains(&query_lower)
+            })
+            .collect())
+    }
 }
 
 #[tauri::command]
 pub fn set_enabled_languages(
-    _state: State<AppState>,
-    _languages: Vec<String>,
+    state: State<AppState>,
+    languages: Vec<String>,
 ) -> Result<(), String> {
-    // TODO: Update enabled languages in system
-    // This might require elevation on Windows
+    #[cfg(target_os = "windows")]
+    {
+        // First update platform storage
+        state.get_platform()
+            .set_enabled_languages(&languages)
+            .map_err(|e| e.to_string())?;
+        
+        // Try to update TSF language profiles directly first
+        match crate::language_profiles::update_language_profiles(&languages) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // If it fails (likely due to permissions), return a special error
+                Err(format!("ELEVATION_REQUIRED: {}", e))
+            }
+        }
+    }
+    
+    #[cfg(not(target_os = "windows"))]
     Ok(())
 }
 
 #[tauri::command]
 pub fn apply_language_changes_elevated(
     _state: State<AppState>,
-    _languages: Vec<String>,
+    languages: Vec<String>,
 ) -> Result<(), String> {
-    // TODO: Apply language changes with elevation
-    // This is Windows-specific
     #[cfg(target_os = "windows")]
     {
-        // Would need to launch elevated process
-        return Err("ELEVATION_REQUIRED".to_string());
+        use std::env;
+        
+        // Get the path to our own executable
+        let exe_path = env::current_exe()
+            .map_err(|e| format!("Failed to get executable path: {}", e))?;
+        
+        // Join languages with commas
+        let languages_str = languages.join(",");
+        
+        // Launch elevated process with hidden window
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        
+        let output = Command::new("powershell")
+            .args(&[
+                "-WindowStyle", "Hidden",
+                "-Command",
+                &format!(
+                    "Start-Process '{}' -ArgumentList '--update-languages','{}' -Verb RunAs -Wait -WindowStyle Hidden",
+                    exe_path.display(),
+                    languages_str
+                ),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("Failed to launch elevated process: {}", e))?;
+        
+        if output.status.success() {
+            Ok(())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("canceled") {
+                Err("ELEVATION_CANCELLED".to_string())
+            } else {
+                Err(format!("Failed to apply language changes: {}", stderr))
+            }
+        }
     }
     
     #[cfg(not(target_os = "windows"))]
     {
-        return Err("This feature is only available on Windows".to_string());
+        let _ = languages;
+        Err("This feature is only available on Windows".to_string())
     }
 }
 

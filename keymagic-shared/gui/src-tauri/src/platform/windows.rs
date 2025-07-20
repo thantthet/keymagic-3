@@ -409,4 +409,40 @@ impl Platform for WindowsBackend {
         }
         None
     }
+    
+    fn get_enabled_languages(&self) -> Result<Vec<String>> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        
+        // Read EnabledLanguages from Settings key
+        if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
+            if let Ok(languages_str) = settings_key.get_value::<String, _>("EnabledLanguages") {
+                // Split by semicolon
+                let languages: Vec<String> = languages_str
+                    .split(';')
+                    .filter(|s| !s.trim().is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect();
+                    
+                if !languages.is_empty() {
+                    return Ok(languages);
+                }
+            }
+        }
+        
+        // Default to English if nothing is set
+        Ok(vec!["en-US".to_string()])
+    }
+    
+    fn set_enabled_languages(&self, languages: &[String]) -> Result<()> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (settings_key, _) = hkcu
+            .create_subkey(SETTINGS_KEY)
+            .context("Failed to create Settings key")?;
+        
+        // Save as semicolon-delimited string
+        let languages_str = languages.join(";");
+        settings_key.set_value("EnabledLanguages", &languages_str)?;
+        
+        Ok(())
+    }
 }

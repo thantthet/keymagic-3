@@ -8,6 +8,15 @@ mod tray;
 #[cfg(target_os = "windows")]
 mod hud_win32;
 
+#[cfg(target_os = "windows")]
+mod keyboard_icon;
+
+#[cfg(target_os = "windows")]
+mod language_profiles;
+
+#[cfg(target_os = "windows")]
+mod windows_languages;
+
 use commands::AppState;
 use core::KeyboardManager;
 use hotkey::HotkeyManager;
@@ -203,6 +212,32 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Update language profiles when running with elevated privileges
+#[cfg(target_os = "windows")]
+pub fn update_languages_elevated(languages_str: &str) -> anyhow::Result<()> {
+    use anyhow::anyhow;
+    
+    // Parse comma-separated language codes
+    let languages: Vec<String> = languages_str
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    
+    if languages.is_empty() {
+        return Err(anyhow!("No languages provided"));
+    }
+    
+    // Update the language profiles
+    crate::language_profiles::update_language_profiles(&languages)
+        .map_err(|e| anyhow!("Failed to update language profiles: {}", e))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn update_languages_elevated(_languages_str: &str) -> anyhow::Result<()> {
+    Ok(())
 }
 
 // State to track first minimize

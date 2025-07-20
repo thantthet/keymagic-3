@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::WindowsBackend as PlatformBackend;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -106,6 +108,15 @@ pub trait Platform: Send + Sync {
     
     fn unregister_language_profile(&self, _keyboard_id: &str) -> Result<()> {
         Ok(())
+    }
+    
+    // Language profile management
+    fn get_enabled_languages(&self) -> Result<Vec<String>> {
+        Ok(vec!["en-US".to_string()]) // Default implementation
+    }
+    
+    fn set_enabled_languages(&self, _languages: &[String]) -> Result<()> {
+        Ok(()) // Default implementation - no-op
     }
     
     // Settings management

@@ -409,6 +409,7 @@ async function addProcessToCompositionMode() {
   try {
     await invoke('add_composition_mode_process', { processName });
     await loadCompositionModeProcesses();
+    showSuccess(`Added "${processName}" to composition mode`);
   } catch (error) {
     console.error('Failed to add process:', error);
     showError('Failed to add process to composition mode');
@@ -419,6 +420,7 @@ async function removeProcessFromCompositionMode(processName) {
   try {
     await invoke('remove_composition_mode_process', { processName });
     await loadCompositionModeProcesses();
+    showSuccess(`Removed "${processName}" from composition mode`);
   } catch (error) {
     console.error('Failed to remove process:', error);
     showError('Failed to remove process from composition mode');

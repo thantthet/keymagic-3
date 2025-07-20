@@ -2331,6 +2331,7 @@ dependencies = [
  "log",
  "notify-rust",
  "objc",
+ "once_cell",
  "serde",
  "serde_json",
  "sha2",
