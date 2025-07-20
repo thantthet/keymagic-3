@@ -9,7 +9,12 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::{Result, anyhow};
 use log::{debug, error};
 
-static HUD_INSTANCE: OnceLock<Mutex<HWND>> = OnceLock::new();
+// Use a wrapper type that implements Send + Sync
+struct HwndWrapper(HWND);
+unsafe impl Send for HwndWrapper {}
+unsafe impl Sync for HwndWrapper {}
+
+static HUD_INSTANCE: OnceLock<Mutex<HwndWrapper>> = OnceLock::new();
 
 const HUD_TIMER_ID: usize = 1;
 const HUD_DISPLAY_TIME_MS: u32 = 1500;
@@ -36,7 +41,7 @@ pub fn initialize_hud() -> Result<()> {
             hInstance: instance.into(),
             hIcon: HICON::default(),
             hCursor: LoadCursorW(HINSTANCE::default(), IDC_ARROW)?,
-            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize as *mut c_void),
             lpszMenuName: PCWSTR::null(),
             lpszClassName: class_name,
             hIconSm: HICON::default(),
@@ -44,11 +49,8 @@ pub fn initialize_hud() -> Result<()> {
 
         let atom = RegisterClassExW(&wc);
         if atom == 0 {
-            let err = GetLastError();
-            if err != Ok(()) {
-                // Check if it's not already registered
-                // For now, continue even if registration failed
-            }
+            // Check if it's not already registered
+            // For now, continue even if registration failed
         }
 
         // Create window
@@ -64,14 +66,15 @@ pub fn initialize_hud() -> Result<()> {
             None,
         );
 
-        if hwnd.0 == 0 {
+        let hwnd = hwnd?;
+        if hwnd.0.is_null() {
             return Err(anyhow!("Failed to create HUD window"));
         }
         
         debug!("HUD window created successfully: {:?}", hwnd);
 
         // Store window handle
-        HUD_INSTANCE.set(Mutex::new(hwnd))
+        HUD_INSTANCE.set(Mutex::new(HwndWrapper(hwnd)))
             .map_err(|_| anyhow!("Failed to store HUD window handle"))?;
             
         debug!("HUD initialization complete");
@@ -92,7 +95,7 @@ pub fn show_keyboard_hud(keyboard_name: &str) -> Result<()> {
                 let text_ptr = Box::into_raw(Box::new(text_wide));
                 
                 // Send message to show HUD
-                let result = PostMessageW(*hwnd, WM_SHOW_HUD, WPARAM(0), LPARAM(text_ptr as isize));
+                let result = PostMessageW(hwnd.0, WM_SHOW_HUD, WPARAM(0), LPARAM(text_ptr as isize));
                 if result.is_err() {
                     error!("Failed to post message: {:?}", result);
                 }

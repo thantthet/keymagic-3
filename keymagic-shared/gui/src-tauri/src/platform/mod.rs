@@ -4,8 +4,6 @@ use std::path::PathBuf;
 
 #[cfg(target_os = "windows")]
 mod windows;
-#[cfg(target_os = "windows")]
-pub use windows::WindowsBackend as PlatformBackend;
 
 #[cfg(target_os = "linux")]
 mod linux;
