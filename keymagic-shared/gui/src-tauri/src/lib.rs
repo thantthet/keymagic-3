@@ -1,12 +1,17 @@
 mod commands;
 mod core;
 mod hotkey;
+mod notification;
 mod platform;
 mod tray;
+
+#[cfg(target_os = "windows")]
+mod hud_win32;
 
 use commands::AppState;
 use core::KeyboardManager;
 use hotkey::HotkeyManager;
+use notification::NotificationManager;
 use platform::create_platform;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -36,9 +41,22 @@ pub fn run() {
             // Create hotkey manager
             let hotkey_manager = Arc::new(HotkeyManager::new());
             
+            // Initialize Windows HUD if on Windows
+            #[cfg(target_os = "windows")]
+            {
+                if let Err(e) = crate::hud_win32::initialize_hud() {
+                    log::warn!("Failed to initialize Windows HUD: {}", e);
+                }
+            }
+            
+            // Create notification manager
+            let notification_manager = Arc::new(NotificationManager::new(app.handle().clone()));
+            
             // Store in app state
             app.manage(keyboard_manager.clone() as AppState);
             app.manage(hotkey_manager.clone());
+            app.manage(notification_manager.clone());
+            app.manage(FirstMinimizeState::new());
             
             // Create system tray
             tray::create_tray_icon(app.handle())?;
@@ -64,6 +82,7 @@ pub fn run() {
                 
                 let km_for_handler = keyboard_manager.clone();
                 let hm_for_handler = hotkey_manager.clone();
+                let nm_for_handler = notification_manager.clone();
                 let app_handle = app.handle().clone();
                 
                 app.handle().plugin(
@@ -78,6 +97,21 @@ pub fn run() {
                                     if let Err(e) = km_for_handler.set_active_keyboard(&keyboard_id) {
                                         log::error!("Failed to switch to keyboard '{}': {}", keyboard_id, e);
                                         return;
+                                    }
+                                    
+                                    // Get keyboard info for the notification
+                                    if let Some(keyboard) = km_for_handler.get_keyboard(&keyboard_id) {
+                                        // Show HUD notification
+                                        let nm = nm_for_handler.clone();
+                                        let kb_name = keyboard.name.clone();
+                                        let icon_data = keyboard.icon_data.clone();
+                                        std::thread::spawn(move || {
+                                            if let Err(e) = futures::executor::block_on(
+                                                nm.show_keyboard_switch(&kb_name, icon_data)
+                                            ) {
+                                                log::error!("Failed to show HUD notification: {}", e);
+                                            }
+                                        });
                                     }
                                     
                                     // Update tray menu
@@ -139,6 +173,50 @@ pub fn run() {
             commands::get_registered_hotkeys,
             commands::refresh_hotkeys,
         ])
+        .on_window_event(|window, event| {
+            use tauri::WindowEvent;
+            
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    // Hide window instead of closing
+                    api.prevent_close();
+                    let _ = window.hide();
+                    
+                    // Check if this is the first minimize
+                    let app_handle = window.app_handle();
+                    if app_handle.state::<FirstMinimizeState>().is_first() {
+                        // Show notification
+                        if let Some(nm) = app_handle.try_state::<Arc<NotificationManager>>() {
+                            let nm = nm.inner().clone();
+                            std::thread::spawn(move || {
+                                if let Err(e) = futures::executor::block_on(
+                                    nm.show_tray_notification()
+                                ) {
+                                    log::error!("Failed to show tray notification: {}", e);
+                                }
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// State to track first minimize
+struct FirstMinimizeState(std::sync::Mutex<bool>);
+
+impl FirstMinimizeState {
+    fn new() -> Self {
+        Self(std::sync::Mutex::new(true))
+    }
+    
+    fn is_first(&self) -> bool {
+        let mut first = self.0.lock().unwrap();
+        let was_first = *first;
+        *first = false;
+        was_first
+    }
 }
