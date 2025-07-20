@@ -71,6 +71,47 @@ impl WindowsBackend {
     }
 }
 
+/// Notify Windows TSF (Text Services Framework) about keyboard changes
+#[cfg(target_os = "windows")]
+fn notify_tsf_change() -> Result<()> {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SendMessageTimeoutW, HWND_BROADCAST, WM_SETTINGCHANGE, 
+        SMTO_ABORTIFHUNG, SMTO_NORMAL
+    };
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    
+    unsafe {
+        // Broadcast WM_SETTINGCHANGE to notify all windows about input method changes
+        let param = HSTRING::from("ImmConfigureIME");
+        
+        let mut result = 0;
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            WPARAM(0),
+            LPARAM(param.as_ptr() as isize),
+            SMTO_ABORTIFHUNG | SMTO_NORMAL,
+            5000, // 5 second timeout
+            Some(&mut result),
+        );
+        
+        // Also try with TsfLanguageProfileNotifySink for better compatibility
+        let param2 = HSTRING::from("TsfLanguageProfileNotifySink");
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            WPARAM(0),
+            LPARAM(param2.as_ptr() as isize),
+            SMTO_ABORTIFHUNG | SMTO_NORMAL,
+            5000, // 5 second timeout
+            Some(&mut result),
+        );
+        
+        Ok(())
+    }
+}
+
 impl Platform for WindowsBackend {
     fn load_config(&self) -> Result<Config> {
         let mut config = Self::default_config();
@@ -229,7 +270,12 @@ impl Platform for WindowsBackend {
         
         settings_key.set_value(DEFAULT_KEYBOARD_VALUE, &keyboard_id)?;
         
-        // TODO: Send notification to TSF text service
+        // Send notification to TSF text service
+        // Note: This would normally call a function similar to notify_language_profile_change
+        // from the language_profiles module, but since we're in a different crate,
+        // we're using our own implementation here
+        notify_tsf_change()?;
+        
         Ok(())
     }
     

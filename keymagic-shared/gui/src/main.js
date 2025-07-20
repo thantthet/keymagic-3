@@ -835,17 +835,21 @@ window.checkForUpdates = async function() {
 // Show update window
 window.showUpdateWindow = async function(updateInfo) {
   try {
-    // TODO: Implement remind me later logic when settings are properly implemented
     // Check if we should show the update (remind me later logic)
-    // const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
-    // if (remindAfterStr) {
-    //   const remindAfter = parseInt(remindAfterStr);
-    //   if (!isNaN(remindAfter) && Date.now() < remindAfter) {
-    //     // Still in "remind later" period, don't show window
-    //     console.log('Update window skipped due to remind later setting');
-    //     return;
-    //   }
-    // }
+    try {
+      const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
+      if (remindAfterStr) {
+        const remindAfter = parseInt(remindAfterStr);
+        if (!isNaN(remindAfter) && Date.now() < remindAfter) {
+          // Still in "remind later" period, don't show window
+          console.log('Update window skipped due to remind later setting');
+          return;
+        }
+      }
+    } catch (e) {
+      // If get_setting fails, continue showing the update
+      console.log('Could not check remind later setting:', e);
+    }
     
     // Create update window
     const { WebviewWindow } = window.__TAURI__.webviewWindow;
@@ -874,9 +878,13 @@ async function loadCurrentVersion() {
   try {
     const currentVersionElement = document.getElementById('current-version');
     if (currentVersionElement) {
-      // TODO: Implement get_app_version in backend
-      // For now, use a placeholder
-      currentVersionElement.textContent = '2.0.0';
+      try {
+        const version = await invoke('get_app_version');
+        currentVersionElement.textContent = version;
+      } catch (error) {
+        console.error('Failed to get app version:', error);
+        currentVersionElement.textContent = '2.0.0';
+      }
     }
   } catch (error) {
     console.error('Failed to load current version:', error);
@@ -892,9 +900,13 @@ async function loadAboutVersion() {
   try {
     const aboutVersionElement = document.getElementById('about-version');
     if (aboutVersionElement) {
-      // TODO: Implement get_app_version in backend
-      // For now, use a placeholder
-      aboutVersionElement.textContent = '2.0.0';
+      try {
+        const version = await invoke('get_app_version');
+        aboutVersionElement.textContent = version;
+      } catch (error) {
+        console.error('Failed to get app version:', error);
+        aboutVersionElement.textContent = '2.0.0';
+      }
     }
   } catch (error) {
     console.error('Failed to load about version:', error);
@@ -1360,7 +1372,6 @@ async function setupTrayEventListeners() {
   await listen('active_keyboard_changed', async (event) => {
     activeKeyboardId = event.payload;
     renderKeyboardList();
-    // TODO: Show HUD notification when keyboard switched via hotkey
   });
   
   // Listen for check for updates event from tray
