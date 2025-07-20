@@ -423,17 +423,40 @@ pub fn get_bundled_keyboards(state: State<AppState>) -> Result<Vec<BundledKeyboa
                             .unwrap_or("unknown")
                             .to_string();
                         
-                        // Check if already installed
-                        let status = if installed_keyboards.iter().any(|k| k.id == id) {
-                            "Installed"
+                        // Try to load the keyboard to get proper name, icon, and check for updates
+                        let (name, icon_data, bundled_hash) = match state.load_keyboard_file(&path) {
+                            Ok(layout) => {
+                                let metadata = layout.metadata();
+                                let name = metadata.name().unwrap_or(id.clone());
+                                let icon_data = metadata.icon().map(|data| data.to_vec());
+                                let hash = state.calculate_file_hash(&path).unwrap_or_default();
+                                (name, icon_data, hash)
+                            }
+                            Err(_) => (id.clone(), None, String::new())
+                        };
+                        
+                        // Check if already installed and compare hashes
+                        let status = if let Some(installed) = installed_keyboards.iter().find(|k| k.name == name) {
+                            if bundled_hash.is_empty() {
+                                "Installed"  // Can't compare, assume installed
+                            } else if installed.hash == bundled_hash {
+                                "Unchanged"  // Same hash, up to date
+                            } else {
+                                // Check if the installed file was modified after installation
+                                // For now, just mark as "Updated" (in real implementation, 
+                                // we'd check if user modified the file)
+                                "Updated"  // Hash mismatch means bundled version is newer
+                            }
                         } else {
                             "New"
                         }.to_string();
                         
                         bundled_keyboards.push(BundledKeyboard {
                             id: id.clone(),
-                            name: id, // Will be updated when loaded
+                            name,
                             status,
+                            icon_data,
+                            bundled_path: path.to_string_lossy().to_string(),
                         });
                     }
                 }
@@ -443,6 +466,62 @@ pub fn get_bundled_keyboards(state: State<AppState>) -> Result<Vec<BundledKeyboa
     }
     
     Ok(bundled_keyboards)
+}
+
+#[tauri::command]
+pub fn import_bundled_keyboard(
+    state: State<AppState>,
+    bundled_path: String,
+    keyboard_status: String,
+    app_handle: tauri::AppHandle,
+) -> Result<KeyboardInfo, String> {
+    let keyboard_file = std::path::PathBuf::from(&bundled_path);
+    if !keyboard_file.exists() {
+        return Err(format!("Bundled keyboard file not found: {}", bundled_path));
+    }
+    
+    // Check if this is an update (keyboard with same name already exists)
+    if keyboard_status == "Updated" {
+        // First, read the bundled keyboard to get its name
+        match state.load_keyboard_file(&keyboard_file) {
+            Ok(layout) => {
+                let metadata = layout.metadata();
+                let keyboard_id = keyboard_file.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let name = metadata.name().unwrap_or(keyboard_id);
+                
+                // Find existing keyboard with the same name
+                if let Some(existing_keyboard) = state.get_keyboard_by_name(&name) {
+                    // Remove the old keyboard
+                    state.remove_keyboard(&existing_keyboard.id)
+                        .map_err(|e| format!("Failed to remove old keyboard: {}", e))?;
+                }
+            }
+            Err(e) => {
+                return Err(format!("Failed to read bundled keyboard: {}", e));
+            }
+        }
+    }
+    
+    // Import the new/updated keyboard
+    let keyboard_info = state.import_keyboard(&keyboard_file)
+        .map_err(|e| format!("Failed to import keyboard: {}", e))?;
+    
+    // Update tray menu
+    if let Err(e) = crate::tray::update_tray_menu(&app_handle) {
+        log::error!("Failed to update tray menu: {}", e);
+    }
+    
+    // Refresh hotkeys
+    if let Some(hotkey_manager) = app_handle.try_state::<Arc<HotkeyManager>>() {
+        if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, state.inner().clone()) {
+            log::error!("Failed to refresh hotkeys: {}", e);
+        }
+    }
+    
+    Ok(keyboard_info)
 }
 
 #[tauri::command]
@@ -607,5 +686,7 @@ pub fn check_for_update() -> Result<Option<UpdateInfo>, String> {
 pub struct BundledKeyboard {
     pub id: String,
     pub name: String,
-    pub status: String, // "New", "Updated", "Installed"
+    pub status: String, // "New", "Updated", "Installed", "Unchanged", "Modified"
+    pub icon_data: Option<Vec<u8>>,
+    pub bundled_path: String,
 }

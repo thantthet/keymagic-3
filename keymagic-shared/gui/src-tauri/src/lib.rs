@@ -123,6 +123,7 @@ pub fn run() {
             commands::get_app_version,
             commands::check_first_run_scan_keyboards,
             commands::get_bundled_keyboards,
+            commands::import_bundled_keyboard,
             commands::clear_first_run_scan_keyboards,
             commands::get_setting,
             commands::set_setting,

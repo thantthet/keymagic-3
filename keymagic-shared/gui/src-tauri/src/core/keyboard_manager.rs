@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use keymagic_core::{KeyMagicEngine, Km2File, km2::Km2Loader};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -261,6 +261,13 @@ impl KeyboardManager {
         self.keyboards.lock().unwrap().get(keyboard_id).cloned()
     }
     
+    pub fn get_keyboard_by_name(&self, name: &str) -> Option<KeyboardInfo> {
+        self.keyboards.lock().unwrap()
+            .values()
+            .find(|kb| kb.name == name)
+            .cloned()
+    }
+    
     pub fn get_engine(&self) -> Arc<Mutex<Option<KeyMagicEngine>>> {
         self.engine.clone()
     }
@@ -281,34 +288,70 @@ impl KeyboardManager {
         let layout = self.load_keyboard_file(file_path)?;
         
         // Generate keyboard info
-        let filename = file_path.file_name()
+        let original_filename = file_path.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown.km2")
             .to_string();
         
-        let id = file_path.file_stem()
+        let original_id = file_path.file_stem()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
         
         let metadata = layout.metadata();
-        let name = metadata.name().unwrap_or(id.clone());
+        let name = metadata.name().unwrap_or(original_id.clone());
         let description = metadata.description().map(|s| s.to_string());
         let icon_data = metadata.icon().map(|data| data.to_vec());
         let default_hotkey = metadata.hotkey();
         let hash = self.calculate_file_hash(file_path)?;
         
+        // Generate unique ID and filename if a file with same name exists
+        let keyboards_dir = self.platform.get_keyboards_dir();
+        let mut final_id = original_id.clone();
+        let mut final_filename = original_filename.clone();
+        let mut dest_path = keyboards_dir.join(&final_filename);
+        
+        if dest_path.exists() && dest_path != file_path {
+            // Generate a unique ID using timestamp and random component
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            
+            // Simple random number (not cryptographically secure, but sufficient for this use case)
+            let random_part = std::process::id() ^ (timestamp as u32);
+            
+            final_id = format!("{}_{:x}_{}", original_id, random_part, timestamp % 1000);
+            final_filename = format!("{}_{:x}_{}.km2", 
+                original_id, random_part, timestamp % 1000);
+            dest_path = keyboards_dir.join(&final_filename);
+            
+            // In the unlikely event this still exists, add a counter
+            let mut counter = 1;
+            while dest_path.exists() && counter < 100 {
+                final_id = format!("{}_{}_{:x}_{}", original_id, counter, random_part, timestamp % 1000);
+                final_filename = format!("{}_{}_{:x}_{}.km2", 
+                    original_id, counter, random_part, timestamp % 1000);
+                dest_path = keyboards_dir.join(&final_filename);
+                counter += 1;
+            }
+            
+            if dest_path.exists() {
+                return Err(anyhow!("Unable to generate unique keyboard filename"));
+            }
+        }
+        
         // Copy to keyboards directory
-        let dest_path = self.platform.get_keyboards_dir().join(&filename);
         if dest_path != file_path {
             fs::create_dir_all(dest_path.parent().unwrap())?;
             fs::copy(file_path, &dest_path)?;
         }
         
         let keyboard_info = KeyboardInfo {
-            id: id.clone(),
+            id: final_id.clone(),
             name,
-            filename,
+            filename: final_filename,
             path: dest_path,
             hotkey: default_hotkey,
             hash,
@@ -322,7 +365,7 @@ impl KeyboardManager {
         
         // Register with platform if supported
         if self.platform.supports_language_profiles() {
-            self.platform.register_language_profile(&id)?;
+            self.platform.register_language_profile(&final_id)?;
         }
         
         Ok(keyboard_info)
@@ -336,7 +379,7 @@ impl KeyboardManager {
             .context("Failed to parse keyboard file")
     }
     
-    fn calculate_file_hash(&self, path: &Path) -> Result<String> {
+    pub fn calculate_file_hash(&self, path: &Path) -> Result<String> {
         use std::io::Read;
         use sha2::{Sha256, Digest};
         
