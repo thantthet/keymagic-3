@@ -37,6 +37,9 @@ Thumbs.db
 ._*
 keymagic-windows/target
 keymagic-windows/tsf/build
+keymagic-windows/tsf/build-*/
+keymagic-windows/test-build/
+keymagic-windows/*.obj
 .claude
 CLAUDE.local.md
 build-*/
