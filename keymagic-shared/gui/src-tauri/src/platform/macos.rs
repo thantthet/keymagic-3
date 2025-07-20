@@ -1,5 +1,5 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, KeyboardsConfig, Language,
+    CompositionModeConfig, Config, GeneralConfig, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
@@ -159,25 +159,5 @@ impl Platform for MacOSBackend {
                 system_tray: true,
             },
         }
-    }
-    
-    fn get_system_languages(&self) -> Result<Vec<Language>> {
-        let mut languages = Vec::new();
-        
-        // TODO: Get system languages from macOS
-        // For now, just return a basic set
-        languages.push(Language {
-            id: "en".to_string(),
-            name: "English".to_string(),
-            code: "en".to_string(),
-        });
-        
-        languages.push(Language {
-            id: "my".to_string(),
-            name: "Myanmar".to_string(),
-            code: "my".to_string(),
-        });
-        
-        Ok(languages)
     }
 }

@@ -54,13 +54,6 @@ pub struct CompositionModeConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Language {
-    pub id: String,
-    pub name: String,
-    pub code: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformInfo {
     pub os: String,
     pub features: PlatformFeatures,
@@ -97,9 +90,6 @@ pub trait Platform: Send + Sync {
     // Platform info
     fn get_platform_name(&self) -> &'static str;
     fn get_platform_info(&self) -> PlatformInfo;
-    
-    // System languages
-    fn get_system_languages(&self) -> Result<Vec<Language>>;
     
     // Optional platform-specific methods with default implementations
     fn register_language_profile(&self, _keyboard_id: &str) -> Result<()> {

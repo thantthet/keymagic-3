@@ -1,6 +1,6 @@
 use crate::core::{KeyboardInfo, KeyboardManager};
 use crate::hotkey::HotkeyManager;
-use crate::platform::{Language, PlatformInfo};
+use crate::platform::PlatformInfo;
 use keymagic_core::{KeyInput, VirtualKey};
 use keymagic_core::engine::ModifierState;
 use serde::{Deserialize, Serialize};
@@ -273,23 +273,6 @@ pub fn refresh_hotkeys(app: AppHandle, state: State<AppState>) -> Result<(), Str
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_system_languages(_state: State<AppState>) -> Result<Vec<Language>, String> {
-    // This would need access to the platform instance
-    // For now, return a basic set
-    Ok(vec![
-        Language {
-            id: "en".to_string(),
-            name: "English".to_string(),
-            code: "en".to_string(),
-        },
-        Language {
-            id: "my".to_string(),
-            name: "Myanmar".to_string(),
-            code: "my".to_string(),
-        },
-    ])
-}
 
 #[tauri::command]
 pub async fn check_for_updates() -> Result<Option<UpdateInfo>, String> {

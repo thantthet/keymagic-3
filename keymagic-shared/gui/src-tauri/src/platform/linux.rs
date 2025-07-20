@@ -1,5 +1,5 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig, Language,
+    CompositionModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
@@ -162,39 +162,5 @@ impl Platform for LinuxBackend {
                 system_tray: true,
             },
         }
-    }
-    
-    fn get_system_languages(&self) -> Result<Vec<Language>> {
-        // Get system locales
-        let mut languages = Vec::new();
-        
-        // Parse locale -a output
-        if let Ok(output) = std::process::Command::new("locale")
-            .arg("-a")
-            .output()
-        {
-            if let Ok(locales) = String::from_utf8(output.stdout) {
-                for locale in locales.lines() {
-                    if let Some(lang_code) = locale.split('.').next() {
-                        languages.push(Language {
-                            id: lang_code.to_string(),
-                            name: lang_code.to_string(), // TODO: Get proper display name
-                            code: lang_code.to_string(),
-                        });
-                    }
-                }
-            }
-        }
-        
-        // Always include Myanmar
-        if !languages.iter().any(|l| l.code == "my" || l.code == "my_MM") {
-            languages.push(Language {
-                id: "my".to_string(),
-                name: "Myanmar".to_string(),
-                code: "my".to_string(),
-            });
-        }
-        
-        Ok(languages)
     }
 }
