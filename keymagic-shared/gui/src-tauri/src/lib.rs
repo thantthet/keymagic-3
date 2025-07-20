@@ -18,6 +18,9 @@ mod language_profiles;
 #[cfg(target_os = "windows")]
 mod windows_languages;
 
+#[cfg(target_os = "windows")]
+mod windows_event;
+
 use commands::AppState;
 use core::KeyboardManager;
 use hotkey::HotkeyManager;
@@ -34,7 +37,7 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
+                        .level(log::LevelFilter::Debug)
                         .build(),
                 )?;
             }

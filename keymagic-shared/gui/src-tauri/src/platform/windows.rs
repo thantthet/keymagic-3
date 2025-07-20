@@ -71,45 +71,28 @@ impl WindowsBackend {
     }
 }
 
-/// Notify Windows TSF (Text Services Framework) about keyboard changes
+/// Notify Windows TSF (Text Services Framework) about registry changes using events
 #[cfg(target_os = "windows")]
-fn notify_tsf_change() -> Result<()> {
-    use windows::core::HSTRING;
-    use windows::Win32::UI::WindowsAndMessaging::{
-        SendMessageTimeoutW, HWND_BROADCAST, WM_SETTINGCHANGE, 
-        SMTO_ABORTIFHUNG, SMTO_NORMAL
-    };
-    use windows::Win32::Foundation::{LPARAM, WPARAM};
+fn notify_registry_change() -> Result<()> {
+    use log::{debug, error};
     
-    unsafe {
-        // Broadcast WM_SETTINGCHANGE to notify all windows about input method changes
-        let param = HSTRING::from("ImmConfigureIME");
-        
-        let mut result = 0;
-        SendMessageTimeoutW(
-            HWND_BROADCAST,
-            WM_SETTINGCHANGE,
-            WPARAM(0),
-            LPARAM(param.as_ptr() as isize),
-            SMTO_ABORTIFHUNG | SMTO_NORMAL,
-            5000, // 5 second timeout
-            Some(&mut result),
-        );
-        
-        // Also try with TsfLanguageProfileNotifySink for better compatibility
-        let param2 = HSTRING::from("TsfLanguageProfileNotifySink");
-        SendMessageTimeoutW(
-            HWND_BROADCAST,
-            WM_SETTINGCHANGE,
-            WPARAM(0),
-            LPARAM(param2.as_ptr() as isize),
-            SMTO_ABORTIFHUNG | SMTO_NORMAL,
-            5000, // 5 second timeout
-            Some(&mut result),
-        );
-        
-        Ok(())
+    debug!("[Registry Notifier] Sending registry update notification to TSF instances via Windows Event");
+    
+    // Use the Windows Event approach for registry update notification
+    match crate::windows_event::WindowsEvent::create_or_open() {
+        Ok(event) => {
+            // Signal the event to notify TSF service about registry changes
+            event.signal()
+                .map_err(|e| anyhow::anyhow!("Failed to signal registry update event: {:?}", e))?;
+            debug!("[Registry Notifier] Registry update event signaled successfully");
+        }
+        Err(e) => {
+            error!("[Registry Notifier] Failed to create/open registry update event: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to create/open registry update event: {:?}", e));
+        }
     }
+    
+    Ok(())
 }
 
 impl Platform for WindowsBackend {
@@ -270,11 +253,8 @@ impl Platform for WindowsBackend {
         
         settings_key.set_value(DEFAULT_KEYBOARD_VALUE, &keyboard_id)?;
         
-        // Send notification to TSF text service
-        // Note: This would normally call a function similar to notify_language_profile_change
-        // from the language_profiles module, but since we're in a different crate,
-        // we're using our own implementation here
-        notify_tsf_change()?;
+        // Send notification to TSF text service about registry changes
+        notify_registry_change()?;
         
         Ok(())
     }
