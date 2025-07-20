@@ -27,37 +27,23 @@ begin
   end;
 end;
 
-// Find and schedule old TSF DLLs for deletion
-procedure CleanupOldTSFDLLs(TSFDir: String; CurrentDLLName: String);
+// Helper to schedule entire directory for deletion
+procedure ScheduleDirectoryForDeletion(DirPath: String);
 var
   FindRec: TFindRec;
-  DLLPath: String;
-  ResultCode: Integer;
+  FilePath: String;
 begin
-  // Find all KeyMagicTSF_*.dll files
-  if FindFirst(TSFDir + '\KeyMagicTSF_*.dll', FindRec) then
+  // Schedule all files in directory for deletion
+  if FindFirst(DirPath + '\*', FindRec) then
   begin
     try
       repeat
-        // Skip the current version DLL
-        if FindRec.Name <> CurrentDLLName then
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') then
         begin
-          DLLPath := TSFDir + '\' + FindRec.Name;
-          Log('Found old TSF DLL: ' + DLLPath);
-          
-          // Try to unregister it first (ignore errors as it might fail if in use)
-          Exec('regsvr32.exe', '/s /u "' + DLLPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-          
-          // Try to delete it
-          if not DeleteFile(DLLPath) then
+          FilePath := DirPath + '\' + FindRec.Name;
+          if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY = 0) then
           begin
-            // If deletion fails (likely because it's in use), schedule for deletion on restart
-            Log('Scheduling for deletion on restart: ' + DLLPath);
-            ScheduleFileForDeletion(DLLPath);
-          end
-          else
-          begin
-            Log('Deleted old TSF DLL: ' + DLLPath);
+            ScheduleFileForDeletion(FilePath);
           end;
         end;
       until not FindNext(FindRec);
@@ -65,6 +51,96 @@ begin
       FindClose(FindRec);
     end;
   end;
+end;
+
+// Helper to clean up old-style DLLs in TSF root (for backward compatibility)
+procedure CleanupOldTSFDLLsInRoot(TSFDir: String);
+var
+  FindRec: TFindRec;
+  DLLPath: String;
+  ResultCode: Integer;
+begin
+  // Find all KeyMagicTSF*.dll files in root TSF directory
+  if FindFirst(TSFDir + '\KeyMagicTSF*.dll', FindRec) then
+  begin
+    try
+      repeat
+        DLLPath := TSFDir + '\' + FindRec.Name;
+        Log('Found old-style TSF DLL in root: ' + DLLPath);
+        
+        // Try to unregister it first
+        Exec('regsvr32.exe', '/s /u "' + DLLPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        
+        // Try to delete it
+        if not DeleteFile(DLLPath) then
+        begin
+          Log('Scheduling for deletion on restart: ' + DLLPath);
+          ScheduleFileForDeletion(DLLPath);
+        end
+        else
+        begin
+          Log('Deleted old-style TSF DLL: ' + DLLPath);
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+// Find and schedule old TSF version directories for deletion
+procedure CleanupOldTSFVersions(TSFDir: String; CurrentVersionSuffix: String);
+var
+  FindRec: TFindRec;
+  VersionDir: String;
+  ResultCode: Integer;
+begin
+  // Find all subdirectories in TSF directory
+  if FindFirst(TSFDir + '\*', FindRec) then
+  begin
+    try
+      repeat
+        // Skip . and .. directories
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') and 
+           (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) then
+        begin
+          // Skip the current version directory
+          if FindRec.Name <> CurrentVersionSuffix then
+          begin
+            VersionDir := TSFDir + '\' + FindRec.Name;
+            Log('Found old TSF version directory: ' + VersionDir);
+            
+            // Try to unregister the forwarder DLL if it exists
+            if FileExists(VersionDir + '\KeyMagicTSF.dll') then
+            begin
+              Exec('regsvr32.exe', '/s /u "' + VersionDir + '\KeyMagicTSF.dll"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+            end;
+            
+            // Try to delete the entire directory
+            if not DelTree(VersionDir, True, True, True) then
+            begin
+              // If deletion fails, try to schedule individual files for deletion
+              Log('Failed to delete directory, scheduling files for deletion on restart: ' + VersionDir);
+              ScheduleDirectoryForDeletion(VersionDir);
+            end
+            else
+            begin
+              Log('Deleted old TSF version directory: ' + VersionDir);
+            end;
+          end
+          else
+          begin
+            Log('Keeping current version directory: ' + FindRec.Name);
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+  
+  // Also clean up any old-style DLLs in the TSF root directory
+  CleanupOldTSFDLLsInRoot(TSFDir);
 end;
 
 // Check if Windows 10 or later
@@ -266,13 +342,13 @@ end;
 procedure CleanupOldTSF();
 var
   TSFDir: String;
-  CurrentDLLName: String;
+  CurrentVersionSuffix: String;
 begin
   TSFDir := ExpandConstant('{app}\TSF');
-  CurrentDLLName := ExpandConstant('{#TSFDLLName}');
+  CurrentVersionSuffix := ExpandConstant('{#MyAppVersionSuffix}');
   
-  // Call the common cleanup function
-  CleanupOldTSFDLLs(TSFDir, CurrentDLLName);
+  // Call the new cleanup function that handles versioned subdirectories
+  CleanupOldTSFVersions(TSFDir, CurrentVersionSuffix);
 end;
 
 // Clean up any temporary TSF registrations

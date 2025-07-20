@@ -24,7 +24,7 @@ echo.
 echo [2/3] Verifying build artifacts...
 
 :: Check x64 TSF
-if not exist "tsf\build-x64\Release\KeyMagicTSF.dll" (
+if not exist "tsf\build-x64\Release\KeyMagicTSF_x64.dll" (
     echo [ERROR] x64 TSF DLL not found
     exit /b 1
 )

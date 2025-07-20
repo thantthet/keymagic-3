@@ -1,4 +1,4 @@
-; KeyMagic Windows Installer Script - ARM64 Version
+; KeyMagic Windows Installer Script - ARM64 Version with ARM64X forwarder
 ; Inno Setup 6.x
 
 #define MyAppName "KeyMagic 3"
@@ -9,6 +9,8 @@
 #define MyAppArch "ARM64"
 #define MyAppVersionSuffix StringChange(MyAppVersion, '.', '_')
 #define TSFDLLName "KeyMagicTSF_" + MyAppVersionSuffix + ".dll"
+#define TSFARM64DLLName "KeyMagicTSF_" + MyAppVersionSuffix + "_arm64.dll"
+#define TSFX64DLLName "KeyMagicTSF_" + MyAppVersionSuffix + "_x64.dll"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -55,8 +57,10 @@ Type: filesandordirs; Name: "{app}\keyboards"
 ; GUI Application
 Source: "..\target\aarch64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
 
-; TSF DLL - ARM64 only (with version suffix)
-Source: "..\tsf\build-arm64\Release\KeyMagicTSF.dll"; DestDir: "{app}\TSF"; DestName: "{#TSFDLLName}"; Flags: ignoreversion
+; TSF DLLs - ARM64X forwarder and implementation DLLs in versioned subdirectory
+Source: "..\tsf\build-arm64x\KeyMagicTSF.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
+Source: "..\tsf\build-arm64x\KeyMagicTSF_arm64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
+Source: "..\tsf\build-arm64x\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
 
 ; Resources
 Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -99,13 +103,13 @@ Root: HKCR; Subkey: "KeyMagicKeyboard\shell\open\command"; ValueType: string; Va
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 Runtime..."; Flags: waituntilterminated; Check: ShouldInstallWebView2; BeforeInstall: DownloadWebView2
 
 ; Register TSF DLL (cleanup of old versions is handled automatically)
-Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#TSFDLLName}"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden; BeforeInstall: CleanupOldTSF
+Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden; BeforeInstall: CleanupOldTSF
 
 ; Launch application after installation
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Unregister TSF DLL before uninstall
-Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#TSFDLLName}"""; RunOnceId: "UnregTSF"; Flags: runhidden
+Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
 #include "common.iss"

@@ -1,6 +1,6 @@
 @echo off
-:: build-installer-arm64.bat - Build KeyMagic ARM64 installer
-:: This script builds ARM64 components and creates the ARM64 installer
+:: build-installer-arm64.bat - Build KeyMagic ARM64 installer with ARM64X forwarder
+:: This script builds ARM64X forwarder components and creates the ARM64 installer
 
 setlocal enabledelayedexpansion
 
@@ -13,22 +13,45 @@ echo.
 cd /d "%~dp0\.."
 
 :: Build dll and gui
-echo [1/3] Building ARM64 TSF DLL...
+echo [1/3] Building ARM64 components...
+
+:: Build GUI and keymagic-core
+echo Building GUI and libraries...
 call make.bat build arm64 Release
 if %errorlevel% neq 0 (
-    echo [ERROR] Failed to build ARM64 TSF DLL
+    echo [ERROR] Failed to build ARM64 components
+    exit /b 1
+)
+
+:: Build ARM64X forwarder TSF DLL
+echo Building ARM64X forwarder TSF DLL...
+call make-arm64x.bat Release
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to build ARM64X forwarder TSF DLL
     exit /b 1
 )
 
 echo.
 echo [2/3] Verifying build artifacts...
 
-:: Check ARM64 TSF
-if not exist "tsf\build-arm64\Release\KeyMagicTSF.dll" (
-    echo [ERROR] ARM64 TSF DLL not found
+:: Check ARM64X forwarder and its dependencies
+if not exist "tsf\build-arm64x\KeyMagicTSF.dll" (
+    echo [ERROR] ARM64X forwarder DLL not found
     exit /b 1
 )
-echo [OK] ARM64 TSF DLL found
+echo [OK] ARM64X forwarder DLL found
+
+if not exist "tsf\build-arm64x\KeyMagicTSF_arm64.dll" (
+    echo [ERROR] ARM64 implementation DLL not found
+    exit /b 1
+)
+echo [OK] ARM64 implementation DLL found
+
+if not exist "tsf\build-arm64x\KeyMagicTSF_x64.dll" (
+    echo [ERROR] x64 implementation DLL not found
+    exit /b 1
+)
+echo [OK] x64 implementation DLL found
 
 :: Check GUI
 if not exist "target\aarch64-pc-windows-msvc\release\gui-tauri.exe" (
