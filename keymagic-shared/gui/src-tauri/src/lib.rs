@@ -59,6 +59,7 @@ pub fn run() {
             commands::get_keyboards,
             commands::get_active_keyboard,
             commands::set_active_keyboard,
+            commands::get_keyboard_layout,
             commands::scan_keyboards,
             commands::import_keyboard,
             commands::remove_keyboard,

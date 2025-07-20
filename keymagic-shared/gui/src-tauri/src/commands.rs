@@ -1,6 +1,9 @@
 use crate::core::{KeyboardInfo, KeyboardManager};
 use crate::platform::{Language, PlatformInfo};
+use keymagic_core::{KeyInput, VirtualKey};
+use keymagic_core::engine::ModifierState;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::State;
@@ -12,6 +15,19 @@ pub struct UpdateInfo {
     pub version: String,
     pub download_url: String,
     pub release_notes: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KeyMapping {
+    pub shifted: Option<String>,
+    pub unshifted: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KeyboardLayoutData {
+    pub keyboard_name: String,
+    pub keyboard_id: String,
+    pub keys: HashMap<String, KeyMapping>,
 }
 
 #[tauri::command]
@@ -52,6 +68,124 @@ pub fn set_active_keyboard(
 #[tauri::command]
 pub fn scan_keyboards(state: State<AppState>) -> Result<Vec<KeyboardInfo>, String> {
     state.scan_keyboards().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_keyboard_layout(
+    state: State<AppState>,
+    keyboard_id: String,
+) -> Result<KeyboardLayoutData, String> {
+    let keyboards = state.get_keyboards();
+    let keyboard = keyboards
+        .iter()
+        .find(|k| k.id == keyboard_id)
+        .ok_or_else(|| format!("Keyboard not found: {}", keyboard_id))?;
+
+    // Load the keyboard file to get the actual engine
+    let layout = state.load_keyboard_file(&keyboard.path)
+        .map_err(|e| format!("Failed to load keyboard file: {}", e))?;
+    
+    // Create a temporary engine for this keyboard
+    let mut engine = keymagic_core::KeyMagicEngine::new(layout)
+        .map_err(|e| format!("Failed to create engine: {}", e))?;
+    
+    let mut keys = HashMap::new();
+    
+    // Helper function to get output for a key with specific modifiers
+    let mut get_key_output = |vk: VirtualKey, modifiers: ModifierState, character: Option<char>| -> Option<String> {
+        // Reset engine state before each test
+        engine.reset();
+        
+        let input = KeyInput::new(vk as u16, modifiers, character);
+        match engine.process_key_test(input) {
+            Ok(output) => {
+                if output.composing_text.is_empty() {
+                    None
+                } else {
+                    Some(output.composing_text)
+                }
+            }
+            Err(_) => None,
+        }
+    };
+
+    // Define key mappings from VirtualKey to DOM key names with their default characters
+    let key_mappings = [
+        // Number row (unshifted, shifted characters)
+        (VirtualKey::Oem3, "Backquote", '`', '~'),
+        (VirtualKey::Key1, "Digit1", '1', '!'),
+        (VirtualKey::Key2, "Digit2", '2', '@'),
+        (VirtualKey::Key3, "Digit3", '3', '#'),
+        (VirtualKey::Key4, "Digit4", '4', '$'),
+        (VirtualKey::Key5, "Digit5", '5', '%'),
+        (VirtualKey::Key6, "Digit6", '6', '^'),
+        (VirtualKey::Key7, "Digit7", '7', '&'),
+        (VirtualKey::Key8, "Digit8", '8', '*'),
+        (VirtualKey::Key9, "Digit9", '9', '('),
+        (VirtualKey::Key0, "Digit0", '0', ')'),
+        (VirtualKey::OemMinus, "Minus", '-', '_'),
+        (VirtualKey::OemPlus, "Equal", '=', '+'),
+        
+        // Top row (QWERTY)
+        (VirtualKey::KeyQ, "KeyQ", 'q', 'Q'),
+        (VirtualKey::KeyW, "KeyW", 'w', 'W'),
+        (VirtualKey::KeyE, "KeyE", 'e', 'E'),
+        (VirtualKey::KeyR, "KeyR", 'r', 'R'),
+        (VirtualKey::KeyT, "KeyT", 't', 'T'),
+        (VirtualKey::KeyY, "KeyY", 'y', 'Y'),
+        (VirtualKey::KeyU, "KeyU", 'u', 'U'),
+        (VirtualKey::KeyI, "KeyI", 'i', 'I'),
+        (VirtualKey::KeyO, "KeyO", 'o', 'O'),
+        (VirtualKey::KeyP, "KeyP", 'p', 'P'),
+        (VirtualKey::Oem4, "BracketLeft", '[', '{'),
+        (VirtualKey::Oem6, "BracketRight", ']', '}'),
+        (VirtualKey::Oem5, "Backslash", '\\', '|'),
+        
+        // Home row (ASDF)
+        (VirtualKey::KeyA, "KeyA", 'a', 'A'),
+        (VirtualKey::KeyS, "KeyS", 's', 'S'),
+        (VirtualKey::KeyD, "KeyD", 'd', 'D'),
+        (VirtualKey::KeyF, "KeyF", 'f', 'F'),
+        (VirtualKey::KeyG, "KeyG", 'g', 'G'),
+        (VirtualKey::KeyH, "KeyH", 'h', 'H'),
+        (VirtualKey::KeyJ, "KeyJ", 'j', 'J'),
+        (VirtualKey::KeyK, "KeyK", 'k', 'K'),
+        (VirtualKey::KeyL, "KeyL", 'l', 'L'),
+        (VirtualKey::Oem1, "Semicolon", ';', ':'),
+        (VirtualKey::Oem7, "Quote", '\'', '"'),
+        
+        // Bottom row (ZXCV)
+        (VirtualKey::KeyZ, "KeyZ", 'z', 'Z'),
+        (VirtualKey::KeyX, "KeyX", 'x', 'X'),
+        (VirtualKey::KeyC, "KeyC", 'c', 'C'),
+        (VirtualKey::KeyV, "KeyV", 'v', 'V'),
+        (VirtualKey::KeyB, "KeyB", 'b', 'B'),
+        (VirtualKey::KeyN, "KeyN", 'n', 'N'),
+        (VirtualKey::KeyM, "KeyM", 'm', 'M'),
+        (VirtualKey::OemComma, "Comma", ',', '<'),
+        (VirtualKey::OemPeriod, "Period", '.', '>'),
+        (VirtualKey::Oem2, "Slash", '/', '?'),
+        
+        // Space
+        (VirtualKey::Space, "Space", ' ', ' '),
+    ];
+
+    // Generate key mappings using the engine
+    for (vk, dom_key, unshifted_char, shifted_char) in key_mappings.iter() {
+        let unshifted = get_key_output(*vk, ModifierState::new(false, false, false, false), Some(*unshifted_char));
+        let shifted = get_key_output(*vk, ModifierState::new(true, false, false, false), Some(*shifted_char));
+        
+        keys.insert(dom_key.to_string(), KeyMapping {
+            shifted,
+            unshifted,
+        });
+    }
+
+    Ok(KeyboardLayoutData {
+        keyboard_name: keyboard.name.clone(),
+        keyboard_id: keyboard.id.clone(),
+        keys,
+    })
 }
 
 #[tauri::command]
