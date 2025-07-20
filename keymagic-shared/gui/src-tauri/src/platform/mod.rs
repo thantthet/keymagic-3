@@ -150,7 +150,7 @@ pub trait Platform: Send + Sync {
 pub fn create_platform() -> Result<Box<dyn Platform>> {
     #[cfg(target_os = "windows")]
     {
-        Ok(Box::new(WindowsBackend::new()?))
+        Ok(Box::new(windows::WindowsBackend::new()?))
     }
     
     #[cfg(target_os = "linux")]

@@ -7,9 +7,22 @@ use std::path::PathBuf;
 use winreg::enums::*;
 use winreg::RegKey;
 
-const REGISTRY_PATH: &str = r"Software\KeyMagic";
-const SETTINGS_PATH: &str = r"Software\KeyMagic\Settings";
-const KEYBOARDS_PATH: &str = r"Software\KeyMagic\Keyboards";
+// Registry paths - matching original implementation
+const KEYMAGIC_ROOT: &str = r"Software\KeyMagic";
+const KEYBOARDS_KEY: &str = r"Software\KeyMagic\Keyboards";
+const SETTINGS_KEY: &str = r"Software\KeyMagic\Settings";
+
+// Registry value names
+const DEFAULT_KEYBOARD_VALUE: &str = "DefaultKeyboard";
+const KEY_PROCESSING_ENABLED_VALUE: &str = "KeyProcessingEnabled";
+
+// Keyboard entry value names
+const KEYBOARD_PATH_VALUE: &str = "Path";
+const KEYBOARD_NAME_VALUE: &str = "Name";
+const KEYBOARD_DESCRIPTION_VALUE: &str = "Description";
+const KEYBOARD_HOTKEY_VALUE: &str = "Hotkey";
+const KEYBOARD_ENABLED_VALUE: &str = "Enabled";
+const KEYBOARD_HASH_VALUE: &str = "Hash";
 
 pub struct WindowsBackend {
     registry_key: RegKey,
@@ -18,10 +31,19 @@ pub struct WindowsBackend {
 impl WindowsBackend {
     pub fn new() -> Result<Self> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let registry_key = hkcu
-            .create_subkey(REGISTRY_PATH)
-            .context("Failed to open/create registry key")?
-            .0;
+        
+        // Ensure registry structure exists
+        let (registry_key, _) = hkcu
+            .create_subkey(KEYMAGIC_ROOT)
+            .context("Failed to create KeyMagic root key")?;
+        
+        // Create Keyboards subkey
+        hkcu.create_subkey(KEYBOARDS_KEY)
+            .context("Failed to create Keyboards key")?;
+        
+        // Create Settings subkey
+        hkcu.create_subkey(SETTINGS_KEY)
+            .context("Failed to create Settings key")?;
         
         Ok(Self { registry_key })
     }
@@ -53,41 +75,45 @@ impl Platform for WindowsBackend {
     fn load_config(&self) -> Result<Config> {
         let mut config = Self::default_config();
         
-        // Load from registry
-        if let Ok(start_with_system) = self.registry_key.get_value::<u32, _>("StartWithSystem") {
-            config.general.start_with_system = start_with_system != 0;
-        }
-        
-        if let Ok(check_updates) = self.registry_key.get_value::<u32, _>("CheckForUpdates") {
-            config.general.check_for_updates = check_updates != 0;
-        }
-        
-        if let Ok(last_check) = self.registry_key.get_value::<String, _>("LastUpdateCheck") {
-            config.general.last_update_check = Some(last_check);
-        }
-        
-        if let Ok(active) = self.registry_key.get_value::<String, _>("ActiveKeyboard") {
-            config.keyboards.active = Some(active);
+        // Load from Settings key
+        if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
+            // Load general settings
+            if let Ok(start_with_system) = settings_key.get_value::<u32, _>("StartWithSystem") {
+                config.general.start_with_system = start_with_system != 0;
+            }
+            
+            if let Ok(check_updates) = settings_key.get_value::<u32, _>("CheckForUpdates") {
+                config.general.check_for_updates = check_updates != 0;
+            }
+            
+            if let Ok(last_check) = settings_key.get_value::<String, _>("LastUpdateCheck") {
+                config.general.last_update_check = Some(last_check);
+            }
+            
+            // Active keyboard is stored with DefaultKeyboard name
+            if let Ok(active) = settings_key.get_value::<String, _>(DEFAULT_KEYBOARD_VALUE) {
+                config.keyboards.active = Some(active);
+            }
         }
         
         // Load installed keyboards from registry
-        if let Ok(keyboards_key) = self.registry_key.open_subkey("Keyboards") {
+        if let Ok(keyboards_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(KEYBOARDS_KEY) {
             for name in keyboards_key.enum_keys().filter_map(Result::ok) {
                 if let Ok(kb_key) = keyboards_key.open_subkey(&name) {
                     let keyboard = InstalledKeyboard {
                         id: name.clone(),
-                        name: kb_key.get_value("DisplayName").unwrap_or(name),
-                        filename: kb_key.get_value("FileName").unwrap_or_default(),
-                        hotkey: kb_key.get_value("Hotkey").ok(),
-                        hash: kb_key.get_value("Hash").unwrap_or_default(),
+                        name: kb_key.get_value(KEYBOARD_NAME_VALUE).unwrap_or(name),
+                        filename: kb_key.get_value(KEYBOARD_PATH_VALUE).unwrap_or_default(),
+                        hotkey: kb_key.get_value(KEYBOARD_HOTKEY_VALUE).ok(),
+                        hash: kb_key.get_value(KEYBOARD_HASH_VALUE).unwrap_or_default(),
                     };
                     config.keyboards.installed.push(keyboard);
                 }
             }
         }
         
-        // Load composition mode processes from registry
-        if let Ok(settings_key) = self.registry_key.open_subkey("Settings") {
+        // Load composition mode processes from Settings registry
+        if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
             if let Ok(processes) = settings_key.get_value::<String, _>("CompositionModeProcesses") {
                 // Split by semicolon or newline
                 config.composition_mode.enabled_processes = processes
@@ -102,43 +128,53 @@ impl Platform for WindowsBackend {
     }
     
     fn save_config(&self, config: &Config) -> Result<()> {
-        // Save to registry
-        self.registry_key.set_value(
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        
+        // Save to Settings key
+        let (settings_key, _) = hkcu
+            .create_subkey(SETTINGS_KEY)
+            .context("Failed to create Settings key")?;
+        
+        settings_key.set_value(
             "StartWithSystem",
             &(config.general.start_with_system as u32),
         )?;
         
-        self.registry_key.set_value(
+        settings_key.set_value(
             "CheckForUpdates",
             &(config.general.check_for_updates as u32),
         )?;
         
         if let Some(ref last_check) = config.general.last_update_check {
-            self.registry_key.set_value("LastUpdateCheck", last_check)?;
+            settings_key.set_value("LastUpdateCheck", last_check)?;
         }
         
+        // Active keyboard uses DefaultKeyboard name
         if let Some(ref active) = config.keyboards.active {
-            self.registry_key.set_value("ActiveKeyboard", active)?;
+            settings_key.set_value(DEFAULT_KEYBOARD_VALUE, active)?;
         }
         
         // Save keyboards
-        let keyboards_key = self.registry_key.create_subkey("Keyboards")?.0;
+        let (keyboards_key, _) = hkcu
+            .create_subkey(KEYBOARDS_KEY)
+            .context("Failed to create Keyboards key")?;
         
         for keyboard in &config.keyboards.installed {
-            let kb_key = keyboards_key.create_subkey(&keyboard.id)?.0;
-            kb_key.set_value("DisplayName", &keyboard.name)?;
-            kb_key.set_value("FileName", &keyboard.filename)?;
-            kb_key.set_value("Hash", &keyboard.hash)?;
+            let (kb_key, _) = keyboards_key.create_subkey(&keyboard.id)?;
+            kb_key.set_value(KEYBOARD_NAME_VALUE, &keyboard.name)?;
+            kb_key.set_value(KEYBOARD_PATH_VALUE, &keyboard.filename)?;
+            kb_key.set_value(KEYBOARD_HASH_VALUE, &keyboard.hash)?;
+            kb_key.set_value(KEYBOARD_ENABLED_VALUE, &1u32)?; // Always enabled for now
             
             if let Some(ref hotkey) = keyboard.hotkey {
-                kb_key.set_value("Hotkey", hotkey)?;
+                kb_key.set_value(KEYBOARD_HOTKEY_VALUE, hotkey)?;
             }
         }
         
-        // Save composition mode processes
+        // Save composition mode processes as multi-string
         if !config.composition_mode.enabled_processes.is_empty() {
+            // Note: winreg doesn't support REG_MULTI_SZ directly, so we'll save as semicolon-delimited
             let processes_str = config.composition_mode.enabled_processes.join(";");
-            let settings_key = self.registry_key.create_subkey("Settings")?.0;
             settings_key.set_value("CompositionModeProcesses", &processes_str)?;
         }
         
@@ -146,15 +182,25 @@ impl Platform for WindowsBackend {
     }
     
     fn get_keyboards_dir(&self) -> PathBuf {
-        // Get from registry or use default
-        if let Ok(path) = self.registry_key.get_value::<String, _>("KeyboardsPath") {
-            PathBuf::from(path)
-        } else {
-            dirs::data_dir()
-                .unwrap_or_else(|| PathBuf::from("C:\\ProgramData"))
-                .join("KeyMagic")
-                .join("Keyboards")
+        // Try to get from Settings registry first
+        if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
+            if let Ok(path) = settings_key.get_value::<String, _>("KeyboardsPath") {
+                return PathBuf::from(path);
+            }
         }
+        
+        // Default to %LOCALAPPDATA%\KeyMagic\Keyboards
+        dirs::data_local_dir()
+            .or_else(|| {
+                // Fallback to environment variable if dirs crate fails
+                std::env::var("LOCALAPPDATA").ok().map(PathBuf::from)
+            })
+            .unwrap_or_else(|| {
+                // Last resort fallback
+                PathBuf::from("C:\\Users\\Default\\AppData\\Local")
+            })
+            .join("KeyMagic")
+            .join("Keyboards")
     }
     
     fn get_keyboard_files(&self) -> Result<Vec<PathBuf>> {
@@ -175,10 +221,15 @@ impl Platform for WindowsBackend {
     }
     
     fn notify_ime_update(&self, keyboard_id: &str) -> Result<()> {
-        // Send notification to Windows IME (TSF)
-        // This would involve sending a message to the TSF text service
-        // For now, just update the registry
-        self.registry_key.set_value("ActiveKeyboard", &keyboard_id)?;
+        // Update the active keyboard in Settings
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (settings_key, _) = hkcu
+            .create_subkey(SETTINGS_KEY)
+            .context("Failed to open Settings key")?;
+        
+        settings_key.set_value(DEFAULT_KEYBOARD_VALUE, &keyboard_id)?;
+        
+        // TODO: Send notification to TSF text service
         Ok(())
     }
     
@@ -193,14 +244,26 @@ impl Platform for WindowsBackend {
     }
     
     fn get_config_dir(&self) -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("C:\\Users\\Default\\AppData\\Roaming"))
+        // Use %LOCALAPPDATA% for config as well, matching the original implementation
+        dirs::data_local_dir()
+            .or_else(|| {
+                std::env::var("LOCALAPPDATA").ok().map(PathBuf::from)
+            })
+            .unwrap_or_else(|| {
+                PathBuf::from("C:\\Users\\Default\\AppData\\Local")
+            })
             .join("KeyMagic")
     }
     
     fn get_data_dir(&self) -> PathBuf {
-        dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("C:\\ProgramData"))
+        // Use %LOCALAPPDATA% for data directory as well
+        dirs::data_local_dir()
+            .or_else(|| {
+                std::env::var("LOCALAPPDATA").ok().map(PathBuf::from)
+            })
+            .unwrap_or_else(|| {
+                PathBuf::from("C:\\Users\\Default\\AppData\\Local")
+            })
             .join("KeyMagic")
     }
     
@@ -260,22 +323,29 @@ impl Platform for WindowsBackend {
     }
     
     fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        
         match key {
             "StartWithWindows" => {
-                // Check autostart status using tauri plugin
-                if let Ok(autostart_manager) = tauri_plugin_autostart::WindowsAutoLaunch::new("KeyMagic") {
-                    match autostart_manager.is_enabled() {
-                        Ok(enabled) => Ok(Some(if enabled { "1" } else { "0" }.to_string())),
-                        Err(_) => Ok(Some("0".to_string())),
+                // Check StartWithSystem in Settings key
+                if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
+                    if let Ok(start_with_system) = settings_key.get_value::<u32, _>("StartWithSystem") {
+                        Ok(Some(if start_with_system != 0 { "1" } else { "0" }.to_string()))
+                    } else {
+                        Ok(Some("0".to_string()))
                     }
                 } else {
                     Ok(Some("0".to_string()))
                 }
             }
             _ => {
-                // Read from registry
-                if let Ok(value) = self.registry_key.get_value::<String, _>(key) {
-                    Ok(Some(value))
+                // Read from Settings key
+                if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
+                    if let Ok(value) = settings_key.get_value::<String, _>(key) {
+                        Ok(Some(value))
+                    } else {
+                        Ok(None)
+                    }
                 } else {
                     Ok(None)
                 }
@@ -284,31 +354,46 @@ impl Platform for WindowsBackend {
     }
     
     fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (settings_key, _) = hkcu
+            .create_subkey(SETTINGS_KEY)
+            .context("Failed to create Settings key")?;
+        
         match key {
             "StartWithWindows" => {
-                // Let autostart plugin handle this
-                // Don't save to registry
+                // Save StartWithSystem to registry for TSF to read
+                let val = if value == "1" || value.to_lowercase() == "true" { 1u32 } else { 0u32 };
+                settings_key.set_value("StartWithSystem", &val)?;
                 Ok(())
             }
             _ => {
-                // Save to registry
-                self.registry_key.set_value(key, &value)?;
+                // Save to Settings key
+                settings_key.set_value(key, &value)?;
                 Ok(())
             }
         }
     }
     
     fn is_first_run(&self) -> Result<bool> {
-        // Check if FirstRunScanKeyboards flag is set
-        match self.registry_key.get_value::<u32, _>("FirstRunScanKeyboards") {
-            Ok(val) => Ok(val != 0),
-            Err(_) => Ok(true), // If key doesn't exist, it's first run
+        // Check if FirstRunScanKeyboards flag is set in Settings
+        if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
+            match settings_key.get_value::<u32, _>("FirstRunScanKeyboards") {
+                Ok(val) => Ok(val != 0),
+                Err(_) => Ok(true), // If value doesn't exist, it's first run
+            }
+        } else {
+            Ok(true) // If Settings key doesn't exist, it's first run
         }
     }
     
     fn clear_first_run_flag(&self) -> Result<()> {
-        // Clear the first run flag
-        self.registry_key.set_value("FirstRunScanKeyboards", &0u32)?;
+        // Clear the first run flag in Settings
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (settings_key, _) = hkcu
+            .create_subkey(SETTINGS_KEY)
+            .context("Failed to create Settings key")?;
+        
+        settings_key.set_value("FirstRunScanKeyboards", &0u32)?;
         Ok(())
     }
     
