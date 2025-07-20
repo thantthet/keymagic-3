@@ -158,9 +158,16 @@ function createKeyboardCard(keyboard) {
 }
 
 function createIconElement(iconData) {
-  // Convert icon data to base64 and create img element
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(iconData)));
-  return `<img src="data:image/png;base64,${base64}" alt="Keyboard icon" style="width: 100%; height: 100%; object-fit: contain;">`;
+  // Handle both base64 string and raw bytes
+  let base64;
+  if (typeof iconData === 'string') {
+    // Already base64 encoded
+    base64 = iconData;
+  } else {
+    // Convert raw bytes to base64
+    base64 = btoa(String.fromCharCode(...new Uint8Array(iconData)));
+  }
+  return `<img src="data:image/bmp;base64,${base64}" alt="Keyboard icon" style="width: 100%; height: 100%; object-fit: contain;">`;
 }
 
 function createDefaultIcon() {

@@ -8,6 +8,36 @@ use std::sync::{Arc, Mutex};
 
 use crate::platform::{InstalledKeyboard, Platform};
 
+mod base64_serde {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    
+    pub fn serialize<S>(bytes: &Option<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match bytes {
+            Some(b) => serializer.serialize_str(&STANDARD.encode(b)),
+            None => serializer.serialize_none(),
+        }
+    }
+    
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Option<String> = Option::deserialize(deserializer)?;
+        match s {
+            Some(base64_str) => {
+                STANDARD.decode(&base64_str)
+                    .map(Some)
+                    .map_err(serde::de::Error::custom)
+            }
+            None => Ok(None),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyboardInfo {
     pub id: String,
@@ -17,6 +47,10 @@ pub struct KeyboardInfo {
     pub hotkey: Option<String>,
     pub hash: String,
     pub is_active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", with = "base64_serde")]
+    pub icon_data: Option<Vec<u8>>,
 }
 
 pub struct KeyboardManager {
@@ -71,6 +105,17 @@ impl KeyboardManager {
         for installed in &config.keyboards.installed {
             let path = self.platform.get_keyboards_dir().join(&installed.filename);
             if path.exists() {
+                // Load the keyboard file to get metadata
+                let (description, icon_data) = if let Ok(layout) = self.load_keyboard_file(&path) {
+                    let metadata = layout.metadata();
+                    (
+                        metadata.description().map(|s| s.to_string()),
+                        metadata.icon().map(|data| data.to_vec())
+                    )
+                } else {
+                    (None, None)
+                };
+                
                 keyboards.insert(
                     installed.id.clone(),
                     KeyboardInfo {
@@ -81,6 +126,8 @@ impl KeyboardManager {
                         hotkey: installed.hotkey.clone(),
                         hash: installed.hash.clone(),
                         is_active: false,
+                        description,
+                        icon_data,
                     },
                 );
             }
@@ -111,7 +158,10 @@ impl KeyboardManager {
                     .unwrap_or("unknown")
                     .to_string();
                 
-                let name = layout.metadata().name().unwrap_or(id.clone());
+                let metadata = layout.metadata();
+                let name = metadata.name().unwrap_or(id.clone());
+                let description = metadata.description().map(|s| s.to_string());
+                let icon_data = metadata.icon().map(|data| data.to_vec());
                 let hash = self.calculate_file_hash(&path)?;
                 
                 found_keyboards.push(KeyboardInfo {
@@ -122,6 +172,8 @@ impl KeyboardManager {
                     hotkey: None,
                     hash,
                     is_active: false,
+                    description,
+                    icon_data,
                 });
             }
         }
@@ -238,7 +290,10 @@ impl KeyboardManager {
             .unwrap_or("unknown")
             .to_string();
         
-        let name = layout.metadata().name().unwrap_or(id.clone());
+        let metadata = layout.metadata();
+        let name = metadata.name().unwrap_or(id.clone());
+        let description = metadata.description().map(|s| s.to_string());
+        let icon_data = metadata.icon().map(|data| data.to_vec());
         let hash = self.calculate_file_hash(file_path)?;
         
         // Copy to keyboards directory
@@ -256,6 +311,8 @@ impl KeyboardManager {
             hotkey: None,
             hash,
             is_active: false,
+            description,
+            icon_data,
         };
         
         // Add to manager
@@ -269,7 +326,7 @@ impl KeyboardManager {
         Ok(keyboard_info)
     }
     
-    fn load_keyboard_file(&self, path: &Path) -> Result<Km2File> {
+    pub fn load_keyboard_file(&self, path: &Path) -> Result<Km2File> {
         let data = fs::read(path)
             .context("Failed to read keyboard file")?;
         

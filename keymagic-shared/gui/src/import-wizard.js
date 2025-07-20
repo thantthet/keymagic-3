@@ -232,18 +232,21 @@ async function closeWizard() {
 
 // Icon creation functions (same as main.js)
 function createIconElement(iconData) {
-  if (!iconData || iconData.length === 0) {
+  if (!iconData || (typeof iconData !== 'string' && iconData.length === 0)) {
     return createDefaultIcon();
   }
   
-  // Convert array to Uint8Array if needed
-  const uint8Array = iconData instanceof Uint8Array ? iconData : new Uint8Array(iconData);
+  // Handle both base64 string and raw bytes
+  let base64;
+  if (typeof iconData === 'string') {
+    // Already base64 encoded
+    base64 = iconData;
+  } else {
+    // Convert raw bytes to base64
+    base64 = btoa(String.fromCharCode(...new Uint8Array(iconData)));
+  }
   
-  // Create blob and URL
-  const blob = new Blob([uint8Array], { type: 'image/bmp' });
-  const url = URL.createObjectURL(blob);
-  
-  return `<img src="${url}" alt="Keyboard icon" style="width: 100%; height: 100%; object-fit: contain;">`;
+  return `<img src="data:image/bmp;base64,${base64}" alt="Keyboard icon" style="width: 100%; height: 100%; object-fit: contain;">`;
 }
 
 function createColoredIcon(color, name) {

@@ -2282,6 +2282,7 @@ name = "keymagic-gui"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "cocoa",
  "dirs 5.0.1",
  "global-hotkey",
