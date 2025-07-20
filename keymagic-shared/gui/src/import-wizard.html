@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Keyboard Import Wizard</title>
+    <script type="module" src="/import-wizard.js" defer></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      
+      .wizard-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      
+      .wizard-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+      }
+      
+      .wizard-body {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+      
+      .wizard-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wizard-container">
+      <div class="wizard-header">
+        <h2>Keyboard Import Wizard</h2>
+        <p class="wizard-intro">Welcome to KeyMagic! We've found some keyboards bundled with the installer that you can import.</p>
+      </div>
+      
+      <div class="wizard-body">
+        <div class="keyboard-comparison-list" id="bundled-keyboards-list">
+          <!-- Comparison items will be inserted here -->
+        </div>
+        
+        <div class="wizard-summary" id="import-summary" style="display: none;">
+          <p>Selected <span id="selected-count">0</span> keyboard(s) to import</p>
+        </div>
+      </div>
+      
+      <div class="wizard-footer">
+        <button type="button" class="btn btn-secondary" id="import-wizard-skip">Skip</button>
+        <button type="button" class="btn btn-primary" id="import-wizard-import" disabled>Import Selected</button>
+      </div>
+    </div>
+  </body>
+</html>
