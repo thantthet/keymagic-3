@@ -105,11 +105,66 @@ BOOL SetRegValue(HKEY hKeyParent, LPCWSTR lpszKeyName, LPCWSTR lpszValueName, LP
     return (lResult == ERROR_SUCCESS);
 }
 
+// Helper function to check if we're loaded through an ARM64X forwarder
+static BOOL IsLoadedViaForwarder(LPCWSTR pszCurrentPath, LPWSTR pszForwarderPath, DWORD cchForwarderPath)
+{
+    // Check if our DLL name contains architecture suffix
+    LPCWSTR pszFileName = wcsrchr(pszCurrentPath, L'\\');
+    if (!pszFileName) pszFileName = pszCurrentPath;
+    else pszFileName++; // Skip the backslash
+    
+    // Check for architecture-specific naming pattern (case-insensitive)
+    size_t fileNameLen = wcslen(pszFileName);
+    BOOL isArchSpecific = FALSE;
+    
+    if (fileNameLen >= 8 && _wcsicmp(pszFileName + fileNameLen - 8, L"_x64.dll") == 0)
+    {
+        isArchSpecific = TRUE;
+    }
+    else if (fileNameLen >= 10 && _wcsicmp(pszFileName + fileNameLen - 10, L"_arm64.dll") == 0)
+    {
+        isArchSpecific = TRUE;
+    }
+    
+    if (isArchSpecific)
+    {
+        // We're likely loaded via forwarder
+        // Construct the forwarder path by replacing the filename in the same directory
+        StringCchCopy(pszForwarderPath, cchForwarderPath, pszCurrentPath);
+        
+        // Find the last backslash
+        LPWSTR pszLastSlash = wcsrchr(pszForwarderPath, L'\\');
+        if (pszLastSlash)
+        {
+            // Replace with forwarder name (KeyMagicTSF.dll) in the same directory
+            StringCchCopy(pszLastSlash + 1, 
+                         cchForwarderPath - (pszLastSlash - pszForwarderPath + 1), 
+                         L"KeyMagicTSF.dll");
+            
+            // Verify the forwarder exists
+            if (GetFileAttributes(pszForwarderPath) != INVALID_FILE_ATTRIBUTES)
+            {
+                return TRUE;
+            }
+        }
+    }
+    
+    return FALSE;
+}
+
 BOOL RegisterServer()
 {
     WCHAR szModule[MAX_PATH];
     if (GetModuleFileName(g_hInst, szModule, ARRAYSIZE(szModule)) == 0)
         return FALSE;
+
+    // Check if we're loaded via ARM64X forwarder
+    WCHAR szForwarderPath[MAX_PATH];
+    if (IsLoadedViaForwarder(szModule, szForwarderPath, ARRAYSIZE(szForwarderPath)))
+    {
+        // Use the forwarder path for registration
+        StringCchCopy(szModule, ARRAYSIZE(szModule), szForwarderPath);
+    }
 
     // Create CLSID key
     WCHAR szCLSID[MAX_PATH];
@@ -266,6 +321,14 @@ BOOL UpdateLanguageProfiles()
     // Get module path for icon
     WCHAR szModule[MAX_PATH] = {0};
     GetModuleFileName(g_hInst, szModule, ARRAYSIZE(szModule));
+    
+    // Check if we're loaded via ARM64X forwarder for icon path too
+    WCHAR szForwarderPath[MAX_PATH];
+    if (IsLoadedViaForwarder(szModule, szForwarderPath, ARRAYSIZE(szForwarderPath)))
+    {
+        // Use the forwarder path for icon
+        StringCchCopy(szModule, ARRAYSIZE(szModule), szForwarderPath);
+    }
 
     // Register all enabled languages regardless of current registration status
     for (size_t i = 0; i < enabledLanguages.size(); i++)
