@@ -58,7 +58,7 @@ Phase 3 involves two major components:
    - Platform-specific features properly abstracted
    - Windows features hidden on non-Windows platforms
 
-#### ✅ Additional Features Completed (July 20, 2025):
+#### ✅ Additional Features Completed (January 20, 2025):
 
 1. **Global Hotkey Implementation**
    - ✅ Integrated Tauri v2 `global-shortcut` plugin for all platforms
@@ -71,6 +71,12 @@ Phase 3 involves two major components:
    - ✅ Fixed keyboard activation state sync between UI components
    - ✅ Unified event system (`active_keyboard_changed`)
    - ✅ Consistent updates across keyboard list, tray menu, and hotkeys
+
+3. **Dynamic Tray Icon**
+   - ✅ Active keyboard icon displayed as system tray icon
+   - ✅ Falls back to default icon when no keyboard has icon data
+   - ✅ Icon updates automatically when switching keyboards
+   - ✅ Supports BMP, PNG, and JPEG icon formats from KM2 files
 
 #### ⏳ Remaining Tasks for Full Feature Parity:
 
