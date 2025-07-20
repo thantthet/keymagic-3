@@ -22,12 +22,13 @@ impl LinuxBackend {
             .context("Failed to get data directory")?
             .join("keymagic");
         
-        // System-wide keyboards directory
-        let keyboards_dir = PathBuf::from("/usr/share/keymagic/keyboards");
+        // User keyboards directory within data directory
+        let keyboards_dir = data_dir.join("keyboards");
         
         // Create directories if they don't exist
         fs::create_dir_all(&config_dir)?;
         fs::create_dir_all(&data_dir)?;
+        fs::create_dir_all(&keyboards_dir)?;
         
         Ok(Self {
             config_dir,
@@ -99,21 +100,9 @@ impl Platform for LinuxBackend {
     fn get_keyboard_files(&self) -> Result<Vec<PathBuf>> {
         let mut keyboards = Vec::new();
         
-        // Check system keyboards directory
+        // Check user keyboards directory
         if self.keyboards_dir.exists() {
             for entry in fs::read_dir(&self.keyboards_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("km2") {
-                    keyboards.push(path);
-                }
-            }
-        }
-        
-        // Check user keyboards directory
-        let user_keyboards_dir = self.data_dir.join("keyboards");
-        if user_keyboards_dir.exists() {
-            for entry in fs::read_dir(&user_keyboards_dir)? {
                 let entry = entry?;
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("km2") {
