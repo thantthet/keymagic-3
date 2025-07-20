@@ -8,6 +8,8 @@
 #include <windows.h>
 #include <vector>
 #include <string>
+#include <shlobj.h>
+#include <fstream>
 
 // List of categories to register the text service under
 static const GUID* g_SupportedCategories[] = {
@@ -147,6 +149,32 @@ static BOOL IsLoadedViaForwarder(LPCWSTR pszCurrentPath, LPWSTR pszForwarderPath
                 return TRUE;
             }
         }
+    }
+    
+    return FALSE;
+}
+
+// Helper function to get the keyboard icon path (same as used by GUI)
+static BOOL GetKeyboardIconPath(LPWSTR pszIconPath, DWORD cchIconPath)
+{
+    // Get the local app data directory
+    WCHAR szAppData[MAX_PATH];
+    if (FAILED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, szAppData)))
+    {
+        // Fallback to APPDATA
+        if (FAILED(SHGetFolderPath(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, szAppData)))
+        {
+            return FALSE;
+        }
+    }
+    
+    // Construct the icon file path (same as GUI: %LOCALAPPDATA%\KeyMagic\keymagic-keyboard.ico)
+    StringCchPrintf(pszIconPath, cchIconPath, L"%s\\KeyMagic\\keymagic-keyboard.ico", szAppData);
+    
+    // Check if the icon file exists (installed by installer or extracted by GUI)
+    if (GetFileAttributes(pszIconPath) != INVALID_FILE_ATTRIBUTES)
+    {
+        return TRUE;
     }
     
     return FALSE;
@@ -318,16 +346,20 @@ BOOL UpdateLanguageProfiles()
         enabledLanguages.push_back(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
     }
 
-    // Get module path for icon
-    WCHAR szModule[MAX_PATH] = {0};
-    GetModuleFileName(g_hInst, szModule, ARRAYSIZE(szModule));
-    
-    // Check if we're loaded via ARM64X forwarder for icon path too
-    WCHAR szForwarderPath[MAX_PATH];
-    if (IsLoadedViaForwarder(szModule, szForwarderPath, ARRAYSIZE(szForwarderPath)))
+    // Get the keyboard icon path
+    WCHAR szIconPath[MAX_PATH] = {0};
+    if (!GetKeyboardIconPath(szIconPath, ARRAYSIZE(szIconPath)))
     {
-        // Use the forwarder path for icon
-        StringCchCopy(szModule, ARRAYSIZE(szModule), szForwarderPath);
+        // Fallback to DLL path with embedded icon
+        GetModuleFileName(g_hInst, szIconPath, ARRAYSIZE(szIconPath));
+        
+        // Check if we're loaded via ARM64X forwarder for icon path too
+        WCHAR szForwarderPath[MAX_PATH];
+        if (IsLoadedViaForwarder(szIconPath, szForwarderPath, ARRAYSIZE(szForwarderPath)))
+        {
+            // Use the forwarder path for icon
+            StringCchCopy(szIconPath, ARRAYSIZE(szIconPath), szForwarderPath);
+        }
     }
 
     // Register all enabled languages regardless of current registration status
@@ -340,8 +372,9 @@ BOOL UpdateLanguageProfiles()
             GUID_KeyMagicProfile,
             TEXTSERVICE_DESC,
             (ULONG)wcslen(TEXTSERVICE_DESC),
-            szModule,
-            (ULONG)(-IDI_KEYMAGIC),
+            szIconPath,
+            (ULONG)(GetFileAttributes(szIconPath) != INVALID_FILE_ATTRIBUTES && 
+                    wcsstr(szIconPath, L".ico") != NULL ? 0 : -IDI_KEYMAGIC),
             0);
             
         if (SUCCEEDED(hr))
