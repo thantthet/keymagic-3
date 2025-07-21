@@ -59,3 +59,7 @@ rpmbuild/
 keymagic-ibus/build/
 keymagic-ibus/ibus-engine-keymagic
 keymagic-ibus/ibus-engine-keymagic3
+
+# Docker build output directories
+dist-amd64/
+dist-arm64/
