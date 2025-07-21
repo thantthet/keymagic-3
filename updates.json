@@ -3,28 +3,59 @@
   "platforms": {
     "windows": {
       "aarch64": {
-        "version": "0.0.5",
-        "releaseDate": "2025-07-17T13:27:17Z",
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.5/KeyMagic3-Setup-0.0.5-arm64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-Setup-0.0.6-arm64.exe",
         "signature": "",
-        "size": 4838243,
-        "sha256": "f708e5adc84ecb6fa48c68a43aeed86a5259759672233b5228dbde5728865982"
+        "size": 5353930,
+        "sha256": "b4e820bfa8bc7e13857af0bf60621e3f1e256027d7280959ac6125905ae82b43"
       },
       "x86_64": {
-        "version": "0.0.5",
-        "releaseDate": "2025-07-17T13:27:17Z",
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.5/KeyMagic3-Setup-0.0.5-x64.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-Setup-0.0.6-x64.exe",
         "signature": "",
-        "size": 4893837,
-        "sha256": "b9e68e1c5a222cfd7f977ef634036c78ac033ed26c0ef7a5255a53ac7972af59"
+        "size": 5277868,
+        "sha256": "81989a7f29f00d7b9efb82efad16733d80d5f8861106ef74ff691859c12cc55e"
+      }
+    },
+    "macos": {
+      "x86_64": {
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
+        "minimumSystemVersion": "10.15",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-0.0.6-x64.dmg",
+        "signature": "",
+        "size": 0,
+        "sha256": ""
+      },
+      "aarch64": {
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
+        "minimumSystemVersion": "11.0",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-0.0.6-arm64.dmg",
+        "signature": "",
+        "size": 0,
+        "sha256": ""
+      }
+    },
+    "linux": {
+      "x86_64": {
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
+        "minimumSystemVersion": "",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/keymagic3-0.0.6-amd64.deb",
+        "signature": "",
+        "size": 0,
+        "sha256": ""
       }
     }
   },
   "releaseNotes": {
-    "0.0.5": {
-      "en": "### KeyMagic 0.0.5\n\n**Major Change: KeyMagic is Now a Windows Keyboard**\n\nKeyMagic has been redesigned as a native Windows keyboard service:\n- **Before:** Toggle button to turn on/off\n- **Now:** Select from Windows language bar (Win + Space)\n\n**New Features**\n- 🌍 Support for 200+ languages with searchable UI\n- 🪟 Better Windows integration - appears in Settings keyboard list\n- 🔤 Composition mode for app compatibility (e.g., Microsoft Teams)\n\n**How to Use**\n1. Press Win + Space and select KeyMagic\n2. Choose your keyboard layout in KeyMagic Configurator\n3. Start typing with your selected layout\n\n**Important:** No more toggle button - KeyMagic is active when selected in Windows, inactive when not selected.\n"
+    "0.0.6": {
+      "en": "### KeyMagic 3 - v0.0.6\n\n**What's New**\n\n• **Visual Keyboard Layout** - Preview and pin keyboard layouts\n• **Smart Organization** - Alphabetical sorting with \"just added\" badges\n• **Direct File Support** - Double-click .km2 files to open\n• **Improved Hotkeys** - Official Windows hotkey system\n• **Clearer UI** - Better Windows activation instructions\n• **Dedicated Icon** - Separate keyboard icon in language bar\n• **Better Stability** - Improved Windows compatibility\n• **Smoother Updates** - Enhanced installer handling"
     }
   }
 }
