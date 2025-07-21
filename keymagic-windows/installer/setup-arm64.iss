@@ -63,10 +63,10 @@ Source: "..\tsf\build-arm64x\KeyMagicTSF_arm64.dll"; DestDir: "{app}\TSF\{#MyApp
 Source: "..\tsf\build-arm64x\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
 
 ; Resources
-Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Keyboard icon for TSF language profile (install to LOCALAPPDATA)
-Source: "..\resources\icons\keymagic-keyboard.ico"; DestDir: "{localappdata}\KeyMagic"; Flags: ignoreversion
+Source: "..\..\resources\icons\keymagic-keyboard.ico"; DestDir: "{localappdata}\KeyMagic"; Flags: ignoreversion
 
 ; Production keyboards (included with installer)
 Source: "keyboards\*.km2"; DestDir: "{app}\keyboards"; Flags: ignoreversion skipifsourcedoesntexist

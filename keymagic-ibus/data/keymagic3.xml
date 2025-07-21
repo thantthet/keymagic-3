@@ -18,7 +18,7 @@
     <engines>
         <engine>
             <name>keymagic3</name>
-            <language>my</language>
+            <language></language>
             <license>GPL-3.0</license>
             <author>Thant Thet Khin Zaw</author>
             <icon>keymagic3</icon>
@@ -28,9 +28,8 @@
             <longname>KeyMagic 3</longname>
             <description>Smart keyboard input method for Myanmar and other languages</description>
             <rank>50</rank>
-            <symbol>က</symbol>
+            <symbol>ကီး</symbol>
             <setup>/usr/bin/keymagic3-gui</setup>
-            <icon_prop_key>InputMode</icon_prop_key>
             <version>0.0.1</version>
             <textdomain>keymagic3</textdomain>
         </engine>

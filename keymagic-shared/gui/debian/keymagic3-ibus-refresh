@@ -1,0 +1,26 @@
+#!/bin/sh
+# Helper script to refresh IBus for KeyMagic 3
+# This can be called by users or desktop environments
+
+# Check if IBus is running for the current user
+if ! pgrep -x "ibus-daemon" > /dev/null; then
+    echo "IBus is not running"
+    exit 0
+fi
+
+# Check if we're in a proper session (not root, not during package install)
+if [ "$USER" = "root" ] || [ -z "$DISPLAY" -a -z "$WAYLAND_DISPLAY" ]; then
+    echo "Not in a user graphical session"
+    exit 0
+fi
+
+# Restart IBus to pick up component changes
+echo "Refreshing IBus components..."
+ibus restart || true
+
+# Check if KeyMagic 3 is now available
+if ibus list-engine | grep -q "keymagic3"; then
+    echo "KeyMagic 3 is now available in IBus"
+else
+    echo "KeyMagic 3 not found in IBus engines"
+fi

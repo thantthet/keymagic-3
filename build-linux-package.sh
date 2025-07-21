@@ -143,8 +143,8 @@ create_package_structure() {
     cp "keymagic-shared/gui/assets/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
     
     # Copy icon if exists
-    if [ -f "keymagic-shared/gui/assets/keymagic.png" ]; then
-        cp "keymagic-shared/gui/assets/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
+    if [ -f "./resources/icons/keymagic.png" ]; then
+        cp "./resources/icons/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
     fi
     
     # Copy documentation

@@ -7,15 +7,20 @@ set -e
 
 case "$1" in
     configure)
-        # Register IBus component
-        if command -v ibus >/dev/null 2>&1; then
-            echo "Registering KeyMagic 3 with IBus..."
-            # Restart IBus to pick up new component
-            ibus restart || true
-            echo "KeyMagic 3 has been registered with IBus."
-            echo "You can add it through Settings > Keyboard > Input Sources"
-        else
-            echo "IBus not found. KeyMagic 3 IBus engine will not be registered."
+        # Install IBus refresh helper if it exists
+        if [ -f /usr/share/keymagic3/keymagic3-ibus-refresh ]; then
+            install -m 755 /usr/share/keymagic3/keymagic3-ibus-refresh /usr/bin/keymagic3-ibus-refresh || true
+        fi
+        # IBus component registration
+        if [ -f /usr/share/ibus/component/keymagic3.xml ]; then
+            echo "KeyMagic 3 IBus component has been installed."
+            echo ""
+            echo "To use KeyMagic 3 with IBus:"
+            echo "1. Restart IBus or log out and log back in"
+            echo "2. Add KeyMagic 3 through Settings > Keyboard > Input Sources"
+            echo ""
+            echo "For immediate use, run as your normal user:"
+            echo "  ibus restart"
         fi
 
         # Update icon cache

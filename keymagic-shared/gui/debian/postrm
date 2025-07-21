@@ -7,10 +7,15 @@ set -e
 
 case "$1" in
     purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
-        # Restart IBus to remove component from registry
-        if command -v ibus >/dev/null 2>&1; then
-            echo "Cleaning up IBus registry..."
-            ibus restart || true
+        # Remove helper script
+        if [ -f /usr/bin/keymagic3-ibus-refresh ]; then
+            rm -f /usr/bin/keymagic3-ibus-refresh
+        fi
+        
+        # Notify about IBus cleanup
+        if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+            echo "KeyMagic 3 has been removed from IBus."
+            echo "Users may need to restart IBus or re-login to update the input method list."
         fi
 
         # Clean up any remaining configuration on purge

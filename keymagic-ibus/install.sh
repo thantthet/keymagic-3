@@ -63,6 +63,12 @@ uninstall_keymagic() {
         rm -f "$PREFIX/share/ibus/component/keymagic3.xml"
     fi
     
+    # Remove icon
+    if [ -f "$PREFIX/share/pixmaps/keymagic3.png" ]; then
+        echo "Removing icon..."
+        rm -f "$PREFIX/share/pixmaps/keymagic3.png"
+    fi
+    
     # Restart IBus to update component list
     echo "Restarting IBus..."
     ibus restart || true
@@ -84,6 +90,7 @@ install_keymagic() {
     echo "Creating directories..."
     mkdir -p "$PREFIX/lib/ibus-keymagic3"
     mkdir -p "$PREFIX/share/ibus/component"
+    mkdir -p "$PREFIX/share/pixmaps"
     
     # Build if not already built
     if [ ! -f ibus-engine-keymagic3 ]; then
@@ -101,6 +108,12 @@ install_keymagic() {
     sed "s|/usr/lib/ibus-keymagic3|$PREFIX/lib/ibus-keymagic3|g" data/keymagic3.xml > /tmp/keymagic3.xml
     install -m 644 /tmp/keymagic3.xml "$PREFIX/share/ibus/component/"
     rm /tmp/keymagic3.xml
+    
+    # Install icon
+    if [ -f "../resources/icons/keymagic.png" ]; then
+        echo "Installing icon..."
+        install -m 644 "../resources/icons/keymagic.png" "$PREFIX/share/pixmaps/keymagic3.png"
+    fi
     
     # Restart IBus to pick up the new component
     echo "Restarting IBus..."

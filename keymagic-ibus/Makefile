@@ -112,8 +112,8 @@ install: $(PROJECT_NAME)
 	# Install IBus component definition
 	install -m 644 $(DATADIR)/keymagic3.xml $(COMPONENTDIR)/keymagic3.xml
 	
-	# Install icon (if available)
-	# install -m 644 $(DATADIR)/keymagic3.png $(ICONDIR)/keymagic3.png
+	# Install icon
+	install -m 644 $(DATADIR)/keymagic3.png $(ICONDIR)/keymagic3.png
 
 # Uninstall from system
 uninstall:
