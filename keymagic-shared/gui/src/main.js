@@ -851,10 +851,12 @@ window.showUpdateWindow = async function(updateInfo) {
       console.log('Could not check remind later setting:', e);
     }
     
-    // Create update window
     const { WebviewWindow } = window.__TAURI__.webviewWindow;
     
-    const updateWindow = new WebviewWindow('update-window', {
+    // Create update window with unique label using timestamp
+    const windowLabel = `update-window-${Date.now()}`;
+    
+    const updateWindow = new WebviewWindow(windowLabel, {
       url: `update-window.html?updateInfo=${encodeURIComponent(JSON.stringify(updateInfo))}`,
       title: 'KeyMagic Update Available',
       width: 600,
