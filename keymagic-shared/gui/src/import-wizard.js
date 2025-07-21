@@ -181,8 +181,8 @@ async function importSelectedKeyboards() {
       }
     }
     
-    // Clear the first run flag
-    await invoke('clear_first_run_scan_keyboards');
+    // Mark that we've scanned bundled keyboards for this version
+    await invoke('mark_bundled_keyboards_scanned');
     
     // Count successful imports
     const successCount = results.filter(r => r.success).length;
@@ -207,8 +207,8 @@ async function closeWizard() {
   console.log('Closing wizard...');
   
   try {
-    // Clear the first run flag
-    await invoke('clear_first_run_scan_keyboards');
+    // Mark that we've scanned bundled keyboards for this version
+    await invoke('mark_bundled_keyboards_scanned');
     console.log('Cleared first run flag');
   } catch (error) {
     console.error('Failed to clear first run flag:', error);

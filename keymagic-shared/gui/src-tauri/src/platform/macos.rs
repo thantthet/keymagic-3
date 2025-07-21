@@ -47,6 +47,7 @@ impl MacOSBackend {
                 start_with_system: false,
                 check_for_updates: true,
                 last_update_check: None,
+                last_scanned_version: None,
             },
             keyboards: KeyboardsConfig {
                 active: None,
@@ -186,5 +187,27 @@ impl Platform for MacOSBackend {
         }
         
         None
+    }
+    
+    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
+        let current_version = env!("CARGO_PKG_VERSION");
+        
+        // Load config to check last scanned version
+        if let Ok(config) = self.load_config() {
+            if let Some(last_version) = config.general.last_scanned_version {
+                // Compare versions - if current > last, should scan for new keyboards
+                return Ok(super::compare_versions(&current_version, &last_version));
+            }
+        }
+        
+        // No version recorded = should scan
+        Ok(true)
+    }
+    
+    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
+        let mut config = self.load_config()?;
+        config.general.last_scanned_version = Some(env!("CARGO_PKG_VERSION").to_string());
+        self.save_config(&config)?;
+        Ok(())
     }
 }

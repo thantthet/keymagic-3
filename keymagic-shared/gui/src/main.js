@@ -1405,7 +1405,7 @@ async function updateTrayMenu() {
 // Import Wizard Functions
 async function checkFirstRunImport() {
   try {
-    const shouldShowWizard = await invoke('check_first_run_scan_keyboards');
+    const shouldShowWizard = await invoke('should_scan_bundled_keyboards');
     if (shouldShowWizard) {
       // Check if there are actually keyboards to import
       const bundledKeyboards = await invoke('get_bundled_keyboards');
@@ -1420,7 +1420,7 @@ async function checkFirstRunImport() {
         await showImportWizard();
       } else {
         // No keyboards to import, clear the flag without showing wizard
-        await invoke('clear_first_run_scan_keyboards');
+        await invoke('mark_bundled_keyboards_scanned');
         console.log('No keyboards to import, skipping wizard');
       }
     }

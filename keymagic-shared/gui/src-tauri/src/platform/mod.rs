@@ -30,6 +30,7 @@ pub struct GeneralConfig {
     pub start_with_system: bool,
     pub check_for_updates: bool,
     pub last_update_check: Option<String>,
+    pub last_scanned_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,12 +121,12 @@ pub trait Platform: Send + Sync {
         Ok(())
     }
     
-    // First run checks
-    fn is_first_run(&self) -> Result<bool> {
-        Ok(false) // Default: not first run
+    // Bundled keyboard scanning
+    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
+        Ok(false) // Default: don't scan
     }
     
-    fn clear_first_run_flag(&self) -> Result<()> {
+    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
         Ok(())
     }
     
@@ -154,5 +155,57 @@ pub fn create_platform() -> Result<Box<dyn Platform>> {
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err(anyhow::anyhow!("Unsupported platform"))
+    }
+}
+
+// Helper function to compare version strings
+pub fn compare_versions(current: &str, last: &str) -> bool {
+    // Simple version comparison - split by dots and compare numerically
+    let current_parts: Vec<u32> = current.split('.')
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    let last_parts: Vec<u32> = last.split('.')
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    
+    for i in 0..current_parts.len().max(last_parts.len()) {
+        let current_part = current_parts.get(i).unwrap_or(&0);
+        let last_part = last_parts.get(i).unwrap_or(&0);
+        
+        if current_part > last_part {
+            return true;
+        } else if current_part < last_part {
+            return false;
+        }
+    }
+    
+    false // Versions are equal
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_version_comparison() {
+        // Test basic version comparisons
+        assert!(compare_versions("1.0.0", "0.9.9"));
+        assert!(compare_versions("2.0.0", "1.9.9"));
+        assert!(compare_versions("0.2.0", "0.1.9"));
+        assert!(compare_versions("0.0.2", "0.0.1"));
+        
+        // Test equal versions
+        assert!(!compare_versions("1.0.0", "1.0.0"));
+        assert!(!compare_versions("0.0.1", "0.0.1"));
+        
+        // Test lower versions
+        assert!(!compare_versions("0.9.9", "1.0.0"));
+        assert!(!compare_versions("1.0.0", "2.0.0"));
+        
+        // Test versions with different number of parts
+        assert!(!compare_versions("1.0.0", "1.0")); // Equal versions
+        assert!(compare_versions("1.0.1", "1.0")); // 1.0.1 > 1.0
+        assert!(!compare_versions("1.0", "1.0.0")); // Equal versions
+        assert!(compare_versions("1.1", "1.0.0")); // 1.1 > 1.0.0
     }
 }

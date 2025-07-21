@@ -54,6 +54,7 @@ impl WindowsBackend {
                 start_with_system: false,
                 check_for_updates: true,
                 last_update_check: None,
+                last_scanned_version: None,
             },
             keyboards: KeyboardsConfig {
                 active: None,
@@ -362,26 +363,30 @@ impl Platform for WindowsBackend {
         }
     }
     
-    fn is_first_run(&self) -> Result<bool> {
-        // Check if FirstRunScanKeyboards flag is set in Settings
+    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
+        let current_version = env!("CARGO_PKG_VERSION");
+        
+        // Check version-based approach
         if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
-            match settings_key.get_value::<u32, _>("FirstRunScanKeyboards") {
-                Ok(val) => Ok(val != 0),
-                Err(_) => Ok(true), // If value doesn't exist, it's first run
+            if let Ok(last_version) = settings_key.get_value::<String, _>("LastScannedVersion") {
+                // Compare versions - if current > last, should scan for new keyboards
+                return Ok(super::compare_versions(&current_version, &last_version));
             }
-        } else {
-            Ok(true) // If Settings key doesn't exist, it's first run
         }
+        
+        // No version recorded = should scan
+        Ok(true)
     }
     
-    fn clear_first_run_flag(&self) -> Result<()> {
-        // Clear the first run flag in Settings
+    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
+        // Update to use version-based tracking
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let (settings_key, _) = hkcu
             .create_subkey(SETTINGS_KEY)
             .context("Failed to create Settings key")?;
         
-        settings_key.set_value("FirstRunScanKeyboards", &0u32)?;
+        // Set current version
+        settings_key.set_value("LastScannedVersion", &env!("CARGO_PKG_VERSION"))?;
         Ok(())
     }
     

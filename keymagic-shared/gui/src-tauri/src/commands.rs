@@ -417,9 +417,9 @@ pub fn get_app_version() -> Result<String, String> {
 
 // Import wizard commands
 #[tauri::command]
-pub fn check_first_run_scan_keyboards(state: State<AppState>) -> Result<bool, String> {
+pub fn should_scan_bundled_keyboards(state: State<AppState>) -> Result<bool, String> {
     state.get_platform()
-        .is_first_run()
+        .should_scan_bundled_keyboards()
         .map_err(|e| e.to_string())
 }
 
@@ -547,9 +547,9 @@ pub fn import_bundled_keyboard(
 }
 
 #[tauri::command]
-pub fn clear_first_run_scan_keyboards(state: State<AppState>) -> Result<(), String> {
+pub fn mark_bundled_keyboards_scanned(state: State<AppState>) -> Result<(), String> {
     state.get_platform()
-        .clear_first_run_flag()
+        .mark_bundled_keyboards_scanned()
         .map_err(|e| e.to_string())
 }
 
