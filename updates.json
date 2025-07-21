@@ -20,11 +20,42 @@
         "size": 5277868,
         "sha256": "81989a7f29f00d7b9efb82efad16733d80d5f8861106ef74ff691859c12cc55e"
       }
+    },
+    "macos": {
+      "x86_64": {
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
+        "minimumSystemVersion": "10.15",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-0.0.6-x64.dmg",
+        "signature": "",
+        "size": 0,
+        "sha256": ""
+      },
+      "aarch64": {
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
+        "minimumSystemVersion": "11.0",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-0.0.6-arm64.dmg",
+        "signature": "",
+        "size": 0,
+        "sha256": ""
+      }
+    },
+    "linux": {
+      "x86_64": {
+        "version": "0.0.6",
+        "releaseDate": "2025-07-21T06:11:36Z",
+        "minimumSystemVersion": "",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/keymagic3-0.0.6-amd64.deb",
+        "signature": "",
+        "size": 0,
+        "sha256": ""
+      }
     }
   },
   "releaseNotes": {
     "0.0.6": {
-      "en": "### KeyMagic 3 - v0.0.6\n\n**What's New**\n\n• **Visual Keyboard Layout** - Preview and pin keyboard layouts\n• **Smart Organization** - Alphabetical sorting with \"just added\" badges\n• **Direct File Support** - Double-click .km2 files to open\n• **Improved Hotkeys** - Official Windows hotkey system\n• **Clearer UI** - Better Windows activation instructions\n• **Dedicated Icon** - Separate keyboard icon in language bar\n• **Better Stability** - Improved Windows compatibility\n• **Smoother Updates** - Enhanced installer handling"
+      "en": "### KeyMagic 3 - v0.0.6 ✨\n\n\n\n**What's New** 🎉\n\n\n\n• **Visual Keyboard Layout** 🎹 - Preview and pin keyboard layouts\n\n• **Smart Organization** 📁 - Alphabetical sorting with \"just added\" badges\n\n• **Direct File Support** 📂 - Double-click .km2 files to open\n\n• **Improved Hotkeys** ⌨️ - Official Windows hotkey system\n\n• **Clearer UI** 🎨 - Better Windows activation instructions\n\n• **Dedicated Icon** 🔤 - Separate keyboard icon in language bar\n\n• **Better Stability** 🛡️ - Improved Windows compatibility\n\n• **Smoother Updates** 🚀 - Enhanced installer handling"
     }
   }
 }
