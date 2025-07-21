@@ -20,37 +20,6 @@
         "size": 5277868,
         "sha256": "81989a7f29f00d7b9efb82efad16733d80d5f8861106ef74ff691859c12cc55e"
       }
-    },
-    "macos": {
-      "x86_64": {
-        "version": "0.0.6",
-        "releaseDate": "2025-07-21T06:11:36Z",
-        "minimumSystemVersion": "10.15",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-0.0.6-x64.dmg",
-        "signature": "",
-        "size": 0,
-        "sha256": ""
-      },
-      "aarch64": {
-        "version": "0.0.6",
-        "releaseDate": "2025-07-21T06:11:36Z",
-        "minimumSystemVersion": "11.0",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/KeyMagic3-0.0.6-arm64.dmg",
-        "signature": "",
-        "size": 0,
-        "sha256": ""
-      }
-    },
-    "linux": {
-      "x86_64": {
-        "version": "0.0.6",
-        "releaseDate": "2025-07-21T06:11:36Z",
-        "minimumSystemVersion": "",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.6/keymagic3-0.0.6-amd64.deb",
-        "signature": "",
-        "size": 0,
-        "sha256": ""
-      }
     }
   },
   "releaseNotes": {
