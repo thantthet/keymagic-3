@@ -492,8 +492,19 @@ function showModal(title, content, footer) {
   modal.classList.add('show');
 }
 
-window.hideModal = function() {
+window.hideModal = async function() {
   modal.classList.remove('show');
+  
+  // Resume hotkeys if we were in hotkey configuration mode
+  if (currentHotkeyKeyboard) {
+    try {
+      await invoke('resume_hotkeys');
+    } catch (error) {
+      console.error('Failed to resume hotkeys:', error);
+    }
+    currentHotkeyKeyboard = null;
+    recordedKeys = [];
+  }
 }
 
 
@@ -570,12 +581,19 @@ function showError(message) {
 let currentHotkeyKeyboard = null;
 let recordedKeys = [];
 
-window.configureHotkey = function(keyboardId) {
+window.configureHotkey = async function(keyboardId) {
   const keyboard = keyboards.find(k => k.id === keyboardId);
   if (!keyboard) return;
   
   currentHotkeyKeyboard = keyboard;
   recordedKeys = [];
+  
+  // Pause hotkeys while configuring
+  try {
+    await invoke('pause_hotkeys');
+  } catch (error) {
+    console.error('Failed to pause hotkeys:', error);
+  }
   
   // Determine initial display value and state
   let initialValue = '';
@@ -699,11 +717,19 @@ window.useDefaultHotkey = function() {
   }
 }
 
-window.cancelHotkeyConfig = function() {
+window.cancelHotkeyConfig = async function() {
   const input = document.getElementById('hotkey-input');
   if (input) {
     input.removeEventListener('keydown', recordHotkey);
   }
+  
+  // Resume hotkeys
+  try {
+    await invoke('resume_hotkeys');
+  } catch (error) {
+    console.error('Failed to resume hotkeys:', error);
+  }
+  
   currentHotkeyKeyboard = null;
   recordedKeys = [];
   hideModal();
@@ -749,6 +775,13 @@ window.saveHotkey = async function() {
       console.error('Failed to save hotkey:', error);
       showError('Failed to save hotkey');
     }
+  }
+  
+  // Resume hotkeys
+  try {
+    await invoke('resume_hotkeys');
+  } catch (error) {
+    console.error('Failed to resume hotkeys:', error);
   }
   
   currentHotkeyKeyboard = null;

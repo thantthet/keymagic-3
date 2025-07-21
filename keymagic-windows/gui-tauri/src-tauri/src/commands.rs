@@ -684,3 +684,30 @@ pub fn get_keyboard_layout(
     })
     }
 }
+
+#[tauri::command]
+pub fn pause_hotkeys(
+    app_handle: AppHandle,
+    hotkey_manager: State<HotkeyManager>,
+) -> Result<(), String> {
+    hotkey_manager.pause_hotkeys(&app_handle)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn resume_hotkeys(
+    app_handle: AppHandle,
+    hotkey_manager: State<HotkeyManager>,
+    keyboard_manager: State<KeyboardManagerState>,
+) -> Result<(), String> {
+    let manager = keyboard_manager.lock().map_err(|e| e.to_string())?;
+    hotkey_manager.resume_hotkeys(&app_handle, &manager)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn is_hotkeys_paused(
+    hotkey_manager: State<HotkeyManager>,
+) -> Result<bool, String> {
+    Ok(hotkey_manager.is_paused())
+}

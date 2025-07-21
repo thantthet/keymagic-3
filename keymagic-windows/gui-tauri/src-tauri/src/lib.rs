@@ -128,6 +128,9 @@ pub fn run_with_file(km2_file: Option<std::path::PathBuf>) {
             commands::get_supported_languages,
             commands::search_languages,
             commands::get_keyboard_layout,
+            commands::pause_hotkeys,
+            commands::resume_hotkeys,
+            commands::is_hotkeys_paused,
         ])
         .setup(|app| {
             // Initialize native HUD window

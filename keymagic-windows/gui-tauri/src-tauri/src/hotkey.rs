@@ -135,12 +135,14 @@ fn parse_function_key(s: &str) -> Option<u8> {
 
 pub struct HotkeyManager {
     registered_hotkeys: Arc<Mutex<HashMap<String, String>>>, // hotkey -> keyboard_id
+    paused: Arc<Mutex<bool>>, // Whether hotkeys are currently paused
 }
 
 impl HotkeyManager {
     pub fn new() -> Self {
         Self {
             registered_hotkeys: Arc::new(Mutex::new(HashMap::new())),
+            paused: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -328,5 +330,43 @@ impl HotkeyManager {
     /// Update hotkeys when keyboards change
     pub fn refresh_hotkeys(&self, app: &AppHandle, keyboard_manager: &KeyboardManager) -> Result<()> {
         self.register_all_hotkeys(app, keyboard_manager)
+    }
+    
+    /// Pause all hotkeys (e.g., when hotkey configuration modal is open)
+    /// This actually unregisters all hotkeys to allow the key combinations to be used elsewhere
+    pub fn pause_hotkeys(&self, app: &AppHandle) -> Result<()> {
+        // Mark as paused
+        if let Ok(mut paused) = self.paused.lock() {
+            *paused = true;
+        }
+        
+        // Unregister all hotkeys
+        let registered = self.registered_hotkeys.lock().unwrap();
+        for hotkey_str in registered.keys() {
+            if let Ok(shortcut) = Shortcut::try_from(hotkey_str.as_str()) {
+                // Ignore errors during unregistration
+                let _ = app.global_shortcut().unregister(shortcut);
+            }
+        }
+        drop(registered);
+        
+        Ok(())
+    }
+    
+    /// Resume all hotkeys (e.g., when hotkey configuration modal is closed)
+    /// This re-registers all previously registered hotkeys
+    pub fn resume_hotkeys(&self, app: &AppHandle, keyboard_manager: &KeyboardManager) -> Result<()> {
+        // Mark as not paused
+        if let Ok(mut paused) = self.paused.lock() {
+            *paused = false;
+        }
+        
+        // Re-register all hotkeys using the existing method
+        self.register_all_hotkeys(app, keyboard_manager)
+    }
+    
+    /// Check if hotkeys are currently paused
+    pub fn is_paused(&self) -> bool {
+        self.paused.lock().map(|p| *p).unwrap_or(false)
     }
 }
