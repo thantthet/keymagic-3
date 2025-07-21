@@ -18,6 +18,18 @@ echo -e "${BLUE}KeyMagic 3 Docker Build System${NC}"
 echo "================================="
 echo ""
 
+# Check Docker and buildx availability
+if ! command -v docker &> /dev/null; then
+    echo -e "${RED}Docker is not installed or not in PATH${NC}"
+    exit 1
+fi
+
+# Check if buildx is available
+if ! docker buildx version &> /dev/null; then
+    echo -e "${YELLOW}Docker buildx not found. Multi-arch builds may not work.${NC}"
+    echo "Please update Docker or enable experimental features."
+fi
+
 # Default values
 ARCHITECTURES=()
 PACKAGE_FORMAT="all"
@@ -85,6 +97,17 @@ if [ ${#ARCHITECTURES[@]} -eq 0 ]; then
             ;;
     esac
 fi
+
+# Performance warning for emulation
+CURRENT_ARCH=$(uname -m)
+for ARCH in "${ARCHITECTURES[@]}"; do
+    if [ "$CURRENT_ARCH" = "x86_64" ] && [ "$ARCH" = "arm64" ]; then
+        echo -e "${YELLOW}Note: Building ARM64 on x86_64 uses emulation and will be slower${NC}"
+    elif [ "$CURRENT_ARCH" = "aarch64" ] && [ "$ARCH" = "amd64" ]; then
+        echo -e "${YELLOW}Note: Building x86_64 on ARM64 uses emulation and will be slower${NC}"
+    fi
+done
+echo ""
 
 # Build for each architecture
 for ARCH in "${ARCHITECTURES[@]}"; do

@@ -94,8 +94,34 @@ Packages are created in the `dist/` directory:
 ## Requirements
 
 ### For Docker Build
-- Docker with buildx support
-- Multi-architecture support enabled
+
+#### Docker Version
+- Docker 19.03+ (for buildx support)
+- Docker Desktop 4.0+ recommended for Mac/Windows
+
+#### Multi-Architecture Support
+- **Linux**: QEMU user-mode emulation must be installed
+- **macOS**: Docker Desktop includes built-in emulation
+- **Windows**: Docker Desktop with WSL2 backend includes emulation
+
+#### Setup on Linux
+If building cross-architecture on Linux, install QEMU:
+```bash
+# Install QEMU user-mode emulation
+sudo apt-get update
+sudo apt-get install -y qemu-user-static
+
+# Verify multi-arch support
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+# Check available platforms
+docker buildx ls
+```
+
+#### Memory Requirements
+- Minimum 4GB RAM for single architecture build
+- Recommended 8GB+ RAM for multi-architecture builds
+- Rust compilation is memory-intensive
 
 ### For Native Build
 - Ubuntu 22.04+ or equivalent
