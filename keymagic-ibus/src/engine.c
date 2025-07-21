@@ -7,6 +7,22 @@
 /* Logging tag */
 #define LOG_TAG "KeyMagicEngine"
 
+/* Conditional logging for sensitive information */
+#ifdef NDEBUG
+    /* Release build - redact sensitive key information */
+    #define LOG_KEY_EVENT(keyval, keycode, modifiers) \
+        g_debug("%s: Processing key event - [REDACTED]", LOG_TAG)
+    #define LOG_COMPOSING_TEXT(text) \
+        g_debug("%s: Engine composing text: [REDACTED]", LOG_TAG)
+#else
+    /* Debug build - show full information */
+    #define LOG_KEY_EVENT(keyval, keycode, modifiers) \
+        g_debug("%s: Processing key event - keyval=%u, keycode=%u, modifiers=%u", \
+                LOG_TAG, keyval, keycode, modifiers)
+    #define LOG_COMPOSING_TEXT(text) \
+        g_debug("%s: Engine composing text: %s", LOG_TAG, text)
+#endif
+
 /* File monitor event callback */
 static void config_file_changed_cb(GFileMonitor* monitor, GFile* file, GFile* other_file,
                                    GFileMonitorEvent event_type, gpointer user_data);
@@ -239,8 +255,7 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
 {
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(ibus_engine);
     
-    g_debug("%s: Processing key event - keyval=%u, keycode=%u, modifiers=%u", 
-            LOG_TAG, keyval, keycode, modifiers);
+    LOG_KEY_EVENT(keyval, keycode, modifiers);
     
     /* Only process key press events, ignore key release */
     if (modifiers & IBUS_RELEASE_MASK) {
@@ -297,7 +312,7 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
     
     /* Handle preedit based on engine output */
     if (result.composing_text && strlen(result.composing_text) > 0) {
-        g_debug("%s: Engine composing text: %s", LOG_TAG, result.composing_text);
+        LOG_COMPOSING_TEXT(result.composing_text);
         
         /* Check if we should commit */
         if (keymagic_engine_should_commit(keyval, result.is_processed, result.composing_text)) {

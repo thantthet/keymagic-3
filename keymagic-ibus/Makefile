@@ -37,7 +37,19 @@ OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
 
 # Compiler and flags
 CC ?= gcc
-CFLAGS = -std=c99 -Wall -Wextra -O2 -fPIC
+CFLAGS_COMMON = -std=c99 -Wall -Wextra -fPIC
+CFLAGS_DEBUG = $(CFLAGS_COMMON) -g -O0
+CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2 -DNDEBUG
+
+# Default to debug build
+BUILD_TYPE ?= debug
+
+ifeq ($(BUILD_TYPE),release)
+    CFLAGS = $(CFLAGS_RELEASE)
+else
+    CFLAGS = $(CFLAGS_DEBUG)
+endif
+
 CPPFLAGS = -DVERSION=\"$(VERSION)\"
 
 # Package config for dependencies
@@ -61,6 +73,14 @@ ALL_LIBS = $(IBUS_LIBS) $(GLIB_LIBS) $(TOML_LIBS) $(KEYMAGIC_LIBS)
 
 # Default target
 all: $(PROJECT_NAME)
+
+# Debug build
+debug:
+	$(MAKE) BUILD_TYPE=debug clean all
+
+# Release build
+release:
+	$(MAKE) BUILD_TYPE=release clean all
 
 # Create build directory
 $(BUILDDIR):

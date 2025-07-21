@@ -7,6 +7,36 @@
 /* Logging tag */
 #define LOG_TAG "KeyMagicFFI"
 
+/* Conditional logging for sensitive information */
+#ifdef NDEBUG
+    /* Release build - redact sensitive information */
+    #define LOG_FFI_PARAMS(km_keycode, keyval, character, shift, ctrl, alt, caps_lock) \
+        g_debug("%s: Calling keymagic_engine_process_key with params: [REDACTED]", LOG_TAG)
+    #define LOG_FFI_RESULT(text, composing_text, is_processed, action_type, delete_count) \
+        g_debug("%s: Process key result - [REDACTED]", LOG_TAG)
+#else
+    /* Debug build - show full information */
+    #define LOG_FFI_PARAMS(km_keycode, keyval, character, shift, ctrl, alt, caps_lock) \
+        do { \
+            g_debug("%s: Calling keymagic_engine_process_key with params:", LOG_TAG); \
+            g_debug("%s:   - key_code: %u (mapped from keyval 0x%x)", LOG_TAG, km_keycode, keyval); \
+            g_debug("%s:   - character: '%c' (0x%02x)", LOG_TAG, \
+                    character >= 0x20 && character <= 0x7E ? character : '?', character); \
+            g_debug("%s:   - shift: %d", LOG_TAG, shift ? 1 : 0); \
+            g_debug("%s:   - ctrl: %d", LOG_TAG, ctrl ? 1 : 0); \
+            g_debug("%s:   - alt: %d", LOG_TAG, alt ? 1 : 0); \
+            g_debug("%s:   - caps_lock: %d", LOG_TAG, caps_lock ? 1 : 0); \
+        } while(0)
+    #define LOG_FFI_RESULT(text, composing_text, is_processed, action_type, delete_count) \
+        g_debug("%s: Process key result - text=%s, composing=%s, processed=%s, action=%d, delete=%d", \
+                LOG_TAG, \
+                text ? text : "(null)", \
+                composing_text ? composing_text : "(null)", \
+                is_processed ? "TRUE" : "FALSE", \
+                action_type, \
+                delete_count)
+#endif
+
 /**
  * FFI Bridge Implementation
  * 
@@ -123,14 +153,7 @@ keymagic_ffi_process_key(EngineHandle* engine, guint keyval, guint keycode,
     }
     
     /* Log parameters before calling Rust FFI */
-    g_debug("%s: Calling keymagic_engine_process_key with params:", LOG_TAG);
-    g_debug("%s:   - key_code: %u (mapped from keyval 0x%x)", LOG_TAG, km_keycode, keyval);
-    g_debug("%s:   - character: '%c' (0x%02x)", LOG_TAG, 
-            character >= 0x20 && character <= 0x7E ? character : '?', character);
-    g_debug("%s:   - shift: %d", LOG_TAG, shift ? 1 : 0);
-    g_debug("%s:   - ctrl: %d", LOG_TAG, ctrl ? 1 : 0);
-    g_debug("%s:   - alt: %d", LOG_TAG, alt ? 1 : 0);
-    g_debug("%s:   - caps_lock: %d", LOG_TAG, caps_lock ? 1 : 0);
+    LOG_FFI_PARAMS(km_keycode, keyval, character, shift, ctrl, alt, caps_lock);
     
     /* Call Rust FFI function with mapped keycode */
     RustProcessKeyOutput rust_output = {0};
@@ -156,13 +179,8 @@ keymagic_ffi_process_key(EngineHandle* engine, guint keyval, guint keycode,
     if (rust_output.text) keymagic_engine_free_string(rust_output.text);
     if (rust_output.composing_text) keymagic_engine_free_string(rust_output.composing_text);
     
-    g_debug("%s: Process key result - text=%s, composing=%s, processed=%s, action=%d, delete=%d", 
-            LOG_TAG, 
-            result->text ? result->text : "(null)",
-            result->composing_text ? result->composing_text : "(null)",
-            result->is_processed ? "TRUE" : "FALSE",
-            result->action_type,
-            result->delete_count);
+    LOG_FFI_RESULT(result->text, result->composing_text, result->is_processed,
+                   result->action_type, result->delete_count);
     
     return KEYMAGIC_RESULT_SUCCESS;
 }
