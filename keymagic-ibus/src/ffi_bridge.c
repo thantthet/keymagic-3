@@ -128,16 +128,48 @@ keymagic_ffi_process_key(EngineHandle* engine, guint keyval, guint keycode,
     /* Initialize result structure */
     memset(result, 0, sizeof(KeyProcessingResult));
     
+    /* Check for unsupported modifiers before processing */
+    /* Only support: no modifiers, Shift, Ctrl, Alt, and their combinations */
+    guint supported_modifiers = IBUS_SHIFT_MASK | IBUS_CONTROL_MASK | IBUS_MOD1_MASK | 
+                               IBUS_LOCK_MASK | IBUS_RELEASE_MASK;
+    if (modifiers & ~supported_modifiers) {
+        g_debug("%s: Skipping engine processing for unsupported modifiers: 0x%x", LOG_TAG, modifiers);
+        
+        /* Mock unprocessed result but include current composing text */
+        result->is_processed = FALSE;
+        result->action_type = 0; /* ActionType::None */
+        result->delete_count = 0;
+        result->text = NULL;
+        
+        /* Get current composing text from engine */
+        char* rust_text = keymagic_engine_get_composition(engine);
+        if (rust_text) {
+            result->composing_text = g_strdup(rust_text);
+            keymagic_engine_free_string(rust_text);
+        } else {
+            result->composing_text = NULL;
+        }
+        
+        g_debug("%s: Returning unprocessed with composing text: %s", LOG_TAG, 
+                result->composing_text ? result->composing_text : "(null)");
+        
+        return KEYMAGIC_RESULT_SUCCESS;
+    }
+    
     /* Convert IBus modifiers to individual flags */
     gboolean shift = (modifiers & IBUS_SHIFT_MASK) != 0;
     gboolean ctrl = (modifiers & IBUS_CONTROL_MASK) != 0;
     gboolean alt = (modifiers & IBUS_MOD1_MASK) != 0;
     gboolean caps_lock = (modifiers & IBUS_LOCK_MASK) != 0;
     
+    /* Check if any modifier except Shift is pressed */
+    /* IBus modifier masks: CONTROL, MOD1(Alt), MOD2(NumLock), MOD3, MOD4, MOD5, SUPER, HYPER, META */
+    guint non_shift_modifiers = modifiers & ~(IBUS_SHIFT_MASK | IBUS_LOCK_MASK | IBUS_RELEASE_MASK);
+    
     /* Convert keyval to character - for ASCII printable chars */
-    /* Only pass character when no modifiers (except Shift) are pressed */
+    /* Only pass character when no modifiers (except Shift and CapsLock) are pressed */
     char character = 0;
-    if ((keyval >= 0x20 && keyval <= 0x7E) && !ctrl && !alt) {
+    if ((keyval >= 0x20 && keyval <= 0x7E) && (non_shift_modifiers == 0)) {
         character = (char)keyval;
     }
     
