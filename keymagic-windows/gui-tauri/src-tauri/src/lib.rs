@@ -10,9 +10,6 @@ mod windows_event;
 mod keyboard_icon;
 
 #[cfg(target_os = "windows")]
-mod keyboard_hook;
-
-#[cfg(target_os = "windows")]
 mod registry;
 
 #[cfg(target_os = "windows")]
@@ -98,6 +95,7 @@ pub fn run_with_file(km2_file: Option<std::path::PathBuf>) {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Mutex::new(keyboard_manager))
         .manage(HotkeyManager::new())
         .invoke_handler(tauri::generate_handler![
