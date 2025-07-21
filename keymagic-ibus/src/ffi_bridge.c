@@ -105,8 +105,9 @@ keymagic_ffi_process_key(EngineHandle* engine, guint keyval, guint keycode,
     gboolean caps_lock = (modifiers & IBUS_LOCK_MASK) != 0;
     
     /* Convert keyval to character - for ASCII printable chars */
+    /* Only pass character when no modifiers (except Shift) are pressed */
     char character = 0;
-    if (keyval >= 0x20 && keyval <= 0x7E) {
+    if ((keyval >= 0x20 && keyval <= 0x7E) && !ctrl && !alt) {
         character = (char)keyval;
     }
     
@@ -120,6 +121,16 @@ keymagic_ffi_process_key(EngineHandle* engine, guint keyval, guint keycode,
     } else {
         g_debug("%s: Mapped keyval 0x%x to VirtualKey %u", LOG_TAG, keyval, km_keycode);
     }
+    
+    /* Log parameters before calling Rust FFI */
+    g_debug("%s: Calling keymagic_engine_process_key with params:", LOG_TAG);
+    g_debug("%s:   - key_code: %u (mapped from keyval 0x%x)", LOG_TAG, km_keycode, keyval);
+    g_debug("%s:   - character: '%c' (0x%02x)", LOG_TAG, 
+            character >= 0x20 && character <= 0x7E ? character : '?', character);
+    g_debug("%s:   - shift: %d", LOG_TAG, shift ? 1 : 0);
+    g_debug("%s:   - ctrl: %d", LOG_TAG, ctrl ? 1 : 0);
+    g_debug("%s:   - alt: %d", LOG_TAG, alt ? 1 : 0);
+    g_debug("%s:   - caps_lock: %d", LOG_TAG, caps_lock ? 1 : 0);
     
     /* Call Rust FFI function with mapped keycode */
     RustProcessKeyOutput rust_output = {0};

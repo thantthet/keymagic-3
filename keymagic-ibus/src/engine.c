@@ -248,6 +248,27 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
         return FALSE;
     }
     
+    /* Ignore standalone modifier key events */
+    switch (keyval) {
+        case IBUS_KEY_Shift_L:
+        case IBUS_KEY_Shift_R:
+        case IBUS_KEY_Control_L:
+        case IBUS_KEY_Control_R:
+        case IBUS_KEY_Alt_L:
+        case IBUS_KEY_Alt_R:
+        case IBUS_KEY_Meta_L:
+        case IBUS_KEY_Meta_R:
+        case IBUS_KEY_Super_L:
+        case IBUS_KEY_Super_R:
+        case IBUS_KEY_Hyper_L:
+        case IBUS_KEY_Hyper_R:
+        case IBUS_KEY_Caps_Lock:
+        case IBUS_KEY_Num_Lock:
+        case IBUS_KEY_Scroll_Lock:
+            g_debug("%s: Ignoring modifier key: keyval=%u", LOG_TAG, keyval);
+            return FALSE;
+    }
+    
     /* Load keyboard on-demand if needed */
     if (engine->keyboard_changed && engine->active_keyboard_id) {
         keymagic_ibus_engine_load_keyboard(engine, engine->active_keyboard_id);
@@ -373,7 +394,8 @@ keymagic_engine_reset(IBusEngine* ibus_engine)
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(ibus_engine);
     g_debug("%s: Reset", LOG_TAG);
     
-    /* Clear preedit */
+    /* Clear preedit without committing - reset means cancel, not commit */
+    /* IBus calls reset when user wants to cancel input (e.g., pressing Escape) */
     keymagic_engine_clear_preedit(engine);
     
     /* Reset core engine */
