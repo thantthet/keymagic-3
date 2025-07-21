@@ -16,11 +16,11 @@ impl LinuxBackend {
     pub fn new() -> Result<Self> {
         let config_dir = dirs::config_dir()
             .context("Failed to get config directory")?
-            .join("keymagic");
+            .join("keymagic3");
         
         let data_dir = dirs::data_dir()
             .context("Failed to get data directory")?
-            .join("keymagic");
+            .join("keymagic3");
         
         // User keyboards directory within data directory
         let keyboards_dir = data_dir.join("keyboards");

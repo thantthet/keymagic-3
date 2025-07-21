@@ -12,9 +12,6 @@ case "$1" in
             echo "Registering KeyMagic 3 with IBus..."
             # Restart IBus to pick up new component
             ibus restart || true
-            sleep 2
-            # Register the component
-            ibus register-component /usr/share/ibus/component/keymagic3.xml || true
             echo "KeyMagic 3 has been registered with IBus."
             echo "You can add it through Settings > Keyboard > Input Sources"
         else
