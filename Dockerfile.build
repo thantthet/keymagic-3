@@ -43,8 +43,18 @@ RUN useradd -m -s /bin/bash builder && \
 # Set working directory
 WORKDIR /build
 
-# Copy source code
-COPY --chown=builder:builder . .
+# First, copy only the files needed for dependency resolution
+# This allows Docker to cache the dependency download layer
+COPY --chown=builder:builder Cargo.toml Cargo.lock ./
+COPY --chown=builder:builder keymagic-core/Cargo.toml ./keymagic-core/
+COPY --chown=builder:builder keymagic-shared/gui/src-tauri/Cargo.toml ./keymagic-shared/gui/src-tauri/
+COPY --chown=builder:builder kms2km2/Cargo.toml ./kms2km2/
+
+# Create dummy source files to allow cargo to download dependencies
+RUN mkdir -p keymagic-core/src keymagic-shared/gui/src-tauri/src kms2km2/src && \
+    echo "fn main() {}" > keymagic-core/src/lib.rs && \
+    echo "fn main() {}" > keymagic-shared/gui/src-tauri/src/main.rs && \
+    echo "fn main() {}" > kms2km2/src/main.rs
 
 # Switch to builder user
 USER builder
@@ -52,6 +62,12 @@ USER builder
 # Make cargo available for builder user
 RUN echo 'source $HOME/.cargo/env' >> ~/.bashrc
 ENV PATH="/home/builder/.cargo/bin:${PATH}"
+
+# Pre-download dependencies (this layer will be cached)
+RUN cargo fetch --locked
+
+# Now copy the actual source code
+COPY --chown=builder:builder . .
 
 # Default command
 CMD ["./build-linux-package.sh"]
