@@ -282,6 +282,9 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
         if (keymagic_engine_should_commit(keyval, result.is_processed, result.composing_text)) {
             g_debug("%s: Committing composition", LOG_TAG);
             
+            /* Update preedit with the final composing text before committing */
+            keymagic_engine_update_preedit(engine, result.composing_text);
+            
             /* Commit the composing text */
             keymagic_engine_commit_preedit(engine);
             
