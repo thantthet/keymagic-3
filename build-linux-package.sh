@@ -131,9 +131,9 @@ create_package_structure() {
     
     # Copy binaries
     if [ "$BUILD_TYPE" = "release" ]; then
-        cp "keymagic-shared/gui/src-tauri/target/release/gui" "$pkg_dir/usr/bin/keymagic3-gui"
+        cp "target/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
     else
-        cp "keymagic-shared/gui/src-tauri/target/debug/gui" "$pkg_dir/usr/bin/keymagic3-gui"
+        cp "target/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
     fi
     
     cp "keymagic-ibus/ibus-engine-keymagic3" "$pkg_dir/usr/lib/ibus-keymagic3/ibus-engine-keymagic3"
@@ -231,7 +231,7 @@ mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 mkdir -p %{buildroot}/usr/share/doc/keymagic3
 
 # Copy files from our build
-cp $SCRIPT_DIR/keymagic-shared/gui/src-tauri/target/release/gui %{buildroot}/usr/bin/keymagic3-gui
+cp $SCRIPT_DIR/target/release/keymagic-gui %{buildroot}/usr/bin/keymagic3-gui
 cp $SCRIPT_DIR/keymagic-ibus/ibus-engine-keymagic3 %{buildroot}/usr/lib/ibus-keymagic3/
 cp $SCRIPT_DIR/keymagic-ibus/data/keymagic3.xml %{buildroot}/usr/share/ibus/component/
 cp $SCRIPT_DIR/keymagic-shared/gui/assets/keymagic3.desktop %{buildroot}/usr/share/applications/ 2>/dev/null || true
