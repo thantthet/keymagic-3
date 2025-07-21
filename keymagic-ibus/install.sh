@@ -9,8 +9,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}KeyMagic IBus Engine Installation${NC}"
-echo "=================================="
+echo -e "${GREEN}KeyMagic 3 IBus Engine Installation${NC}"
+echo "======================================"
 
 # Check if running as root for system install
 if [ "$EUID" -eq 0 ]; then 
@@ -23,11 +23,11 @@ fi
 
 # Create directories
 echo "Creating directories..."
-mkdir -p "$PREFIX/lib/ibus-keymagic"
+mkdir -p "$PREFIX/lib/ibus-keymagic3"
 mkdir -p "$PREFIX/share/ibus/component"
 
 # Build if not already built
-if [ ! -f ibus-engine-keymagic ]; then
+if [ ! -f ibus-engine-keymagic3 ]; then
     echo "Building engine..."
     make clean
     make
@@ -35,13 +35,13 @@ fi
 
 # Install engine
 echo "Installing engine executable..."
-install -m 755 ibus-engine-keymagic "$PREFIX/lib/ibus-keymagic/"
+install -m 755 ibus-engine-keymagic3 "$PREFIX/lib/ibus-keymagic3/ibus-engine-keymagic3"
 
 # Update component XML with correct path
 echo "Installing IBus component definition..."
-sed "s|/usr/lib/ibus-keymagic|$PREFIX/lib/ibus-keymagic|g" data/keymagic.xml > /tmp/keymagic.xml
-install -m 644 /tmp/keymagic.xml "$PREFIX/share/ibus/component/"
-rm /tmp/keymagic.xml
+sed "s|/usr/lib/ibus-keymagic3|$PREFIX/lib/ibus-keymagic3|g" data/keymagic3.xml > /tmp/keymagic3.xml
+install -m 644 /tmp/keymagic3.xml "$PREFIX/share/ibus/component/"
+rm /tmp/keymagic3.xml
 
 # Restart IBus
 echo "Restarting IBus..."
@@ -50,17 +50,17 @@ sleep 2
 
 # Register component
 echo "Registering component..."
-ibus register-component "$PREFIX/share/ibus/component/keymagic.xml" || true
+ibus register-component "$PREFIX/share/ibus/component/keymagic3.xml" || true
 
 echo ""
 echo -e "${GREEN}Installation complete!${NC}"
 echo ""
-echo "To use KeyMagic:"
-echo "1. Run 'ibus-setup' and add KeyMagic to your input methods"
-echo "2. Switch to KeyMagic using your input method switcher"
+echo "To use KeyMagic 3:"
+echo "1. Run 'ibus-setup' and add KeyMagic 3 to your input methods"
+echo "2. Switch to KeyMagic 3 using your input method switcher"
 echo ""
 echo "To test immediately:"
-echo "  ibus engine keymagic"
+echo "  ibus engine keymagic3"
 echo ""
 echo "For debugging, run:"
 echo "  ./test-debug.sh"

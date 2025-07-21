@@ -1,38 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    KeyMagic IBus Component Definition
+    KeyMagic 3 IBus Component Definition
     
-    This file defines the KeyMagic input method component for IBus.
-    It should be installed to /usr/share/ibus/component/keymagic.xml
+    This file defines the KeyMagic 3 input method component for IBus.
+    It should be installed to /usr/share/ibus/component/keymagic3.xml
 -->
 <component>
-    <name>org.freedesktop.IBus.KeyMagic</name>
-    <description>KeyMagic Input Method</description>
-    <exec>/usr/lib/ibus-keymagic/ibus-engine-keymagic --ibus</exec>
+    <name>org.freedesktop.IBus.KeyMagic3</name>
+    <description>KeyMagic 3 Input Method</description>
+    <exec>/usr/lib/ibus-keymagic3/ibus-engine-keymagic3 --ibus</exec>
     <version>0.0.1</version>
     <author>Thant Thet Khin Zaw</author>
     <license>GPL-3.0</license>
     <homepage>https://github.com/thantthet/keymagic-3</homepage>
-    <textdomain>keymagic</textdomain>
+    <textdomain>keymagic3</textdomain>
     
     <engines>
         <engine>
-            <name>keymagic</name>
+            <name>keymagic3</name>
             <language>my</language>
             <license>GPL-3.0</license>
             <author>Thant Thet Khin Zaw</author>
-            <icon>keymagic</icon>
+            <icon>keymagic3</icon>
             <layout>us</layout>
             <layout_variant></layout_variant>
             <layout_option></layout_option>
-            <longname>KeyMagic</longname>
+            <longname>KeyMagic 3</longname>
             <description>Smart keyboard input method for Myanmar and other languages</description>
             <rank>50</rank>
             <symbol>က</symbol>
-            <setup>/usr/bin/keymagic-gui</setup>
+            <setup>/usr/bin/keymagic3-gui</setup>
             <icon_prop_key>InputMode</icon_prop_key>
             <version>0.0.1</version>
-            <textdomain>keymagic</textdomain>
+            <textdomain>keymagic3</textdomain>
         </engine>
     </engines>
 </component>

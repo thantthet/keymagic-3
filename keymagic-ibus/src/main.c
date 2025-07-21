@@ -28,25 +28,25 @@ init_ibus_component(IBusBus *bus)
     
     /* Create IBus component */
     component = ibus_component_new(
-        "org.freedesktop.IBus.KeyMagic",    /* name */
-        "KeyMagic Input Method",             /* description */
-        "1.0.0",                            /* version */
+        "org.freedesktop.IBus.KeyMagic3",   /* name */
+        "KeyMagic 3 Input Method",           /* description */
+        VERSION,                            /* version */
         "GPL-3.0",                          /* license */
-        "KeyMagic Team",                    /* author */
-        "https://github.com/keymagic/keymagic", /* homepage */
+        "Thant Thet Khin Zaw",              /* author */
+        "https://github.com/thantthet/keymagic-3", /* homepage */
         "",                                 /* command line */
-        "keymagic"                          /* textdomain */
+        "keymagic3"                         /* textdomain */
     );
     
     /* Create engine description */
     engine_desc = ibus_engine_desc_new(
-        ibus ? "keymagic" : "keymagic-debug",  /* name */
-        "KeyMagic",                            /* longname */
-        "KeyMagic Input Method for Myanmar and other languages", /* description */
+        ibus ? "keymagic3" : "keymagic3-debug", /* name */
+        "KeyMagic 3",                           /* longname */
+        "KeyMagic 3 Input Method for Myanmar and other languages", /* description */
         "my",                               /* language */
         "GPL-3.0",                          /* license */
-        "KeyMagic Team",                    /* author */
-        "keymagic.png",                     /* icon */
+        "Thant Thet Khin Zaw",              /* author */
+        "keymagic3.png",                    /* icon */
         "us"                                /* layout */
     );
     
@@ -58,11 +58,11 @@ init_ibus_component(IBusBus *bus)
     
     if (ibus) {
         /* Running under IBus - use standard name */
-        ibus_factory_add_engine(factory, "keymagic", KEYMAGIC_TYPE_ENGINE);
-        ibus_bus_request_name(bus, "org.freedesktop.IBus.KeyMagic", 0);
+        ibus_factory_add_engine(factory, "keymagic3", KEYMAGIC_TYPE_ENGINE);
+        ibus_bus_request_name(bus, "org.freedesktop.IBus.KeyMagic3", 0);
     } else {
         /* Debug mode - use debug name and register component */
-        ibus_factory_add_engine(factory, "keymagic-debug", KEYMAGIC_TYPE_ENGINE);
+        ibus_factory_add_engine(factory, "keymagic3-debug", KEYMAGIC_TYPE_ENGINE);
         ibus_bus_register_component(bus, component);
     }
     
@@ -84,8 +84,8 @@ main(int argc, char *argv[])
     setlocale(LC_ALL, "");
     
     /* Parse command line options */
-    context = g_option_context_new("- KeyMagic IBus Engine");
-    g_option_context_add_main_entries(context, entries, "keymagic");
+    context = g_option_context_new("- KeyMagic 3 IBus Engine");
+    g_option_context_add_main_entries(context, entries, "keymagic3");
     
     if (!g_option_context_parse(context, &argc, &argv, &error)) {
         g_printerr("Option parsing failed: %s\n", error->message);
@@ -124,10 +124,10 @@ main(int argc, char *argv[])
     if (!ibus) {
         g_message("Running in debug mode (without --ibus flag)");
         g_message("You can test the engine using:");
-        g_message("  ibus engine keymagic-debug");
+        g_message("  ibus engine keymagic3-debug");
     }
     
-    g_debug("Starting KeyMagic IBus engine main loop");
+    g_debug("Starting KeyMagic 3 IBus engine main loop");
     
     /* Run main loop */
     main_loop = g_main_loop_new(NULL, FALSE);
@@ -140,7 +140,7 @@ main(int argc, char *argv[])
         g_object_unref(factory);
     }
     
-    g_debug("KeyMagic IBus engine shutting down");
+    g_debug("KeyMagic 3 IBus engine shutting down");
     
     return EXIT_SUCCESS;
 }

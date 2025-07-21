@@ -5,7 +5,7 @@
 #include <ibus.h>
 
 /* Logging tag */
-#define LOG_TAG "KeyMagicFFI"
+#define LOG_TAG "KeyMagic3FFI"
 
 /* Conditional logging for sensitive information */
 #ifdef NDEBUG

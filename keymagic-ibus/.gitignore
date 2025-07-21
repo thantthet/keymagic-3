@@ -1,6 +1,6 @@
 # Build artifacts
 build/
-ibus-engine-keymagic
+ibus-engine-keymagic3
 
 # Test files
 test_ibus_engine.py

@@ -1,0 +1,30 @@
+#!/bin/sh
+# prerm script for keymagic3
+#
+# This script is executed before the package is removed
+
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        # If KeyMagic engine is currently active, switch away
+        if command -v ibus >/dev/null 2>&1; then
+            current_engine=$(ibus engine 2>/dev/null || true)
+            if [ "$current_engine" = "keymagic3" ]; then
+                echo "Switching away from KeyMagic 3 engine..."
+                # Try to switch to a default engine
+                ibus engine xkb:us::eng || true
+            fi
+        fi
+        ;;
+
+    failed-upgrade)
+        ;;
+
+    *)
+        echo "prerm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

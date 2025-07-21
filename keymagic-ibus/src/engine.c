@@ -71,7 +71,7 @@ keymagic_engine_class_init(KeyMagicEngineClass* klass)
 static void
 keymagic_engine_init(KeyMagicEngine* engine)
 {
-    g_debug("%s: Initializing KeyMagic engine", LOG_TAG);
+    g_debug("%s: Initializing KeyMagic 3 engine", LOG_TAG);
     
     /* Initialize fields */
     engine->km_engine = NULL;
@@ -119,7 +119,7 @@ keymagic_engine_finalize(GObject* object)
 {
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(object);
     
-    g_debug("%s: Finalizing KeyMagic engine", LOG_TAG);
+    g_debug("%s: Finalizing KeyMagic 3 engine", LOG_TAG);
     
     /* Cleanup engine */
     keymagic_engine_unload_keyboard(engine);

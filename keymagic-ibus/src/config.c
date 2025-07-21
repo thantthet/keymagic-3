@@ -152,7 +152,7 @@ keymagic_config_get_default_path(void)
         return NULL;
     }
     
-    return g_build_filename(config_dir, "keymagic", "config.toml", NULL);
+    return g_build_filename(config_dir, "keymagic3", "config.toml", NULL);
 }
 
 /**
@@ -167,7 +167,7 @@ keymagic_config_get_keyboards_dir(void)
         return NULL;
     }
     
-    return g_build_filename(data_dir, "keymagic", "keyboards", NULL);
+    return g_build_filename(data_dir, "keymagic3", "keyboards", NULL);
 }
 
 /**

@@ -1,0 +1,44 @@
+#!/bin/sh
+# postinst script for keymagic3
+#
+# This script is executed after the package is installed
+
+set -e
+
+case "$1" in
+    configure)
+        # Register IBus component
+        if command -v ibus >/dev/null 2>&1; then
+            echo "Registering KeyMagic 3 with IBus..."
+            # Restart IBus to pick up new component
+            ibus restart || true
+            sleep 2
+            # Register the component
+            ibus register-component /usr/share/ibus/component/keymagic3.xml || true
+            echo "KeyMagic 3 has been registered with IBus."
+            echo "You can add it through Settings > Keyboard > Input Sources"
+        else
+            echo "IBus not found. KeyMagic 3 IBus engine will not be registered."
+        fi
+
+        # Update icon cache
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+        fi
+
+        # Update desktop database
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database /usr/share/applications || true
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

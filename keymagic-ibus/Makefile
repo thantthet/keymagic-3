@@ -1,11 +1,11 @@
-# KeyMagic IBus Engine Makefile
+# KeyMagic 3 IBus Engine Makefile
 #
-# This Makefile builds the KeyMagic IBus engine and prepares it for installation.
+# This Makefile builds the KeyMagic 3 IBus engine and prepares it for installation.
 # It requires IBus development headers and links against the keymagic-core library.
 
 # Project information
-PROJECT_NAME = ibus-engine-keymagic
-VERSION = 1.0.0
+PROJECT_NAME = ibus-engine-keymagic3
+VERSION = 0.0.1
 
 # Directories
 SRCDIR = src
@@ -15,7 +15,7 @@ DESTDIR ?=
 PREFIX ?= /usr
 
 # Installation paths
-ENGINEDIR = $(DESTDIR)$(PREFIX)/lib/ibus-keymagic
+ENGINEDIR = $(DESTDIR)$(PREFIX)/lib/ibus-keymagic3
 COMPONENTDIR = $(DESTDIR)$(PREFIX)/share/ibus/component
 ICONDIR = $(DESTDIR)$(PREFIX)/share/pixmaps
 
@@ -110,16 +110,16 @@ install: $(PROJECT_NAME)
 	install -m 755 $(PROJECT_NAME) $(ENGINEDIR)/$(PROJECT_NAME)
 	
 	# Install IBus component definition
-	install -m 644 $(DATADIR)/keymagic.xml $(COMPONENTDIR)/keymagic.xml
+	install -m 644 $(DATADIR)/keymagic3.xml $(COMPONENTDIR)/keymagic3.xml
 	
 	# Install icon (if available)
-	# install -m 644 $(DATADIR)/keymagic.png $(ICONDIR)/keymagic.png
+	# install -m 644 $(DATADIR)/keymagic3.png $(ICONDIR)/keymagic3.png
 
 # Uninstall from system
 uninstall:
 	rm -f $(ENGINEDIR)/$(PROJECT_NAME)
-	rm -f $(COMPONENTDIR)/keymagic.xml
-	rm -f $(ICONDIR)/keymagic.png
+	rm -f $(COMPONENTDIR)/keymagic3.xml
+	rm -f $(ICONDIR)/keymagic3.png
 	rmdir --ignore-fail-on-non-empty $(ENGINEDIR)
 
 # Development shortcuts
@@ -127,7 +127,7 @@ dev-install: install
 	# Register component with IBus (for development)
 	ibus restart || true
 	sleep 2
-	ibus register-component $(COMPONENTDIR)/keymagic.xml || true
+	ibus register-component $(COMPONENTDIR)/keymagic3.xml || true
 
 dev-uninstall: uninstall
 	# Restart IBus to remove component
@@ -143,8 +143,8 @@ check-deps:
 
 # Show build information
 info:
-	@echo "KeyMagic IBus Engine Build Information"
-	@echo "======================================"
+	@echo "KeyMagic 3 IBus Engine Build Information"
+	@echo "========================================"
 	@echo "Project: $(PROJECT_NAME)"
 	@echo "Version: $(VERSION)"
 	@echo "CC: $(CC)"
@@ -158,7 +158,7 @@ debug: $(PROJECT_NAME)
 
 # Help target
 help:
-	@echo "KeyMagic IBus Engine Makefile"
+	@echo "KeyMagic 3 IBus Engine Makefile"
 	@echo ""
 	@echo "Targets:"
 	@echo "  all          - Build the engine (default)"

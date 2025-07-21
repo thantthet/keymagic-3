@@ -47,3 +47,15 @@ build-*/
 # Node.js
 node_modules/
 package-lock.json
+
+# Build and distribution directories
+dist/
+rpmbuild/
+*.deb
+*.rpm
+*.AppImage
+
+# IBus engine build artifacts
+keymagic-ibus/build/
+keymagic-ibus/ibus-engine-keymagic
+keymagic-ibus/ibus-engine-keymagic3
