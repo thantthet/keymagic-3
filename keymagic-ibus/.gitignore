@@ -1,7 +1,3 @@
-# Build artifacts
-build/
-ibus-engine-keymagic3
-
 # Test files
 test_ibus_engine.py
 test-config/
@@ -30,3 +26,19 @@ install_manifest.txt
 # Dependencies (if any local libs downloaded)
 lib/
 deps/
+
+# Build and distribution directories
+dist/
+rpmbuild/
+*.deb
+*.rpm
+*.AppImage
+
+# IBus engine build artifacts
+build/
+ibus-engine-keymagic3
+
+# IBus package distribution directories
+dist/
+dist-amd64/
+dist-arm64/

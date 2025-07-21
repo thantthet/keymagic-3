@@ -12,7 +12,9 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+# Get project root (two levels up from build-scripts)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 
 echo -e "${BLUE}KeyMagic 3 Docker Build System${NC}"
 echo "================================="
@@ -119,7 +121,7 @@ for ARCH in "${ARCHITECTURES[@]}"; do
         --platform linux/${ARCH} \
         --build-arg ARCH=${ARCH} \
         -t keymagic-builder:${ARCH} \
-        -f Dockerfile.build \
+        -f keymagic-ibus/Dockerfile.build \
         .
     
     # Run build in container
@@ -127,9 +129,9 @@ for ARCH in "${ARCHITECTURES[@]}"; do
     docker run \
         --rm \
         --platform linux/${ARCH} \
-        -v "${SCRIPT_DIR}/dist-${ARCH}:/build/dist" \
+        -v "${PROJECT_ROOT}/keymagic-ibus/dist-${ARCH}:/build/keymagic-ibus/dist" \
         keymagic-builder:${ARCH} \
-        ./build-linux-package.sh --${PACKAGE_FORMAT} $([ "$BUILD_TYPE" = "debug" ] && echo "--debug")
+        ./keymagic-ibus/build-scripts/build-linux-package.sh --${PACKAGE_FORMAT} $([ "$BUILD_TYPE" = "debug" ] && echo "--debug")
     
     echo -e "${GREEN}✓ Build completed for $ARCH${NC}"
     echo ""
@@ -137,13 +139,13 @@ done
 
 # Collect all packages
 echo -e "${BLUE}Collecting packages...${NC}"
-mkdir -p dist
+mkdir -p keymagic-ibus/dist
 for ARCH in "${ARCHITECTURES[@]}"; do
-    if [ -d "dist-${ARCH}" ]; then
-        cp -v dist-${ARCH}/*.{deb,rpm} dist/ 2>/dev/null || true
+    if [ -d "keymagic-ibus/dist-${ARCH}" ]; then
+        cp -v keymagic-ibus/dist-${ARCH}/*.{deb,rpm} keymagic-ibus/dist/ 2>/dev/null || true
     fi
 done
 
 echo -e "${GREEN}Build complete!${NC}"
-echo "Packages are available in the dist/ directory:"
-ls -la dist/
+echo "Packages are available in the keymagic-ibus/dist/ directory:"
+ls -la keymagic-ibus/dist/

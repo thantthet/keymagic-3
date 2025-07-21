@@ -13,7 +13,9 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+# Get project root (two levels up from build-scripts)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 
 echo -e "${BLUE}KeyMagic 3 Linux Package Builder${NC}"
 echo "==================================="
@@ -81,7 +83,7 @@ echo ""
 
 # Step 1: Build keymagic-core
 echo -e "${BLUE}Step 1: Building keymagic-core...${NC}"
-cd "$SCRIPT_DIR/keymagic-core"
+cd "$PROJECT_ROOT/keymagic-core"
 if [ "$BUILD_TYPE" = "release" ]; then
     cargo build --release
 else
@@ -92,7 +94,7 @@ echo ""
 
 # Step 2: Build IBus engine
 echo -e "${BLUE}Step 2: Building IBus engine...${NC}"
-cd "$SCRIPT_DIR/keymagic-ibus"
+cd "$PROJECT_ROOT/keymagic-ibus"
 make clean
 if [ "$BUILD_TYPE" = "release" ]; then
     make release
@@ -104,7 +106,7 @@ echo ""
 
 # Step 3: Build GUI
 echo -e "${BLUE}Step 3: Building GUI application...${NC}"
-cd "$SCRIPT_DIR/keymagic-shared/gui/src-tauri"
+cd "$PROJECT_ROOT/keymagic-shared/gui/src-tauri"
 if [ "$BUILD_TYPE" = "release" ]; then
     cargo build --release
 else
@@ -114,7 +116,7 @@ echo -e "${GREEN}✓ GUI application built${NC}"
 echo ""
 
 # Step 4: Create packages
-cd "$SCRIPT_DIR"
+cd "$PROJECT_ROOT/keymagic-ibus"
 mkdir -p dist
 
 # Helper function to create package structure
@@ -131,24 +133,24 @@ create_package_structure() {
     
     # Copy binaries
     if [ "$BUILD_TYPE" = "release" ]; then
-        cp "target/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
+        cp "$PROJECT_ROOT/target/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
     else
-        cp "target/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
+        cp "$PROJECT_ROOT/target/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
     fi
     
-    cp "keymagic-ibus/ibus-engine-keymagic3" "$pkg_dir/usr/lib/ibus-keymagic3/ibus-engine-keymagic3"
+    cp "$PROJECT_ROOT/keymagic-ibus/ibus-engine-keymagic3" "$pkg_dir/usr/lib/ibus-keymagic3/ibus-engine-keymagic3"
     
     # Copy data files
-    cp "keymagic-ibus/data/keymagic3.xml" "$pkg_dir/usr/share/ibus/component/"
-    cp "keymagic-shared/gui/assets/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.xml" "$pkg_dir/usr/share/ibus/component/"
+    cp "$PROJECT_ROOT/keymagic-shared/gui/assets/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
     
     # Copy icon if exists
-    if [ -f "./resources/icons/keymagic.png" ]; then
-        cp "./resources/icons/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
+    if [ -f "$PROJECT_ROOT/resources/icons/keymagic.png" ]; then
+        cp "$PROJECT_ROOT/resources/icons/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
     fi
     
     # Copy documentation
-    cp "README.md" "$pkg_dir/usr/share/doc/keymagic3/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/README.md" "$pkg_dir/usr/share/doc/keymagic3/" 2>/dev/null || true
     echo "KeyMagic 3 version 0.0.1" > "$pkg_dir/usr/share/doc/keymagic3/VERSION"
 }
 
@@ -180,10 +182,10 @@ Description: KeyMagic 3 - Smart keyboard input method
 EOF
 
     # Copy maintainer scripts
-    if [ -d "keymagic-shared/gui/debian" ]; then
-        cp keymagic-shared/gui/debian/postinst "$PKG_DIR/DEBIAN/" 2>/dev/null || true
-        cp keymagic-shared/gui/debian/prerm "$PKG_DIR/DEBIAN/" 2>/dev/null || true
-        cp keymagic-shared/gui/debian/postrm "$PKG_DIR/DEBIAN/" 2>/dev/null || true
+    if [ -d "$PROJECT_ROOT/keymagic-shared/gui/debian" ]; then
+        cp "$PROJECT_ROOT/keymagic-shared/gui/debian/postinst" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
+        cp "$PROJECT_ROOT/keymagic-shared/gui/debian/prerm" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
+        cp "$PROJECT_ROOT/keymagic-shared/gui/debian/postrm" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
         chmod 755 "$PKG_DIR/DEBIAN/"* 2>/dev/null || true
     fi
     
@@ -231,11 +233,11 @@ mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 mkdir -p %{buildroot}/usr/share/doc/keymagic3
 
 # Copy files from our build
-cp $SCRIPT_DIR/target/release/keymagic-gui %{buildroot}/usr/bin/keymagic3-gui
-cp $SCRIPT_DIR/keymagic-ibus/ibus-engine-keymagic3 %{buildroot}/usr/lib/ibus-keymagic3/
-cp $SCRIPT_DIR/keymagic-ibus/data/keymagic3.xml %{buildroot}/usr/share/ibus/component/
-cp $SCRIPT_DIR/keymagic-shared/gui/assets/keymagic3.desktop %{buildroot}/usr/share/applications/ 2>/dev/null || true
-cp $SCRIPT_DIR/README.md %{buildroot}/usr/share/doc/keymagic3/ 2>/dev/null || true
+cp "$PROJECT_ROOT/target/release/keymagic-gui" %{buildroot}/usr/bin/keymagic3-gui
+cp "$PROJECT_ROOT/keymagic-ibus/ibus-engine-keymagic3" %{buildroot}/usr/lib/ibus-keymagic3/
+cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.xml" %{buildroot}/usr/share/ibus/component/
+cp "$PROJECT_ROOT/keymagic-shared/gui/assets/keymagic3.desktop" %{buildroot}/usr/share/applications/ 2>/dev/null || true
+cp "$PROJECT_ROOT/README.md" %{buildroot}/usr/share/doc/keymagic3/ 2>/dev/null || true
 
 %files
 %defattr(-,root,root,-)
@@ -264,10 +266,10 @@ EOF
 
         # Build RPM
         cd "$RPMBUILD_DIR/SPECS"
-        SCRIPT_DIR="$SCRIPT_DIR" rpmbuild -bb keymagic3.spec
+        PROJECT_ROOT="$PROJECT_ROOT" rpmbuild -bb keymagic3.spec
         
         # Copy to dist directory
-        cp "$RPMBUILD_DIR/RPMS/$(uname -m)/keymagic3-0.0.1-1."*".rpm" "$SCRIPT_DIR/dist/"
+        cp "$RPMBUILD_DIR/RPMS/$(uname -m)/keymagic3-0.0.1-1."*".rpm" "$PROJECT_ROOT/keymagic-ibus/dist/"
         echo -e "${GREEN}✓ RPM package created${NC}"
     else
         echo -e "${YELLOW}rpmbuild not found, skipping RPM creation${NC}"
@@ -285,11 +287,11 @@ fi
 
 echo ""
 echo -e "${GREEN}Build complete!${NC}"
-echo "Packages are available in the dist/ directory"
+echo "Packages are available in the keymagic-ibus/dist/ directory"
 echo ""
 echo "To install the Debian package:"
-echo "  sudo dpkg -i dist/keymagic3_0.0.1_*.deb"
+echo "  sudo dpkg -i keymagic-ibus/dist/keymagic3_0.0.1_*.deb"
 echo "  sudo apt-get install -f  # Install any missing dependencies"
 echo ""
 echo "To test IBus engine directly:"
-echo "  cd keymagic-ibus && ./test-debug.sh"
+echo "  cd $PROJECT_ROOT/keymagic-ibus && ./test-debug.sh"

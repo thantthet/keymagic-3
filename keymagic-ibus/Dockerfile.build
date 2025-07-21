@@ -60,4 +60,4 @@ RUN grep -v -E 'keymagic-(macos|windows)' Cargo.toml > Cargo.toml.tmp && \
     mv Cargo.toml.tmp Cargo.toml
 
 # Default command
-CMD ["./build-linux-package.sh"]
+CMD ["./keymagic-ibus/build-scripts/build-linux-package.sh"]
