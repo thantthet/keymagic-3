@@ -388,16 +388,17 @@ keymagic_engine_focus_out(IBusEngine* ibus_engine)
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(ibus_engine);
     g_debug("%s: Focus out", LOG_TAG);
     
-    /* Commit any pending preedit */
+    /* Commit any pending preedit BEFORE parent focus_out */
+    /* This ensures we can still send text to the client */
     keymagic_engine_commit_preedit(engine);
     
-    /* Reset engine state */
+    /* Call parent method - this might disconnect from client */
+    IBUS_ENGINE_CLASS(keymagic_engine_parent_class)->focus_out(ibus_engine);
+    
+    /* Reset engine state after parent processing */
     if (engine->km_engine) {
         keymagic_ffi_reset_engine(engine->km_engine);
     }
-    
-    /* Call parent method */
-    IBUS_ENGINE_CLASS(keymagic_engine_parent_class)->focus_out(ibus_engine);
 }
 
 /**
@@ -409,9 +410,8 @@ keymagic_engine_reset(IBusEngine* ibus_engine)
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(ibus_engine);
     g_debug("%s: Reset", LOG_TAG);
     
-    /* Clear preedit without committing - reset means cancel, not commit */
-    /* IBus calls reset when user wants to cancel input (e.g., pressing Escape) */
-    keymagic_engine_clear_preedit(engine);
+    /* Always try to commit any pending preedit before reset */
+    keymagic_engine_commit_preedit(engine);
     
     /* Reset core engine */
     if (engine->km_engine) {
@@ -512,6 +512,11 @@ keymagic_engine_commit_preedit(KeyMagicEngine* engine)
         /* Get text to commit */
         const gchar* text = ibus_text_get_text(engine->preedit_text);
         if (text && strlen(text) > 0) {
+            g_debug("%s: Attempting to commit preedit text: %s", LOG_TAG, text);
+            
+            /* Hide preedit first to ensure it's not shown as underlined */
+            ibus_engine_hide_preedit_text(ibus_engine);
+            
             /* Create a new text object for commit - IBus takes ownership */
             IBusText* commit_text = ibus_text_new_from_string(text);
             ibus_engine_commit_text(ibus_engine, commit_text);
