@@ -160,4 +160,31 @@ impl Platform for MacOSBackend {
             },
         }
     }
+    
+    fn get_bundled_keyboards_path(&self) -> Option<PathBuf> {
+        // For macOS, bundled keyboards are inside the app bundle
+        if let Ok(exe_path) = std::env::current_exe() {
+            // Navigate from executable to Resources directory in app bundle
+            // Typical structure: MyApp.app/Contents/MacOS/executable
+            // We need: MyApp.app/Contents/Resources/keyboards
+            if let Some(macos_dir) = exe_path.parent() {
+                if let Some(contents_dir) = macos_dir.parent() {
+                    let resources_keyboards_path = contents_dir.join("Resources").join("keyboards");
+                    if resources_keyboards_path.exists() {
+                        return Some(resources_keyboards_path);
+                    }
+                }
+            }
+            
+            // Fallback for development: check relative to executable
+            if let Some(parent) = exe_path.parent() {
+                let bundled_path = parent.join("keyboards");
+                if bundled_path.exists() {
+                    return Some(bundled_path);
+                }
+            }
+        }
+        
+        None
+    }
 }

@@ -10,3 +10,6 @@ Homepage: https://github.com/thantthet/keymagic-3
 Description: KeyMagic 3 - Smart keyboard input method
  KeyMagic 3 is a powerful and flexible input method that allows users to type
  in Myanmar and other complex scripts using standard keyboards.
+ .
+ This package includes the GUI configuration tool, IBus engine, and bundled
+ keyboard layouts.

@@ -131,6 +131,7 @@ create_package_structure() {
     mkdir -p "$pkg_dir/usr/share/icons/hicolor/256x256/apps"
     mkdir -p "$pkg_dir/usr/share/doc/keymagic3"
     mkdir -p "$pkg_dir/usr/share/keymagic3"
+    mkdir -p "$pkg_dir/usr/share/keymagic3/keyboards"
     
     # Copy binaries
     if [ "$BUILD_TYPE" = "release" ]; then
@@ -157,6 +158,17 @@ create_package_structure() {
     # Copy helper scripts
     if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" ]; then
         cp "$PROJECT_ROOT/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" "$pkg_dir/usr/share/keymagic3/"
+    fi
+    
+    # Copy bundled keyboard files
+    if [ -d "$PROJECT_ROOT/keymagic-ibus/data/keyboards" ]; then
+        echo "Copying bundled keyboard files..."
+        for km2_file in "$PROJECT_ROOT/keymagic-ibus/data/keyboards"/*.km2; do
+            if [ -f "$km2_file" ]; then
+                cp "$km2_file" "$pkg_dir/usr/share/keymagic3/keyboards/"
+                echo "  - $(basename "$km2_file")"
+            fi
+        done
     fi
 }
 

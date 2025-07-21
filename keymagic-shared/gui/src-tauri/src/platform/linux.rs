@@ -163,4 +163,24 @@ impl Platform for LinuxBackend {
             },
         }
     }
+    
+    fn get_bundled_keyboards_path(&self) -> Option<PathBuf> {
+        // Check system-wide bundled keyboards location
+        let system_keyboards_path = PathBuf::from("/usr/share/keymagic3/keyboards");
+        if system_keyboards_path.exists() {
+            return Some(system_keyboards_path);
+        }
+        
+        // Fallback: Check relative to executable (for development/testing)
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                let bundled_path = parent.join("keyboards");
+                if bundled_path.exists() {
+                    return Some(bundled_path);
+                }
+            }
+        }
+        
+        None
+    }
 }

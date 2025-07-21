@@ -25,6 +25,7 @@ mkdir -p %{buildroot}/usr/share/applications
 mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 mkdir -p %{buildroot}/usr/share/doc/keymagic3
 mkdir -p %{buildroot}/usr/share/keymagic3
+mkdir -p %{buildroot}/usr/share/keymagic3/keyboards
 
 # Copy files from our build
 cp "@PROJECT_ROOT@/target/release/keymagic-gui" %{buildroot}/usr/bin/keymagic3-gui
@@ -41,6 +42,15 @@ fi
 # Copy icon if exists
 if [ -f "@PROJECT_ROOT@/resources/icons/keymagic.png" ]; then
     cp "@PROJECT_ROOT@/resources/icons/keymagic.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/keymagic3.png
+fi
+
+# Copy bundled keyboard files
+if [ -d "@PROJECT_ROOT@/keymagic-ibus/data/keyboards" ]; then
+    for km2_file in "@PROJECT_ROOT@/keymagic-ibus/data/keyboards"/*.km2; do
+        if [ -f "$km2_file" ]; then
+            cp "$km2_file" %{buildroot}/usr/share/keymagic3/keyboards/
+        fi
+    done
 fi
 
 %files
