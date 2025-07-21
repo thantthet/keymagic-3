@@ -29,45 +29,35 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Install Tauri CLI
-RUN cargo install tauri-cli
-
 # Create build user
 RUN useradd -m -s /bin/bash builder && \
     echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
+# Switch to builder user for Rust installation
+USER builder
+WORKDIR /home/builder
+
+# Install Rust as builder user
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/home/builder/.cargo/bin:${PATH}"
+
 # Set working directory
 WORKDIR /build
 
-# First, copy only the files needed for dependency resolution
-# This allows Docker to cache the dependency download layer
-COPY --chown=builder:builder Cargo.toml Cargo.lock ./
-COPY --chown=builder:builder keymagic-core/Cargo.toml ./keymagic-core/
-COPY --chown=builder:builder keymagic-shared/gui/src-tauri/Cargo.toml ./keymagic-shared/gui/src-tauri/
-COPY --chown=builder:builder kms2km2/Cargo.toml ./kms2km2/
+# Switch back to root to create directory structure
+USER root
+RUN mkdir -p /build && chown builder:builder /build
 
-# Create dummy source files to allow cargo to download dependencies
-RUN mkdir -p keymagic-core/src keymagic-shared/gui/src-tauri/src kms2km2/src && \
-    echo "fn main() {}" > keymagic-core/src/lib.rs && \
-    echo "fn main() {}" > keymagic-shared/gui/src-tauri/src/main.rs && \
-    echo "fn main() {}" > kms2km2/src/main.rs
-
-# Switch to builder user
+# Switch back to builder
 USER builder
 
-# Make cargo available for builder user
-RUN echo 'source $HOME/.cargo/env' >> ~/.bashrc
-ENV PATH="/home/builder/.cargo/bin:${PATH}"
-
-# Pre-download dependencies (this layer will be cached)
-RUN cargo fetch --locked
-
-# Now copy the actual source code
+# Copy all source files and configurations
 COPY --chown=builder:builder . .
+
+# Generate Linux-specific workspace configuration by filtering out platform-specific members
+# This removes any line containing keymagic-macos or keymagic-windows
+RUN grep -v -E 'keymagic-(macos|windows)' Cargo.toml > Cargo.toml.tmp && \
+    mv Cargo.toml.tmp Cargo.toml
 
 # Default command
 CMD ["./build-linux-package.sh"]

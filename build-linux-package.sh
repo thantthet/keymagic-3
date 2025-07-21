@@ -31,6 +31,10 @@ while [[ $# -gt 0 ]]; do
             BUILD_TYPE="debug"
             shift
             ;;
+        --all)
+            PACKAGE_FORMAT="all"
+            shift
+            ;;
         --deb)
             PACKAGE_FORMAT="deb"
             shift
@@ -47,6 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [options]"
             echo "Options:"
             echo "  --debug      Build debug version"
+            echo "  --all        Build all package formats (default)"
             echo "  --deb        Build only Debian package"
             echo "  --rpm        Build only RPM package"
             echo "  --appimage   Build only AppImage"
@@ -99,11 +104,11 @@ echo ""
 
 # Step 3: Build GUI
 echo -e "${BLUE}Step 3: Building GUI application...${NC}"
-cd "$SCRIPT_DIR/keymagic-shared/gui"
+cd "$SCRIPT_DIR/keymagic-shared/gui/src-tauri"
 if [ "$BUILD_TYPE" = "release" ]; then
-    cargo tauri build
+    cargo build --release
 else
-    cargo tauri build --debug
+    cargo build
 fi
 echo -e "${GREEN}✓ GUI application built${NC}"
 echo ""
@@ -126,12 +131,8 @@ create_package_structure() {
     
     # Copy binaries
     if [ "$BUILD_TYPE" = "release" ]; then
-        cp "target/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui" 2>/dev/null || \
-        cp "keymagic-shared/gui/src-tauri/target/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui" 2>/dev/null || \
         cp "keymagic-shared/gui/src-tauri/target/release/gui" "$pkg_dir/usr/bin/keymagic3-gui"
     else
-        cp "target/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui" 2>/dev/null || \
-        cp "keymagic-shared/gui/src-tauri/target/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui" 2>/dev/null || \
         cp "keymagic-shared/gui/src-tauri/target/debug/gui" "$pkg_dir/usr/bin/keymagic3-gui"
     fi
     
@@ -230,7 +231,7 @@ mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 mkdir -p %{buildroot}/usr/share/doc/keymagic3
 
 # Copy files from our build
-cp $SCRIPT_DIR/target/release/keymagic-gui %{buildroot}/usr/bin/keymagic3-gui
+cp $SCRIPT_DIR/keymagic-shared/gui/src-tauri/target/release/gui %{buildroot}/usr/bin/keymagic3-gui
 cp $SCRIPT_DIR/keymagic-ibus/ibus-engine-keymagic3 %{buildroot}/usr/lib/ibus-keymagic3/
 cp $SCRIPT_DIR/keymagic-ibus/data/keymagic3.xml %{buildroot}/usr/share/ibus/component/
 cp $SCRIPT_DIR/keymagic-shared/gui/assets/keymagic3.desktop %{buildroot}/usr/share/applications/ 2>/dev/null || true
