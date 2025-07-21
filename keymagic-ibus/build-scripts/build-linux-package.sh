@@ -130,6 +130,7 @@ create_package_structure() {
     mkdir -p "$pkg_dir/usr/share/applications"
     mkdir -p "$pkg_dir/usr/share/icons/hicolor/256x256/apps"
     mkdir -p "$pkg_dir/usr/share/doc/keymagic3"
+    mkdir -p "$pkg_dir/usr/share/keymagic3"
     
     # Copy binaries
     if [ "$BUILD_TYPE" = "release" ]; then
@@ -142,7 +143,7 @@ create_package_structure() {
     
     # Copy data files
     cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.xml" "$pkg_dir/usr/share/ibus/component/"
-    cp "$PROJECT_ROOT/keymagic-shared/gui/assets/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
     
     # Copy icon if exists
     if [ -f "$PROJECT_ROOT/resources/icons/keymagic.png" ]; then
@@ -152,6 +153,11 @@ create_package_structure() {
     # Copy documentation
     cp "$PROJECT_ROOT/README.md" "$pkg_dir/usr/share/doc/keymagic3/" 2>/dev/null || true
     echo "KeyMagic 3 version 0.0.1" > "$pkg_dir/usr/share/doc/keymagic3/VERSION"
+    
+    # Copy helper scripts
+    if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" ]; then
+        cp "$PROJECT_ROOT/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" "$pkg_dir/usr/share/keymagic3/"
+    fi
 }
 
 # Build Debian package
@@ -165,27 +171,21 @@ if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "deb" ]; then
     # Create DEBIAN directory
     mkdir -p "$PKG_DIR/DEBIAN"
     
-    # Create control file
-    cat > "$PKG_DIR/DEBIAN/control" << EOF
-Package: keymagic3
-Version: 0.0.1
-Section: utils
-Priority: optional
-Architecture: $(dpkg --print-architecture)
-Maintainer: Thant Thet Khin Zaw <contact@keymagic.net>
-Depends: libc6 (>= 2.31), libgtk-3-0 (>= 3.24), ibus (>= 1.5.0)
-Recommends: fonts-myanmar
-Homepage: https://github.com/thantthet/keymagic-3
-Description: KeyMagic 3 - Smart keyboard input method
- KeyMagic 3 is a powerful and flexible input method that allows users to type
- in Myanmar and other complex scripts using standard keyboards.
-EOF
+    # Generate control file from template
+    if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/debian/control.in" ]; then
+        sed -e "s/@VERSION@/0.0.1/g" \
+            -e "s/@ARCH@/$(dpkg --print-architecture)/g" \
+            "$PROJECT_ROOT/keymagic-ibus/packaging/debian/control.in" > "$PKG_DIR/DEBIAN/control"
+    else
+        echo -e "${RED}Debian control template not found${NC}"
+        exit 1
+    fi
 
     # Copy maintainer scripts
-    if [ -d "$PROJECT_ROOT/keymagic-shared/gui/debian" ]; then
-        cp "$PROJECT_ROOT/keymagic-shared/gui/debian/postinst" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
-        cp "$PROJECT_ROOT/keymagic-shared/gui/debian/prerm" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
-        cp "$PROJECT_ROOT/keymagic-shared/gui/debian/postrm" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
+    if [ -d "$PROJECT_ROOT/keymagic-ibus/packaging/debian" ]; then
+        cp "$PROJECT_ROOT/keymagic-ibus/packaging/debian/postinst" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
+        cp "$PROJECT_ROOT/keymagic-ibus/packaging/debian/prerm" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
+        cp "$PROJECT_ROOT/keymagic-ibus/packaging/debian/postrm" "$PKG_DIR/DEBIAN/" 2>/dev/null || true
         chmod 755 "$PKG_DIR/DEBIAN/"* 2>/dev/null || true
     fi
     
@@ -203,70 +203,21 @@ if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "rpm" ]; then
         RPMBUILD_DIR="$HOME/rpmbuild"
         mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
         
-        # Create spec file
-        cat > "$RPMBUILD_DIR/SPECS/keymagic3.spec" << EOF
-Name:           keymagic3
-Version:        0.0.1
-Release:        1%{?dist}
-Summary:        KeyMagic 3 - Smart keyboard input method
-License:        GPL-3.0
-URL:            https://github.com/thantthet/keymagic-3
-BuildArch:      $(uname -m)
-
-%description
-KeyMagic 3 is a powerful and flexible input method that allows users to type
-in Myanmar and other complex scripts using standard keyboards.
-
-%prep
-# No prep needed as we're using pre-built binaries
-
-%build
-# No build needed as we're using pre-built binaries
-
-%install
-rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/bin
-mkdir -p %{buildroot}/usr/lib/ibus-keymagic3
-mkdir -p %{buildroot}/usr/share/ibus/component
-mkdir -p %{buildroot}/usr/share/applications
-mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
-mkdir -p %{buildroot}/usr/share/doc/keymagic3
-
-# Copy files from our build
-cp "$PROJECT_ROOT/target/release/keymagic-gui" %{buildroot}/usr/bin/keymagic3-gui
-cp "$PROJECT_ROOT/keymagic-ibus/ibus-engine-keymagic3" %{buildroot}/usr/lib/ibus-keymagic3/
-cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.xml" %{buildroot}/usr/share/ibus/component/
-cp "$PROJECT_ROOT/keymagic-shared/gui/assets/keymagic3.desktop" %{buildroot}/usr/share/applications/ 2>/dev/null || true
-cp "$PROJECT_ROOT/README.md" %{buildroot}/usr/share/doc/keymagic3/ 2>/dev/null || true
-
-%files
-%defattr(-,root,root,-)
-/usr/bin/keymagic3-gui
-/usr/lib/ibus-keymagic3/ibus-engine-keymagic3
-/usr/share/ibus/component/keymagic3.xml
-/usr/share/applications/keymagic3.desktop
-%doc /usr/share/doc/keymagic3/
-
-%post
-# Register with IBus
-if command -v ibus write-cache >/dev/null 2>&1; then
-    ibus write-cache
-fi
-
-%postun
-# Cleanup IBus cache
-if [ "$1" = "0" ] && command -v ibus write-cache >/dev/null 2>&1; then
-    ibus write-cache
-fi
-
-%changelog
-* $(date +"%a %b %d %Y") Thant Thet Khin Zaw <contact@keymagic.net> - 0.0.1-1
-- Initial release of KeyMagic 3
-EOF
+        # Generate spec file from template
+        if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/keymagic3.spec.in" ]; then
+            sed -e "s/@VERSION@/0.0.1/g" \
+                -e "s/@ARCH@/$(uname -m)/g" \
+                -e "s/@DATE@/$(date +"%a %b %d %Y")/g" \
+                -e "s|@PROJECT_ROOT@|$PROJECT_ROOT|g" \
+                "$PROJECT_ROOT/keymagic-ibus/packaging/keymagic3.spec.in" > "$RPMBUILD_DIR/SPECS/keymagic3.spec"
+        else
+            echo -e "${RED}RPM spec template not found${NC}"
+            exit 1
+        fi
 
         # Build RPM
         cd "$RPMBUILD_DIR/SPECS"
-        PROJECT_ROOT="$PROJECT_ROOT" rpmbuild -bb keymagic3.spec
+        rpmbuild -bb keymagic3.spec
         
         # Copy to dist directory
         cp "$RPMBUILD_DIR/RPMS/$(uname -m)/keymagic3-0.0.1-1."*".rpm" "$PROJECT_ROOT/keymagic-ibus/dist/"
