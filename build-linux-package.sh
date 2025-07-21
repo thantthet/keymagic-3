@@ -195,8 +195,81 @@ fi
 if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "rpm" ]; then
     if command -v rpmbuild >/dev/null 2>&1; then
         echo -e "${BLUE}Creating RPM package...${NC}"
-        # RPM building would go here
-        echo -e "${YELLOW}RPM building not yet implemented${NC}"
+        
+        # Create RPM build structure
+        RPMBUILD_DIR="$HOME/rpmbuild"
+        mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        
+        # Create spec file
+        cat > "$RPMBUILD_DIR/SPECS/keymagic3.spec" << EOF
+Name:           keymagic3
+Version:        0.0.1
+Release:        1%{?dist}
+Summary:        KeyMagic 3 - Smart keyboard input method
+License:        GPL-3.0
+URL:            https://github.com/thantthet/keymagic-3
+BuildArch:      $(uname -m)
+
+%description
+KeyMagic 3 is a powerful and flexible input method that allows users to type
+in Myanmar and other complex scripts using standard keyboards.
+
+%prep
+# No prep needed as we're using pre-built binaries
+
+%build
+# No build needed as we're using pre-built binaries
+
+%install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/bin
+mkdir -p %{buildroot}/usr/lib/ibus-keymagic3
+mkdir -p %{buildroot}/usr/share/ibus/component
+mkdir -p %{buildroot}/usr/share/applications
+mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+mkdir -p %{buildroot}/usr/share/doc/keymagic3
+
+# Copy files from our build
+cp $SCRIPT_DIR/target/release/keymagic-gui %{buildroot}/usr/bin/keymagic3-gui
+cp $SCRIPT_DIR/keymagic-ibus/ibus-engine-keymagic3 %{buildroot}/usr/lib/ibus-keymagic3/
+cp $SCRIPT_DIR/keymagic-ibus/data/keymagic3.xml %{buildroot}/usr/share/ibus/component/
+cp $SCRIPT_DIR/keymagic-shared/gui/assets/keymagic3.desktop %{buildroot}/usr/share/applications/ 2>/dev/null || true
+cp $SCRIPT_DIR/README.md %{buildroot}/usr/share/doc/keymagic3/ 2>/dev/null || true
+
+%files
+%defattr(-,root,root,-)
+/usr/bin/keymagic3-gui
+/usr/lib/ibus-keymagic3/ibus-engine-keymagic3
+/usr/share/ibus/component/keymagic3.xml
+/usr/share/applications/keymagic3.desktop
+%doc /usr/share/doc/keymagic3/
+
+%post
+# Register with IBus
+if command -v ibus write-cache >/dev/null 2>&1; then
+    ibus write-cache
+fi
+
+%postun
+# Cleanup IBus cache
+if [ "$1" = "0" ] && command -v ibus write-cache >/dev/null 2>&1; then
+    ibus write-cache
+fi
+
+%changelog
+* $(date +"%a %b %d %Y") Thant Thet Khin Zaw <contact@keymagic.net> - 0.0.1-1
+- Initial release of KeyMagic 3
+EOF
+
+        # Build RPM
+        cd "$RPMBUILD_DIR/SPECS"
+        SCRIPT_DIR="$SCRIPT_DIR" rpmbuild -bb keymagic3.spec
+        
+        # Copy to dist directory
+        cp "$RPMBUILD_DIR/RPMS/$(uname -m)/keymagic3-0.0.1-1."*".rpm" "$SCRIPT_DIR/dist/"
+        echo -e "${GREEN}✓ RPM package created${NC}"
+    else
+        echo -e "${YELLOW}rpmbuild not found, skipping RPM creation${NC}"
     fi
 fi
 
