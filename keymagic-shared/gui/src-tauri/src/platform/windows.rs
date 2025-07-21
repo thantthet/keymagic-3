@@ -294,17 +294,6 @@ impl Platform for WindowsBackend {
             .join("KeyMagic")
     }
     
-    fn supports_language_profiles(&self) -> bool {
-        true // Windows supports TSF language profiles
-    }
-    
-    fn supports_composition_mode(&self) -> bool {
-        true // Windows supports composition mode
-    }
-    
-    fn get_platform_name(&self) -> &'static str {
-        "windows"
-    }
     
     fn get_platform_info(&self) -> PlatformInfo {
         PlatformInfo {

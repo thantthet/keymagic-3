@@ -141,24 +141,13 @@ impl Platform for LinuxBackend {
         self.data_dir.clone()
     }
     
-    fn supports_language_profiles(&self) -> bool {
-        false // Linux doesn't have language profiles like Windows
-    }
-    
-    fn supports_composition_mode(&self) -> bool {
-        true // Linux can support composition mode
-    }
-    
-    fn get_platform_name(&self) -> &'static str {
-        "linux"
-    }
     
     fn get_platform_info(&self) -> PlatformInfo {
         PlatformInfo {
             os: "linux".to_string(),
             features: PlatformFeatures {
                 language_profiles: false,
-                composition_mode: true,
+                composition_mode: false,
                 global_hotkeys: true,
                 system_tray: true,
             },

@@ -74,6 +74,10 @@ impl KeyboardManager {
         &*self.platform
     }
     
+    pub fn get_platform_info(&self) -> crate::platform::PlatformInfo {
+        self.platform.get_platform_info()
+    }
+    
     pub fn get_config(&self) -> crate::platform::Config {
         self.platform.load_config().unwrap_or_else(|_| {
             crate::platform::Config {
@@ -211,7 +215,8 @@ impl KeyboardManager {
         self.save_keyboards_to_config()?;
         
         // Unregister from platform if supported
-        if self.platform.supports_language_profiles() {
+        let platform_info = self.platform.get_platform_info();
+        if platform_info.features.language_profiles {
             self.platform.unregister_language_profile(keyboard_id)?;
         }
         
@@ -365,7 +370,8 @@ impl KeyboardManager {
         self.add_keyboard(keyboard_info.clone())?;
         
         // Register with platform if supported
-        if self.platform.supports_language_profiles() {
+        let platform_info = self.platform.get_platform_info();
+        if platform_info.features.language_profiles {
             self.platform.register_language_profile(&final_id)?;
         }
         

@@ -138,17 +138,6 @@ impl Platform for MacOSBackend {
         self.data_dir.clone()
     }
     
-    fn supports_language_profiles(&self) -> bool {
-        false // macOS uses different system for input methods
-    }
-    
-    fn supports_composition_mode(&self) -> bool {
-        true // macOS can support composition mode
-    }
-    
-    fn get_platform_name(&self) -> &'static str {
-        "macos"
-    }
     
     fn get_platform_info(&self) -> PlatformInfo {
         PlatformInfo {

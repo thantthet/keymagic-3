@@ -85,11 +85,8 @@ pub trait Platform: Send + Sync {
     // System integration
     fn get_config_dir(&self) -> PathBuf;
     fn get_data_dir(&self) -> PathBuf;
-    fn supports_language_profiles(&self) -> bool;
-    fn supports_composition_mode(&self) -> bool;
     
     // Platform info
-    fn get_platform_name(&self) -> &'static str;
     fn get_platform_info(&self) -> PlatformInfo;
     
     // Optional platform-specific methods with default implementations

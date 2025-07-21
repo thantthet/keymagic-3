@@ -28,18 +28,9 @@ pub struct KeyboardLayoutData {
 }
 
 #[tauri::command]
-pub fn get_platform_info(_state: State<AppState>) -> Result<PlatformInfo, String> {
-    // Access platform through a temporary manager instance
-    // In a real implementation, we'd store the platform reference separately
-    Ok(PlatformInfo {
-        os: std::env::consts::OS.to_string(),
-        features: crate::platform::PlatformFeatures {
-            language_profiles: cfg!(windows),
-            composition_mode: true,
-            global_hotkeys: true,
-            system_tray: true,
-        },
-    })
+pub fn get_platform_info(state: State<AppState>) -> Result<PlatformInfo, String> {
+    // Get platform info from the keyboard manager
+    Ok(state.get_platform_info())
 }
 
 #[tauri::command]
