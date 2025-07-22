@@ -77,6 +77,18 @@ if command -v ibus write-cache >/dev/null 2>&1; then
     ibus write-cache
 fi
 
+# Launch KeyMagic3 GUI if we're in a graphical session
+if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+    # Check if we're running as root (during package installation)
+    if [ "$SUDO_USER" ]; then
+        # Launch as the sudo user, not root
+        su -c "nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 &" "$SUDO_USER" || true
+    elif [ "$USER" != "root" ]; then
+        # Launch directly if not root
+        nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 & || true
+    fi
+fi
+
 # Update icon cache
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
