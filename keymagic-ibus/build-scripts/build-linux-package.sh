@@ -146,10 +146,8 @@ create_package_structure() {
     cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.xml" "$pkg_dir/usr/share/ibus/component/"
     cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
     
-    # Copy icon if exists
-    if [ -f "$PROJECT_ROOT/resources/icons/keymagic.png" ]; then
-        cp "$PROJECT_ROOT/resources/icons/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
-    fi
+    # Copy icon
+    cp "$PROJECT_ROOT/resources/icons/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
     
     # Copy documentation
     cp "$PROJECT_ROOT/README.md" "$pkg_dir/usr/share/doc/keymagic3/" 2>/dev/null || true
