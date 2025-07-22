@@ -4,7 +4,7 @@ Section: utils
 Priority: optional
 Architecture: @ARCH@
 Maintainer: Thant Thet Khin Zaw <contact@keymagic.net>
-Depends: libgtk-3-0, ibus, libayatana-appindicator3-1, libwebkit2gtk-4.1-0
+Depends: libgtk-3-0, ibus (>= 1.5.0), libayatana-appindicator3-1, libwebkit2gtk-4.1-0
 Recommends: fonts-myanmar
 Homepage: https://github.com/thantthet/keymagic-3
 Description: KeyMagic 3 - Smart keyboard input method

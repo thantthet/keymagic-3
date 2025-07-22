@@ -43,10 +43,10 @@ init_ibus_component(IBusBus *bus)
         ibus ? "keymagic3" : "keymagic3-debug", /* name */
         "KeyMagic 3",                           /* longname */
         "KeyMagic 3 Input Method for Myanmar and other languages", /* description */
-        "my",                               /* language */
+        "",                               /* language */
         "GPL-3.0",                          /* license */
         "Thant Thet Khin Zaw",              /* author */
-        "keymagic3.png",                    /* icon */
+        "keymagic3",                    /* icon */
         "us"                                /* layout */
     );
     
