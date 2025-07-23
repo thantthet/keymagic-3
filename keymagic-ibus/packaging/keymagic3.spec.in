@@ -81,13 +81,11 @@ fi
 if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
     # Check if we're running as root (during package installation)
     if [ "$SUDO_USER" ]; then
-        # Restart IBus and launch as the sudo user, not root
-        su -c "ibus restart >/dev/null 2>&1 || true" "$SUDO_USER" || true
+        # Launch as the sudo user, not root
         su -c "nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 &" "$SUDO_USER" || true
     elif [ "$USER" != "root" ]; then
-        # Restart IBus and launch directly if not root
-        ibus restart >/dev/null 2>&1 || true
-        nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 &
+        # Launch directly if not root
+        nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 & || true
     fi
 fi
 
