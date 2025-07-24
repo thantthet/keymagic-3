@@ -816,8 +816,8 @@ window.checkForUpdates = async function() {
       statusElement.textContent = `New version ${updateInfo.latest_version} is available!`;
       statusElement.className = 'update-status available';
       
-      // Open update window
-      await showUpdateWindow(updateInfo);
+      // Open update window (manual check - always show)
+      await showUpdateWindow(updateInfo, true);
     } else {
       statusElement.textContent = 'You are using the latest version.';
       statusElement.className = 'update-status up-to-date';
@@ -833,22 +833,25 @@ window.checkForUpdates = async function() {
 }
 
 // Show update window
-window.showUpdateWindow = async function(updateInfo) {
+window.showUpdateWindow = async function(updateInfo, isManualCheck = false) {
   try {
-    // Check if we should show the update (remind me later logic)
-    try {
-      const remindAfterStr = await invoke('get_update_remind_after');
-      if (remindAfterStr) {
-        const remindAfter = parseInt(remindAfterStr);
-        if (!isNaN(remindAfter) && Date.now() < remindAfter) {
-          // Still in "remind later" period, don't show window
-          console.log('Update window skipped due to remind later setting');
-          return;
+    // Only check remind later setting for automatic checks
+    if (!isManualCheck) {
+      // Check if we should show the update (remind me later logic)
+      try {
+        const remindAfterStr = await invoke('get_update_remind_after');
+        if (remindAfterStr) {
+          const remindAfter = parseInt(remindAfterStr);
+          if (!isNaN(remindAfter) && Date.now() < remindAfter) {
+            // Still in "remind later" period, don't show window
+            console.log('Update window skipped due to remind later setting');
+            return;
+          }
         }
+      } catch (e) {
+        // If get_update_remind_after fails, continue showing the update
+        console.log('Could not check remind later setting:', e);
       }
-    } catch (e) {
-      // If get_update_remind_after fails, continue showing the update
-      console.log('Could not check remind later setting:', e);
     }
     
     const { WebviewWindow } = window.__TAURI__.webviewWindow;
@@ -917,34 +920,6 @@ async function loadAboutVersion() {
       aboutVersionElement.textContent = '-';
     }
   }
-}
-
-// Show update notification
-function showUpdateNotification(updateInfo) {
-  // Create a subtle notification banner
-  const banner = document.createElement('div');
-  banner.className = 'update-notification-banner';
-  banner.innerHTML = `
-    <div class="update-notification-content">
-      <span>New version ${updateInfo.latest_version} is available!</span>
-      <button class="btn-link" onclick="window.showUpdateWindow(${JSON.stringify(updateInfo).replace(/"/g, '&quot;')}); this.parentElement.parentElement.remove();">
-        View Details
-      </button>
-      <button class="btn-link" onclick="this.parentElement.parentElement.remove();">
-        Dismiss
-      </button>
-    </div>
-  `;
-  
-  // Add to the body
-  document.body.appendChild(banner);
-  
-  // Auto-dismiss after 10 seconds
-  setTimeout(() => {
-    if (banner.parentElement) {
-      banner.remove();
-    }
-  }, 10000);
 }
 
 // Language profile management
