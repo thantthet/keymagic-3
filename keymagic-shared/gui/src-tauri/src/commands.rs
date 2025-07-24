@@ -409,9 +409,23 @@ pub fn get_app_version() -> Result<String, String> {
 // Import wizard commands
 #[tauri::command]
 pub fn should_scan_bundled_keyboards(state: State<AppState>) -> Result<bool, String> {
-    state.get_platform()
-        .should_scan_bundled_keyboards()
-        .map_err(|e| e.to_string())
+    // Check if we need to scan bundled keyboards based on version
+    let current_version = env!("CARGO_PKG_VERSION");
+    
+    let config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    
+    match &config.general.last_scanned_version {
+        Some(last_version) => {
+            // Use the compare_versions function from platform module
+            Ok(crate::platform::compare_versions(current_version, last_version))
+        }
+        None => {
+            // First run, should scan
+            Ok(true)
+        }
+    }
 }
 
 #[tauri::command]
@@ -539,8 +553,15 @@ pub fn import_bundled_keyboard(
 
 #[tauri::command]
 pub fn mark_bundled_keyboards_scanned(state: State<AppState>) -> Result<(), String> {
+    // Update the last scanned version to current version
+    let mut config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    
+    config.general.last_scanned_version = Some(env!("CARGO_PKG_VERSION").to_string());
+    
     state.get_platform()
-        .mark_bundled_keyboards_scanned()
+        .save_config(&config)
         .map_err(|e| e.to_string())
 }
 
@@ -557,6 +578,26 @@ pub fn get_setting(state: State<AppState>, key: String) -> Result<String, String
 pub fn set_setting(state: State<AppState>, key: String, value: String) -> Result<(), String> {
     state.get_platform()
         .set_setting(&key, &value)
+        .map_err(|e| e.to_string())
+}
+
+// Update reminder commands
+#[tauri::command]
+pub fn get_update_remind_after(state: State<AppState>) -> Result<Option<String>, String> {
+    let config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    Ok(config.general.update_remind_after)
+}
+
+#[tauri::command]
+pub fn set_update_remind_after(state: State<AppState>, value: Option<String>) -> Result<(), String> {
+    let mut config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    config.general.update_remind_after = value;
+    state.get_platform()
+        .save_config(&config)
         .map_err(|e| e.to_string())
 }
 

@@ -195,6 +195,8 @@ pub fn run() {
             commands::mark_bundled_keyboards_scanned,
             commands::get_setting,
             commands::set_setting,
+            commands::get_update_remind_after,
+            commands::set_update_remind_after,
             commands::run_command,
             commands::add_composition_mode_process,
             commands::remove_composition_mode_process,

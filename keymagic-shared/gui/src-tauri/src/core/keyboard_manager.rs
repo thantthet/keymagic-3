@@ -86,6 +86,7 @@ impl KeyboardManager {
                     check_for_updates: true,
                     last_update_check: None,
                     last_scanned_version: None,
+                    update_remind_after: None,
                 },
                 keyboards: crate::platform::KeyboardsConfig {
                     active: None,

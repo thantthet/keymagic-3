@@ -31,6 +31,7 @@ pub struct GeneralConfig {
     pub check_for_updates: bool,
     pub last_update_check: Option<String>,
     pub last_scanned_version: Option<String>,
+    pub update_remind_after: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,14 +119,6 @@ pub trait Platform: Send + Sync {
         Ok(())
     }
     
-    // Bundled keyboard scanning
-    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
-        Ok(false) // Default: don't scan
-    }
-    
-    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
-        Ok(())
-    }
     
     // Bundled keyboards
     fn get_bundled_keyboards_path(&self) -> Option<PathBuf> {

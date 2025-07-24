@@ -837,7 +837,7 @@ window.showUpdateWindow = async function(updateInfo) {
   try {
     // Check if we should show the update (remind me later logic)
     try {
-      const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
+      const remindAfterStr = await invoke('get_update_remind_after');
       if (remindAfterStr) {
         const remindAfter = parseInt(remindAfterStr);
         if (!isNaN(remindAfter) && Date.now() < remindAfter) {
@@ -847,7 +847,7 @@ window.showUpdateWindow = async function(updateInfo) {
         }
       }
     } catch (e) {
-      // If get_setting fails, continue showing the update
+      // If get_update_remind_after fails, continue showing the update
       console.log('Could not check remind later setting:', e);
     }
     

@@ -115,6 +115,10 @@ impl Platform for WindowsBackend {
                 config.general.last_update_check = Some(last_check);
             }
             
+            if let Ok(remind_after) = settings_key.get_value::<String, _>("UpdateRemindAfter") {
+                config.general.update_remind_after = Some(remind_after);
+            }
+            
             // Active keyboard is stored with DefaultKeyboard name
             if let Ok(active) = settings_key.get_value::<String, _>(DEFAULT_KEYBOARD_VALUE) {
                 config.keyboards.active = Some(active);
@@ -172,6 +176,10 @@ impl Platform for WindowsBackend {
         
         if let Some(ref last_check) = config.general.last_update_check {
             settings_key.set_value("LastUpdateCheck", last_check)?;
+        }
+        
+        if let Some(ref remind_after) = config.general.update_remind_after {
+            settings_key.set_value("UpdateRemindAfter", remind_after)?;
         }
         
         // Active keyboard uses DefaultKeyboard name
@@ -352,32 +360,6 @@ impl Platform for WindowsBackend {
         }
     }
     
-    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
-        let current_version = env!("CARGO_PKG_VERSION");
-        
-        // Check version-based approach
-        if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
-            if let Ok(last_version) = settings_key.get_value::<String, _>("LastScannedVersion") {
-                // Compare versions - if current > last, should scan for new keyboards
-                return Ok(super::compare_versions(&current_version, &last_version));
-            }
-        }
-        
-        // No version recorded = should scan
-        Ok(true)
-    }
-    
-    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
-        // Update to use version-based tracking
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let (settings_key, _) = hkcu
-            .create_subkey(SETTINGS_KEY)
-            .context("Failed to create Settings key")?;
-        
-        // Set current version
-        settings_key.set_value("LastScannedVersion", &env!("CARGO_PKG_VERSION"))?;
-        Ok(())
-    }
     
     fn get_bundled_keyboards_path(&self) -> Option<PathBuf> {
         // Get the installation directory

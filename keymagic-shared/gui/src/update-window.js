@@ -116,8 +116,7 @@ async function remindLater() {
   try {
     // Set a timestamp for when to show the update again (24 hours from now)
     const remindTimestamp = Date.now() + (24 * 60 * 60 * 1000); // 24 hours in milliseconds
-    await invoke('set_setting', {
-      key: 'UpdateRemindAfter',
+    await invoke('set_update_remind_after', {
       value: remindTimestamp.toString()
     });
     
