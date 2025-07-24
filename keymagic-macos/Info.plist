@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    
+    <key>CFBundleExecutable</key>
+    <string>KeyMagic3</string>
+
+    <key>CFBundleIconFile</key>
+    <string>KeyMagic3.icns</string>
+    
+    <key>CFBundleIdentifier</key>
+    <string>org.keymagic.inputmethod.KeyMagic3</string>
+    
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    
+    <key>CFBundleName</key>
+    <string>KeyMagic3</string>
+    
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    
+    <key>LSBackgroundOnly</key>
+    <true/>
+    
+    <key>LSUIElement</key>
+    <true/>
+    
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024 KeyMagic. All rights reserved.</string>
+    
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    
+    <!-- Input Method specific keys -->
+    <key>InputMethodConnectionName</key>
+    <string>org.keymagic.inputmethod.KeyMagic3_Connection</string>
+    
+    <key>InputMethodServerControllerClass</key>
+    <string>KeyMagic3.KMInputController</string>
+    
+    <key>InputMethodServerDelegateClass</key>
+    <string>KeyMagic3.KMInputController</string>
+    
+    <key>tsInputMethodIconFileKey</key>
+    <string>KeyMagic3.icns</string>
+    
+    <key>tsInputMethodCharacterRepertoireKey</key>
+    <array>
+        <string>mul</string>
+    </array>
+
+    <key>TISIntendedLanguage</key>
+    <string>mul</string>
+</dict>
+</plist>
