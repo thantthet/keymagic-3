@@ -1,6 +1,6 @@
 # Multi-architecture Dockerfile for building KeyMagic packages
 ARG ARCH=amd64
-FROM --platform=linux/${ARCH} ubuntu:24.04
+FROM --platform=linux/${ARCH} ubuntu:22.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive

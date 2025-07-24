@@ -137,6 +137,18 @@ keymagic_map_ibus_keyval(guint keyval)
         case IBUS_KEY_F11:          return 78;  /* VirtualKey::F11 */
         case IBUS_KEY_F12:          return 79;  /* VirtualKey::F12 */
         
+        /* Shifted number keys (map to base number keys) */
+        case IBUS_KEY_exclam:       return 17;  /* VirtualKey::Key1 (!) */
+        case IBUS_KEY_at:           return 18;  /* VirtualKey::Key2 (@) */
+        case IBUS_KEY_numbersign:   return 19;  /* VirtualKey::Key3 (#) */
+        case IBUS_KEY_dollar:       return 20;  /* VirtualKey::Key4 ($) */
+        case IBUS_KEY_percent:      return 21;  /* VirtualKey::Key5 (%) */
+        case IBUS_KEY_asciicircum:  return 22;  /* VirtualKey::Key6 (^) */
+        case IBUS_KEY_ampersand:    return 23;  /* VirtualKey::Key7 (&) */
+        case IBUS_KEY_asterisk:     return 24;  /* VirtualKey::Key8 (*) */
+        case IBUS_KEY_parenleft:    return 25;  /* VirtualKey::Key9 (() */
+        case IBUS_KEY_parenright:   return 16;  /* VirtualKey::Key0 ()) */
+        
         /* OEM keys */
         case IBUS_KEY_semicolon:
         case IBUS_KEY_colon:        return 86;  /* VirtualKey::Oem1 */
