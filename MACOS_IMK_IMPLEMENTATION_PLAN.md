@@ -114,15 +114,37 @@ static const KeyMapping keyMappings[] = {
 
 ### 4. Configuration Management
 
-#### Keyboard Loading
-- Read keyboard paths from preferences
-- Support hot-reload on configuration change
-- Handle missing/invalid keyboards gracefully
+#### Shared Configuration with GUI
+- Read from same location as GUI: `~/Library/Preferences/net.keymagic/config.toml`
+- Keyboards stored in: `~/Library/Application Support/KeyMagic/Keyboards/`
+- Monitor config file for changes using DispatchSource
+- Load active keyboard on startup and config changes
 
-#### Settings
-- Use NSUserDefaults for persistence
-- Monitor changes using KVO or NSNotificationCenter
-- Settings structure similar to Linux implementation
+#### Configuration Structure (TOML)
+```toml
+[general]
+start_with_system = false
+check_for_updates = true
+
+[keyboards]
+active = "myanmar3"
+last_used = ["myanmar3", "zawgyi"]
+
+[[keyboards.installed]]
+id = "myanmar3"
+name = "Myanmar3 Unicode"
+filename = "myanmar3.km2"
+hash = "abc123..."
+
+[composition_mode]
+enabled_processes = ["Safari", "Chrome", "Firefox"]
+```
+
+#### Implementation
+- `KMConfiguration.swift` handles all config management
+- Singleton pattern for easy access throughout IMK
+- Automatic reload on config file changes
+- Fallback to searching keyboards directory by ID
 
 ### 5. Composition State Management
 
