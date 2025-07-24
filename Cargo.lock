@@ -2430,13 +2430,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keymagic-macos"
-version = "0.1.0"
-dependencies = [
- "keymagic-core",
-]
-
-[[package]]
 name = "kms2km2"
 version = "0.1.0"
 dependencies = [
