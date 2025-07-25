@@ -2406,6 +2406,7 @@ dependencies = [
  "futures",
  "image",
  "keymagic-core",
+ "kms2km2",
  "log",
  "notify-rust",
  "objc",

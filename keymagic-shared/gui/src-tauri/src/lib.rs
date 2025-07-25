@@ -211,6 +211,9 @@ pub fn run() {
             commands::check_for_update,
             commands::get_registered_hotkeys,
             commands::refresh_hotkeys,
+            commands::convert_kms_to_km2,
+            commands::validate_kms_file,
+            commands::convert_kms_file,
         ])
         .on_window_event(|window, event| {
             use tauri::WindowEvent;

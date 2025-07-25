@@ -840,6 +840,107 @@ pub async fn check_for_update() -> Result<Option<UpdateInfo>, String> {
     check_for_updates().await
 }
 
+// KMS to KM2 converter commands
+#[tauri::command]
+pub fn convert_kms_to_km2(
+    input_path: String,
+    output_path: String,
+) -> Result<(), String> {
+    let input = std::path::PathBuf::from(&input_path);
+    let output = std::path::PathBuf::from(&output_path);
+    
+    // Ensure input file exists
+    if !input.exists() {
+        return Err(format!("Input file not found: {}", input_path));
+    }
+    
+    // Ensure it's a file, not a directory
+    if input.is_dir() {
+        return Err(format!("Input path is a directory, not a file: {}", input_path));
+    }
+    
+    // Ensure input has .kms extension
+    if input.extension().and_then(|s| s.to_str()) != Some("kms") {
+        return Err("Input file must have .kms extension".to_string());
+    }
+    
+    // Convert using kms2km2 crate
+    kms2km2::convert_kms_to_km2(&input, &output)
+        .map_err(|e| format!("Conversion failed: {}", e))
+}
+
+#[tauri::command]
+pub fn validate_kms_file(
+    file_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let path = std::path::PathBuf::from(&file_path);
+    
+    // Debug: Log the path
+    log::info!("Validating KMS file at path: {:?}", path);
+    
+    // Ensure file exists
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    
+    // Get file metadata
+    let metadata = match fs::metadata(&path) {
+        Ok(m) => m,
+        Err(e) => return Err(format!("Failed to get file metadata: {}", e))
+    };
+    
+    // Log file type
+    log::info!("File type - is_file: {}, is_dir: {}, is_symlink: {}", 
+        metadata.is_file(), 
+        metadata.is_dir(), 
+        metadata.file_type().is_symlink()
+    );
+    
+    // Ensure it's a file, not a directory
+    if metadata.is_dir() {
+        return Err(format!("Path is a directory, not a file: {}", file_path));
+    }
+    
+    // Ensure it has .kms extension
+    if path.extension().and_then(|s| s.to_str()) != Some("kms") {
+        return Err("File must have .kms extension".to_string());
+    }
+    
+    // Try to read the file content first to debug
+    match fs::read_to_string(&path) {
+        Ok(content) => {
+            log::info!("Successfully read file, content length: {} bytes", content.len());
+        }
+        Err(e) => {
+            return Err(format!("Failed to read file: {} (os error: {:?})", e, e.raw_os_error()));
+        }
+    }
+    
+    // Try to compile the KMS file to validate it
+    match kms2km2::compile_kms_file(&path) {
+        Ok(km2_file) => {
+            // Extract metadata for validation result
+            let metadata = km2_file.metadata();
+            let name = metadata.name().unwrap_or("Unnamed Keyboard".to_string());
+            let description = metadata.description().unwrap_or("No description".to_string());
+            
+            Ok(format!("Valid KMS file\nName: {}\nDescription: {}", name, description))
+        }
+        Err(e) => Err(format!("Invalid KMS file: {}", e))
+    }
+}
+
+#[tauri::command]
+pub fn convert_kms_file(
+    input_path: String,
+    output_path: String,
+) -> Result<(), String> {
+    // Use the existing convert_kms_to_km2 function
+    convert_kms_to_km2(input_path, output_path)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BundledKeyboard {
     pub id: String,

@@ -1396,6 +1396,9 @@ async function init() {
   // Set up event listeners
   setupEventListeners();
   
+  // Initialize converter
+  initializeConverter();
+  
   // Listen for keyboard import events
   const { listen } = window.__TAURI__.event;
   listen('keyboards-imported', async (event) => {
@@ -1560,6 +1563,254 @@ async function showImportWizard() {
     console.error('Failed to show import wizard:', error);
     showError('Failed to open import wizard: ' + error.message);
   }
+}
+
+// Converter Page Functions
+let selectedKmsFile = null;
+
+function initializeConverter() {
+  const fileInput = document.getElementById('kms-file-input');
+  const fileLabel = document.querySelector('.file-input-label');
+  const selectedFileInfo = document.getElementById('selected-file-info');
+  const validationResult = document.getElementById('validation-result');
+  const convertBtn = document.getElementById('convert-btn');
+  const convertAndImportBtn = document.getElementById('convert-and-import-btn');
+  const conversionResult = document.getElementById('conversion-result');
+  
+  if (!fileInput) return; // Converter page not loaded yet
+  
+  // Replace file input with button click to use dialog
+  fileLabel.addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    const { open } = window.__TAURI__.dialog;
+    
+    // Open file dialog
+    const selected = await open({
+      multiple: false,
+      filters: [{
+        name: 'KeyMagic Script',
+        extensions: ['kms']
+      }],
+      title: 'Select KMS File'
+    });
+    
+    if (!selected) {
+      resetConverterUI();
+      return;
+    }
+    
+    selectedKmsFile = selected;
+    const fileName = selected.split(/[\\/]/).pop(); // Get file name from path
+    
+    // Create a more refined file display
+    selectedFileInfo.innerHTML = `
+      <div class="selected-file-display">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" class="file-icon">
+          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V8h-3a1 1 0 01-1-1V4H6zm5 0v2h2.586L11 3.414V4z" clip-rule="evenodd"/>
+        </svg>
+        <span class="file-name">${fileName}</span>
+        <button class="clear-file-btn" onclick="window.clearSelectedFile()">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+      </div>
+    `;
+    selectedFileInfo.style.display = 'block';
+    
+    // Validate the KMS file
+    try {
+      const validationMsg = await invoke('validate_kms_file', { 
+        filePath: selected
+      });
+      
+      validationResult.innerHTML = `
+        <div class="validation-success">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+          ${validationMsg.replace(/\n/g, '<br>')}
+        </div>
+      `;
+      validationResult.style.display = 'block';
+      
+      // Enable convert buttons
+      convertBtn.disabled = false;
+      convertAndImportBtn.disabled = false;
+    } catch (error) {
+      showValidationError(error.toString());
+      convertBtn.disabled = true;
+      convertAndImportBtn.disabled = true;
+    }
+  });
+  
+  convertBtn.addEventListener('click', async () => {
+    await convertKmsFile(false);
+  });
+  
+  convertAndImportBtn.addEventListener('click', async () => {
+    await convertKmsFile(true);
+  });
+  
+  function resetConverterUI() {
+    selectedKmsFile = null;
+    selectedFileInfo.textContent = '';
+    selectedFileInfo.style.display = 'none';
+    validationResult.style.display = 'none';
+    conversionResult.style.display = 'none';
+    convertBtn.disabled = true;
+    convertAndImportBtn.disabled = true;
+  }
+  
+  // Clear selected file function
+  window.clearSelectedFile = function() {
+    resetConverterUI();
+  }
+  
+  function showValidationError(error) {
+    validationResult.innerHTML = `
+      <div class="validation-error">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>
+        ${error}
+      </div>
+    `;
+    validationResult.style.display = 'block';
+  }
+}
+
+async function convertKmsFile(shouldImport) {
+  if (!selectedKmsFile) return;
+  
+  const conversionResult = document.getElementById('conversion-result');
+  const convertBtn = document.getElementById('convert-btn');
+  const convertAndImportBtn = document.getElementById('convert-and-import-btn');
+  
+  // Disable buttons during conversion
+  convertBtn.disabled = true;
+  convertAndImportBtn.disabled = true;
+  
+  try {
+    // Get file name from path
+    const fileName = selectedKmsFile.split(/[\\/]/).pop();
+    const outputFileName = fileName.replace('.kms', '.km2');
+    let outputPath;
+    
+    if (shouldImport) {
+      // For import, we'll use a temporary path
+      const { tempDir, join } = window.__TAURI__.path;
+      const tempDirPath = await tempDir();
+      outputPath = await join(tempDirPath, outputFileName);
+    } else {
+      // For save, let user choose location
+      outputPath = await saveFileDialog(outputFileName);
+      if (!outputPath) {
+        // User cancelled save dialog
+        convertBtn.disabled = false;
+        convertAndImportBtn.disabled = false;
+        return;
+      }
+    }
+    
+    // Convert the file
+    await invoke('convert_kms_file', {
+      inputPath: selectedKmsFile,
+      outputPath: outputPath
+    });
+    
+    // Show success message
+    if (shouldImport) {
+      // Import the converted keyboard
+      try {
+        const keyboard = await invoke('import_keyboard', { filePath: outputPath });
+        
+        // Mark this keyboard as recently added
+        recentlyAddedKeyboardIds.add(keyboard.id);
+        
+        // Switch to keyboards page
+        switchPage('keyboards');
+        
+        // Load keyboards to show the new one
+        await loadKeyboards();
+        await updateTrayMenu();
+        
+        showSuccess(`Keyboard "${keyboard.name}" has been imported successfully`);
+        
+        // Remove "just added" label after 60 seconds (1 minute)
+        setTimeout(() => {
+          recentlyAddedKeyboardIds.delete(keyboard.id);
+          renderKeyboardList();
+        }, 60000);
+        
+        // Re-enable buttons before returning
+        convertBtn.disabled = false;
+        convertAndImportBtn.disabled = false;
+        
+        return; // Don't show conversion result since we switched pages
+      } catch (importError) {
+        conversionResult.innerHTML = `
+          <div class="conversion-warning">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+              <strong>Conversion successful but import failed:</strong><br>
+              ${importError}
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      conversionResult.innerHTML = `
+        <div class="conversion-success">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <strong>Conversion successful!</strong><br>
+            File saved as: ${outputFileName}
+          </div>
+        </div>
+      `;
+    }
+    
+    conversionResult.style.display = 'block';
+    
+  } catch (error) {
+    conversionResult.innerHTML = `
+      <div class="conversion-error">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+          <strong>Conversion failed:</strong><br>
+          ${error}
+        </div>
+      </div>
+    `;
+    conversionResult.style.display = 'block';
+  } finally {
+    // Re-enable buttons
+    convertBtn.disabled = false;
+    convertAndImportBtn.disabled = false;
+  }
+}
+
+// Helper function for save file dialog
+async function saveFileDialog(defaultFileName) {
+  const { save } = window.__TAURI__.dialog;
+  
+  const filePath = await save({
+    defaultPath: defaultFileName,
+    filters: [{
+      name: 'KeyMagic Binary File',
+      extensions: ['km2']
+    }]
+  });
+  
+  return filePath;
 }
 
 window.addEventListener('DOMContentLoaded', init);
