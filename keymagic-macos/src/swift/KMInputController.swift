@@ -51,9 +51,6 @@ class KMInputController: IMKInputController {
     private var currentBundleId: String = "unknown"
     private var useCompositionMode: Bool = true
     private var supportsTSMDocumentAccess: Bool = false
-    private var hasAccessibilityPermission: Bool = false
-    private var accessibilityCheckTimer: Timer?
-    private static var hasPromptedForAccessibility: Bool = false
     private var deleteFailedLastTime: Bool = false
     
     // MARK: - Initialization
@@ -75,9 +72,6 @@ class KMInputController: IMKInputController {
         if let configObserver = configObserver {
             NotificationCenter.default.removeObserver(configObserver)
         }
-        
-        accessibilityCheckTimer?.invalidate()
-        accessibilityCheckTimer = nil
         
         if let engine = engine {
             keymagic_engine_free(engine)
@@ -706,78 +700,6 @@ class KMInputController: IMKInputController {
         return supportsAccess
     }
     
-    // MARK: - Accessibility Permissions
-    
-    private func checkAccessibilityPermissions() -> Bool {
-        // Check if we have accessibility permissions
-        let trusted = AXIsProcessTrusted()
-        LOG_DEBUG("Accessibility permission status: \(trusted)")
-        return trusted
-    }
-    
-    private func requestAccessibilityPermissions() {
-        LOG_DEBUG("Checking accessibility permissions for direct mode")
-        
-        // First, just check if we already have permissions
-        let trusted = AXIsProcessTrusted()
-        hasAccessibilityPermission = trusted
-        
-        if trusted {
-            LOG_DEBUG("Accessibility permissions already granted")
-            stopAccessibilityCheckTimer()
-            return
-        }
-        
-        // If not trusted and we haven't prompted yet, show the prompt
-        if !Self.hasPromptedForAccessibility {
-            LOG_DEBUG("First time requesting accessibility permissions - showing system prompt")
-            
-            // Create options dictionary to show prompt
-            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-            
-            // This will show the prompt asynchronously
-            _ = AXIsProcessTrustedWithOptions(options)
-            
-            // Mark that we've prompted
-            Self.hasPromptedForAccessibility = true
-            
-            LOG_DEBUG("System prompt shown to user")
-        } else {
-            LOG_DEBUG("Already prompted for accessibility permissions in this session")
-        }
-        
-        // Start a timer to periodically check if permissions were granted
-        startAccessibilityCheckTimer()
-        
-        LOG_DEBUG("Direct input mode will use fallback methods until accessibility permissions are granted")
-    }
-    
-    private func startAccessibilityCheckTimer() {
-        // Stop any existing timer
-        stopAccessibilityCheckTimer()
-        
-        // Start a new timer to check every 2 seconds
-        accessibilityCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            // Check if permissions have been granted
-            let trusted = AXIsProcessTrusted()
-            
-            if trusted && !self.hasAccessibilityPermission {
-                LOG_DEBUG("Accessibility permissions have been granted!")
-                self.hasAccessibilityPermission = true
-                
-                // Stop the timer
-                self.stopAccessibilityCheckTimer()
-            }
-        }
-    }
-    
-    private func stopAccessibilityCheckTimer() {
-        accessibilityCheckTimer?.invalidate()
-        accessibilityCheckTimer = nil
-    }
-    
     // MARK: - State Management
     
     override func activateServer(_ sender: Any!) {
@@ -800,12 +722,6 @@ class KMInputController: IMKInputController {
         
         LOG_DEBUG("Activated for bundle: \(currentBundleId), mode: \(useCompositionMode ? "Composition" : "Direct"), TSMDocumentAccess: \(supportsTSMDocumentAccess)")
         
-        // Check accessibility permissions if in direct mode
-        if !useCompositionMode {
-            // Request/check permissions (this will only prompt once per session)
-            requestAccessibilityPermissions()
-        }
-        
         // Reset engine state
         if let engine = engine {
             keymagic_engine_reset(engine)
@@ -817,9 +733,6 @@ class KMInputController: IMKInputController {
     
     override func deactivateServer(_ sender: Any!) {
         LOG_DEBUG("Focus out")
-
-        // Stop accessibility check timer
-        stopAccessibilityCheckTimer()
 
         guard let client = sender as? (IMKTextInput & NSObjectProtocol) else {
             // Still reset engine even without valid client
