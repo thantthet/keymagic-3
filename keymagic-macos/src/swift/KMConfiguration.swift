@@ -279,6 +279,29 @@ public class KMConfiguration {
         }
     }
     
+    // MARK: - Active Keyboard Management
+    public func setActiveKeyboard(_ keyboardId: String) {
+        guard var config = config else { return }
+        
+        // Update active keyboard
+        config.keyboards.active = keyboardId
+        
+        // Update last used list
+        if !config.keyboards.lastUsed.contains(keyboardId) {
+            config.keyboards.lastUsed.insert(keyboardId, at: 0)
+            // Keep only last 5 keyboards
+            if config.keyboards.lastUsed.count > 5 {
+                config.keyboards.lastUsed = Array(config.keyboards.lastUsed.prefix(5))
+            }
+        }
+        
+        // Save updated config
+        self.config = config
+        saveConfig()
+        
+        NSLog("KeyMagic: Set active keyboard to: \(keyboardId)")
+    }
+    
     // MARK: - Config File Monitoring
     private var configMonitor: DispatchSourceFileSystemObject?
     

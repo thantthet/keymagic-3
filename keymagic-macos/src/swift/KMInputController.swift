@@ -495,7 +495,6 @@ class KMInputController: IMKInputController {
         }
         
         // First, try to get text matching engine composing length
-        let engineLength = engineComposingText.count
         let engineUtf16Length = engineComposingText.utf16.count
         
         // Request based on UTF-16 length (add some extra to ensure we get enough)
@@ -854,40 +853,40 @@ class KMInputController: IMKInputController {
     // MARK: - Menu Support
     
     override func menu() -> NSMenu! {
+        LOG_DEBUG("Creating menu")
         let menu = NSMenu(title: "KeyMagic")
-        
-        // Add keyboard selection items
-        let keyboardsItem = NSMenuItem(title: "Keyboards", action: nil, keyEquivalent: "")
-        let keyboardsSubmenu = NSMenu(title: "Keyboards")
         
         // Load available keyboards from config
         let config = KMConfiguration.shared
         let keyboards = config.installedKeyboards
+        LOG_DEBUG("Found \(keyboards.count) keyboards")
         
+        // Add keyboards directly to the main menu
         if keyboards.isEmpty {
             let noKeyboardsItem = NSMenuItem(title: "No Keyboards Installed", action: nil, keyEquivalent: "")
             noKeyboardsItem.isEnabled = false
-            keyboardsSubmenu.addItem(noKeyboardsItem)
+            menu.addItem(noKeyboardsItem)
         } else {
-            for keyboard in keyboards {
+            for (index, keyboard) in keyboards.enumerated() {
                 guard let id = keyboard["id"],
                       let name = keyboard["name"] else { continue }
                 
-                let menuItem = NSMenuItem(title: name, action: #selector(selectKeyboard(_:)), keyEquivalent: "")
+                LOG_DEBUG("Adding keyboard menu item: \(name) (id: \(id))")
+                
+                let menuItem = NSMenuItem(title: name, action: #selector(selectionChanged(_:)), keyEquivalent: "")
                 menuItem.target = self
                 menuItem.representedObject = id
+                menuItem.tag = index
+                menuItem.isEnabled = true
                 
                 // Check current keyboard
                 if id == currentKeyboardId {
                     menuItem.state = .on
                 }
                 
-                keyboardsSubmenu.addItem(menuItem)
+                menu.addItem(menuItem)
             }
         }
-        
-        keyboardsItem.submenu = keyboardsSubmenu
-        menu.addItem(keyboardsItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -899,20 +898,39 @@ class KMInputController: IMKInputController {
         return menu
     }
     
-    @objc private func selectKeyboard(_ sender: NSMenuItem) {
-        guard let keyboardId = sender.representedObject as? String else { return }
+    @objc private func selectionChanged(_ sender: Any) {
+        LOG_DEBUG("selectionChanged called with sender: \(type(of: sender))")
         
+        // IMK passes a dictionary with the menu item
+        guard let dict = sender as? [String: Any],
+              let menuItem = dict["IMKCommandMenuItem"] as? NSMenuItem else {
+            LOG_DEBUG("Could not get menu item from sender")
+            return
+        }
+        
+        // Get the keyboard ID from representedObject
+        guard let keyboardId = menuItem.representedObject as? String else {
+            LOG_DEBUG("No keyboard ID in menu item")
+            return
+        }
+        
+        LOG_DEBUG("Selected keyboard ID: \(keyboardId)")
+        selectKeyboardById(keyboardId)
+    }
+    
+    private func selectKeyboardById(_ keyboardId: String) {
         // Update configuration
         let config = KMConfiguration.shared
         if let keyboardPath = config.getKeyboardPath(for: keyboardId) {
             if loadKeyboard(id: keyboardId, path: keyboardPath) {
                 LOG_DEBUG("Switched to keyboard: \(keyboardId)")
                 
-                // TODO: Update config file to save the active keyboard
-                // This would require implementing a method in KMConfiguration to save changes
+                // Save the active keyboard to config
+                config.setActiveKeyboard(keyboardId)
             }
         }
     }
+    
     
     @objc private func showKeyMagicPreferences() {
         // Launch the GUI application
