@@ -569,8 +569,8 @@ function showDirectModeHostInputDialog() {
         <p class="modal-hint">The application will use direct mode (no underlined text while typing).</p>
       `,
       `
-        <button class="btn btn-secondary" onclick="cancelHostInput()">Cancel</button>
-        <button class="btn btn-primary" onclick="confirmHostInput()">Add</button>
+        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddHost();">Cancel</button>
+        <button class="btn btn-primary" onclick="window.confirmAddHost();">Add</button>
       `
     );
     
