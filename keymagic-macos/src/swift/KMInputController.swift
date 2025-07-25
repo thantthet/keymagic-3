@@ -48,6 +48,8 @@ class KMInputController: IMKInputController {
     private var currentKeyboardId: String?
     private var composingText: String = ""
     private var configObserver: NSObjectProtocol?
+    private var currentBundleId: String = "unknown"
+    private var useCompositionMode: Bool = true
     
     // MARK: - Initialization
     
@@ -94,6 +96,15 @@ class KMInputController: IMKInputController {
         // Skip processing for Command key combinations
         if (modifiers & NSEvent.ModifierFlags.command.rawValue) != 0 {
             LOG_DEBUG("Skipping Command key combination")
+
+            // Commit and reset if in composition mode
+            if useCompositionMode && !composingText.isEmpty {
+                commitAndReset(composingText, client: sender)
+            } else if let engine = engine {
+                // Just reset engine if nothing to commit
+                keymagic_engine_reset(engine)
+            }
+            
             return false
         }
         
@@ -113,6 +124,15 @@ class KMInputController: IMKInputController {
         // Convert macOS keycode to VirtualKey
         guard let virtualKey = keycode.toVirtualKey else {
             LOG_DEBUG("Unknown keycode \(keycode) - cannot convert to VirtualKey")
+
+            // Commit and reset if in composition mode
+            if useCompositionMode && !composingText.isEmpty {
+                commitAndReset(composingText, client: sender)
+            } else {
+                // Just reset engine if nothing to commit
+                keymagic_engine_reset(engine)
+            }
+
             return false
         }
         
@@ -169,11 +189,6 @@ class KMInputController: IMKInputController {
                 LOG_TEXT("Output text", text)
             }
             
-            if let composingTextPtr = output.composing_text {
-                let composingText = String(cString: composingTextPtr)
-                LOG_TEXT("Output composing text", composingText)
-            }
-            
             // Handle output based on composing text
             if let composingTextPtr = output.composing_text, 
                String(cString: composingTextPtr).count > 0 {
@@ -220,12 +235,69 @@ class KMInputController: IMKInputController {
     private func processOutput(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: Any!) {
         LOG_DEBUG("processOutput called")
         
+        if useCompositionMode {
+            processOutputCompositionMode(&output, keycode: keycode, client: sender)
+        } else {
+            processOutputDirectMode(&output, keycode: keycode, client: sender)
+        }
+    }
+    
+    private func processOutputDirectMode(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: Any!) {
+        LOG_DEBUG("Direct mode - committing immediately")
+        
+        guard let client = sender as? IMKTextInput & NSObjectProtocol else { return }
+        
+        // Handle text replacement (delete + insert)
+        if output.delete_count > 0 || output.text != nil {
+            let textToInsert = output.text != nil ? String(cString: output.text!) : ""
+            
+            if output.delete_count > 0 {
+                LOG_DEBUG("Direct mode - replacing \(output.delete_count) characters with '\(textToInsert)'")
+                
+                // Get current selection/cursor position
+                let currentRange = client.selectedRange()
+                LOG_DEBUG("Current range: location=\(currentRange.location), length=\(currentRange.length)")
+                
+                if currentRange.location != NSNotFound && currentRange.location >= output.delete_count {
+                    // Calculate range to replace (delete characters before cursor)
+                    let replacementRange = NSRange(
+                        location: currentRange.location - Int(output.delete_count),
+                        length: Int(output.delete_count)
+                    )
+                    LOG_DEBUG("Replacement range: location=\(replacementRange.location), length=\(replacementRange.length)")
+                    
+                    if textToInsert.isEmpty {
+                        // For pure deletion, use our helper method
+                        deleteCharacters(count: UInt32(output.delete_count), 
+                                       currentRange: currentRange, 
+                                       replacementRange: replacementRange, 
+                                       client: client)
+                    } else {
+                        // For replacement (delete + insert), this works well
+                        client.insertText(textToInsert, replacementRange: replacementRange)
+                    }
+                } else {
+                    // Fallback: just insert text if we can't determine proper range
+                    LOG_DEBUG("Cannot determine proper range, just inserting text")
+                    if !textToInsert.isEmpty {
+                        client.insertText(textToInsert, replacementRange: NSRange(location: NSNotFound, length: 0))
+                    }
+                }
+            } else {
+                // Just insert text without deletion
+                LOG_TEXT("Direct mode - inserting text", textToInsert)
+                client.insertText(textToInsert, replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+        }
+    }
+    
+    private func processOutputCompositionMode(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: Any!) {
         // Update composing text from engine
         if let composingTextPtr = output.composing_text {
             composingText = String(cString: composingTextPtr)
             LOG_TEXT("Updated composing text", composingText)
         }
-        
+
         // Check if we should commit the composition
         let shouldCommitResult = shouldCommit(keycode: keycode, isProcessed: output.is_processed != 0, composingText: composingText)
         LOG_DEBUG("Should commit: \(shouldCommitResult)")
@@ -237,18 +309,8 @@ class KMInputController: IMKInputController {
                 // Update marked text with final composing text before committing
                 updateMarkedText(composingText, client: sender)
                 
-                // Commit the composing text
-                commitText(composingText, client: sender)
-                
-                // Reset engine after commit
-                LOG_DEBUG("Resetting engine after commit")
-                keymagic_engine_reset(engine)
-                
-                // For unprocessed space, commit space too
-                if keycode == kVK_Space && output.is_processed == 0 {
-                    LOG_DEBUG("Committing additional space for unprocessed space key")
-                    commitText(" ", client: sender)
-                }
+                // Commit and reset
+                commitAndReset(composingText, client: sender)
             }
         } else {
             // Just update preedit display
@@ -257,7 +319,83 @@ class KMInputController: IMKInputController {
         }
     }
     
+    private func deleteCharacters(count: UInt32, currentRange: NSRange, replacementRange: NSRange, client: IMKTextInput & NSObjectProtocol) {
+        LOG_DEBUG("Pure deletion - attempting to delete \(count) characters")
+        
+        // Always use extended replacement approach for better compatibility
+        if replacementRange.location > 0 {
+            // Read the character before the deletion range
+            let extendedRange = NSRange(
+                location: replacementRange.location - 1,
+                length: 1
+            )
+            
+            // Check if client responds to stringFromRange
+            if client.responds(to: #selector(IMKTextInput.string(from:actualRange:))) {
+                var actualRange = NSRange()
+                if let prefixChar = client.string(from: extendedRange, actualRange: &actualRange) {
+                    LOG_DEBUG("Read prefix character: '\(prefixChar)' from range \(extendedRange)")
+                    
+                    // Now do replacement with extended range
+                    let extendedReplacementRange = NSRange(
+                        location: replacementRange.location - 1,
+                        length: replacementRange.length + 1
+                    )
+                    
+                    // Insert the prefix character back (effectively deleting only the target text)
+                    client.insertText(prefixChar, replacementRange: extendedReplacementRange)
+                    LOG_DEBUG("Extended replacement completed")
+                } else {
+                    LOG_DEBUG("Could not read prefix character, falling back to setMarkedText approach")
+                    fallbackDeleteUsingMarkedText(replacementRange: replacementRange, client: client)
+                }
+            } else {
+                LOG_DEBUG("Client doesn't support stringFromRange, falling back to setMarkedText approach")
+                fallbackDeleteUsingMarkedText(replacementRange: replacementRange, client: client)
+            }
+        } else {
+            // At beginning of text, try simple deletion first
+            LOG_DEBUG("At beginning of text, trying simple deletion")
+            client.insertText("", replacementRange: replacementRange)
+            
+            // If that doesn't work, use setMarkedText approach
+            let newRange = client.selectedRange()
+            if newRange.location == currentRange.location {
+                LOG_DEBUG("Simple deletion failed, using setMarkedText approach")
+                fallbackDeleteUsingMarkedText(replacementRange: replacementRange, client: client)
+            }
+        }
+    }
+    
+    private func fallbackDeleteUsingMarkedText(replacementRange: NSRange, client: IMKTextInput & NSObjectProtocol) {
+        // Use setMarkedText/unmarkText as fallback
+        // First, set marked text over the range we want to delete
+        // This effectively "selects" the text
+        client.setMarkedText("", 
+                           selectionRange: NSRange(location: 0, length: 0), 
+                           replacementRange: replacementRange)
+        
+        // Then unmark (commit empty text) which deletes the selected range
+        client.setMarkedText("", 
+                           selectionRange: NSRange(location: 0, length: 0), 
+                           replacementRange: NSRange(location: NSNotFound, length: 0))
+        
+        LOG_DEBUG("Deletion attempted using setMarkedText/unmarkText")
+    }
+    
     // MARK: - Composition Management
+    
+    private func commitAndReset(_ text: String, client sender: Any!) {
+        LOG_DEBUG("Committing and resetting engine")
+
+        // Commit the text
+        commitText(text, client: sender)
+        
+        // Reset engine
+        if let engine = engine {
+            keymagic_engine_reset(engine)
+        }
+    }
     
     private func shouldCommit(keycode: UInt16, isProcessed: Bool, composingText: String) -> Bool {
         // If engine didn't process the key, commit
@@ -327,12 +465,63 @@ class KMInputController: IMKInputController {
         composingText = ""
     }
     
+    // MARK: - Process Detection
+    
+    private func getClientBundleIdentifier(_ client: Any) -> String {
+        // Try multiple approaches to get the client bundle identifier
+        
+        // Approach 1: Try to get bundle identifier directly from client
+        if let clientProxy = client as? NSObject {
+            // Try bundleIdentifier
+            if clientProxy.responds(to: Selector(("bundleIdentifier"))) {
+                if let bundleId = clientProxy.value(forKey: "bundleIdentifier") as? String {
+                    LOG_DEBUG("Got bundle identifier from client: \(bundleId)")
+                    return bundleId
+                }
+            }
+            
+            // Try client() method which might return the actual application
+            if clientProxy.responds(to: Selector(("client"))) {
+                if let actualClient = clientProxy.perform(Selector(("client")))?.takeUnretainedValue() as? NSObject {
+                    LOG_DEBUG("Got actual client: \(actualClient)")
+                    
+                    // Try to get bundle identifier from actual client
+                    if actualClient.responds(to: Selector(("bundleIdentifier"))) {
+                        if let bundleId = actualClient.value(forKey: "bundleIdentifier") as? String {
+                            LOG_DEBUG("Got bundle identifier from actual client: \(bundleId)")
+                            return bundleId
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Approach 2: Use the frontmost application as fallback
+        if let frontApp = NSWorkspace.shared.frontmostApplication {
+            if let bundleId = frontApp.bundleIdentifier {
+                LOG_DEBUG("Using frontmost app bundle ID: \(bundleId)")
+                return bundleId
+            }
+        }
+        
+        LOG_DEBUG("Could not determine client bundle identifier")
+        return "unknown"
+    }
+    
     // MARK: - State Management
     
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         
         LOG_DEBUG("Focus in")
+        
+        // Detect client bundle ID and set input mode
+        if let client = sender {
+            currentBundleId = getClientBundleIdentifier(client)
+            useCompositionMode = KMConfiguration.shared.shouldUseCompositionMode(for: currentBundleId)
+        }
+        
+        LOG_DEBUG("Activated for bundle: \(currentBundleId), mode: \(useCompositionMode ? "Composition" : "Direct")")
         
         // Reset engine state
         if let engine = engine {
@@ -345,10 +534,13 @@ class KMInputController: IMKInputController {
     
     override func deactivateServer(_ sender: Any!) {
         LOG_DEBUG("Focus out")
-        
-        // Commit any pending composition
-        if !composingText.isEmpty {
-            commitText(composingText, client: sender)
+
+        // Commit and reset if in composition mode
+        if useCompositionMode && !composingText.isEmpty {
+            commitAndReset(composingText, client: sender)
+        } else if let engine = engine {
+            // Just reset engine if nothing to commit
+            keymagic_engine_reset(engine)
         }
         
         super.deactivateServer(sender)
@@ -356,8 +548,13 @@ class KMInputController: IMKInputController {
     
     override func commitComposition(_ sender: Any!) {
         LOG_DEBUG("Reset")
-        if !composingText.isEmpty {
-            commitText(composingText, client: sender)
+
+        // Commit and reset if in composition mode
+        if useCompositionMode && !composingText.isEmpty {
+            commitAndReset(composingText, client: sender)
+        } else if let engine = engine {
+            // Just reset engine if nothing to commit
+            keymagic_engine_reset(engine)
         }
     }
     
