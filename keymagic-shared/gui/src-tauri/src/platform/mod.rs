@@ -23,6 +23,8 @@ pub struct Config {
     pub keyboards: KeyboardsConfig,
     #[serde(default)]
     pub composition_mode: CompositionModeConfig,
+    #[serde(default)]
+    pub direct_mode: DirectModeConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +54,11 @@ pub struct InstalledKeyboard {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CompositionModeConfig {
+    pub enabled_hosts: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DirectModeConfig {
     pub enabled_hosts: Vec<String>,
 }
 

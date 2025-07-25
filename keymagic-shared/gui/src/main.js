@@ -42,9 +42,13 @@ window.switchPage = function(pageName) {
     loadAboutVersion();
   }
   
-  // Load composition mode settings for settings page
+  // Load composition/direct mode settings for settings page
   if (pageName === 'settings') {
-    loadCompositionModeHosts();
+    if (platformInfo.os === 'macos') {
+      loadDirectModeHosts();
+    } else {
+      loadCompositionModeHosts();
+    }
   }
 }
 
@@ -357,8 +361,12 @@ async function loadSettings() {
     // Load current version
     await loadCurrentVersion();
     
-    // Load composition mode hosts
-    await loadCompositionModeHosts();
+    // Load composition/direct mode hosts based on platform
+    if (platformInfo.os === 'macos') {
+      await loadDirectModeHosts();
+    } else {
+      await loadCompositionModeHosts();
+    }
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
@@ -484,9 +492,108 @@ window.cancelAddHost = function() {
   }
 };
 
+// Direct Mode Host Management (for macOS)
+async function loadDirectModeHosts() {
+  try {
+    const hosts = await invoke('get_direct_mode_hosts');
+    renderDirectModeHostList(hosts);
+  } catch (error) {
+    console.error('Failed to load direct mode hosts:', error);
+    showError('Failed to load direct mode hosts');
+  }
+}
+
+function renderDirectModeHostList(hosts) {
+  const hostList = document.getElementById('direct-mode-process-list');
+  if (!hostList) return;
+  
+  hostList.innerHTML = '';
+  
+  if (hosts.length === 0) {
+    hostList.innerHTML = `
+      <div class="process-list-empty">
+        <p>No app bundles configured for direct mode.<br>
+        All applications will use composition mode.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  hosts.forEach(hostName => {
+    const item = document.createElement('div');
+    item.className = 'process-item';
+    item.innerHTML = `
+      <span class="process-name">${hostName}</span>
+      <button class="btn btn-link" onclick="removeHostFromDirectMode('${hostName.replace(/'/g, "\\'")}')">Remove</button>
+    `;
+    hostList.appendChild(item);
+  });
+}
+
+async function addHostToDirectMode() {
+  const hostName = await showDirectModeHostInputDialog();
+  if (!hostName) return;
+  
+  try {
+    await invoke('add_direct_mode_host', { hostName });
+    await loadDirectModeHosts();
+    showSuccess(`Added "${hostName}" to direct mode`);
+  } catch (error) {
+    console.error('Failed to add host:', error);
+    showError('Failed to add host to direct mode');
+  }
+}
+
+async function removeHostFromDirectMode(hostName) {
+  try {
+    await invoke('remove_direct_mode_host', { hostName });
+    await loadDirectModeHosts();
+    showSuccess(`Removed "${hostName}" from direct mode`);
+  } catch (error) {
+    console.error('Failed to remove host:', error);
+    showError('Failed to remove host from direct mode');
+  }
+}
+
+function showDirectModeHostInputDialog() {
+  return new Promise((resolve) => {
+    // Store resolve function for later use
+    window._hostInputResolve = resolve;
+    
+    showModal(
+      'Add App Bundle',
+      `
+        <p>Enter the app bundle identifier (e.g., "com.apple.Safari", "com.microsoft.VSCode"):</p>
+        <input type="text" id="host-name-input" class="modal-input" placeholder="com.example.app" 
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <p class="modal-hint">The application will use direct mode (no underlined text while typing).</p>
+      `,
+      `
+        <button class="btn btn-secondary" onclick="cancelHostInput()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmHostInput()">Add</button>
+      `
+    );
+    
+    // Focus on input
+    setTimeout(() => {
+      const input = document.getElementById('host-name-input');
+      if (input) {
+        input.focus();
+        input.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            confirmHostInput();
+          }
+        });
+      }
+    }, 100);
+  });
+}
+
 // Make these functions available globally
 window.addHostToCompositionMode = addHostToCompositionMode;
 window.removeHostFromCompositionMode = removeHostFromCompositionMode;
+window.addHostToDirectMode = addHostToDirectMode;
+window.removeHostFromDirectMode = removeHostFromDirectMode;
 
 
 // Modal functions
@@ -1246,10 +1353,24 @@ function updatePlatformSpecificUI() {
     }
   }
   
-  // Hide composition mode section if not supported
-  const compositionSection = document.querySelector('.settings-section:has(#composition-mode-process-list)');
-  if (compositionSection && !platformInfo.features.composition_mode) {
-    compositionSection.style.display = 'none';
+  // Handle composition/direct mode sections based on platform
+  const compositionSection = document.getElementById('composition-mode-section');
+  const directModeSection = document.getElementById('direct-mode-section');
+  
+  if (platformInfo.features.composition_mode) {
+    if (platformInfo.os === 'macos') {
+      // macOS: Show direct mode section, hide composition mode section
+      if (compositionSection) compositionSection.style.display = 'none';
+      if (directModeSection) directModeSection.style.display = 'block';
+    } else {
+      // Windows: Show composition mode section, hide direct mode section
+      if (compositionSection) compositionSection.style.display = 'block';
+      if (directModeSection) directModeSection.style.display = 'none';
+    }
+  } else {
+    // Platform doesn't support composition mode at all
+    if (compositionSection) compositionSection.style.display = 'none';
+    if (directModeSection) directModeSection.style.display = 'none';
   }
   
   // Hide Windows input settings button if not on Windows

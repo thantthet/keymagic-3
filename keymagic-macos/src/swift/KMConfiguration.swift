@@ -8,11 +8,13 @@ public class KMConfiguration {
         var general: GeneralConfig
         var keyboards: KeyboardsConfig
         var compositionMode: CompositionModeConfig?
+        var directMode: DirectModeConfig?
         
         private enum CodingKeys: String, CodingKey {
             case general
             case keyboards
             case compositionMode = "composition_mode"
+            case directMode = "direct_mode"
         }
     }
     
@@ -60,6 +62,14 @@ public class KMConfiguration {
         }
     }
     
+    private struct DirectModeConfig: Codable {
+        var enabledHosts: [String]
+        
+        private enum CodingKeys: String, CodingKey {
+            case enabledHosts = "enabled_hosts"
+        }
+    }
+    
     // MARK: - Singleton
     public static let shared = KMConfiguration()
     
@@ -99,6 +109,22 @@ public class KMConfiguration {
         // Check if the bundle ID is in the enabled list (case-insensitive)
         let lowercaseBundleId = bundleId.lowercased()
         return compositionMode.enabledHosts.contains { enabledHost in
+            enabledHost.lowercased() == lowercaseBundleId
+        }
+    }
+    
+    // MARK: - Direct Mode Management
+    public func shouldUseDirectMode(for bundleId: String) -> Bool {
+        NSLog("KeyMagic: Bundle ID: \(bundleId)")
+        NSLog("KeyMagic: Direct mode: \(String(describing: config?.directMode))")
+        // If no direct mode config, default to composition mode (return false)
+        guard let directMode = config?.directMode else {
+            return false
+        }
+        
+        // Check if the bundle ID is in the enabled list (case-insensitive)
+        let lowercaseBundleId = bundleId.lowercased()
+        return directMode.enabledHosts.contains { enabledHost in
             enabledHost.lowercased() == lowercaseBundleId
         }
     }
@@ -185,6 +211,23 @@ public class KMConfiguration {
             ),
             compositionMode: CompositionModeConfig(
                 enabledHosts: []
+            ),
+            directMode: DirectModeConfig(
+                enabledHosts: [
+                    "com.apple.Spotlight",
+                    "com.apple.finder",
+                    "com.apple.TextEdit",
+                    "com.microsoft.Word",
+                    "com.apple.Dictionary",
+                    "ru.keepcoder.Telegram",
+                    "com.tencent.xinWeChat",
+                    "com.tinyspeck.slackmacgap",
+                    "com.apple.Safari",
+                    "com.google.Chrome",
+                    "us.zoom.xos",
+                    "com.apple.dt.Xcode",
+                    "com.apple.AppStore"
+                ]
             )
         )
         saveConfig()

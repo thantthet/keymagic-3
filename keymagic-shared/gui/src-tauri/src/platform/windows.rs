@@ -1,5 +1,5 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
+    CompositionModeConfig, DirectModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
@@ -65,6 +65,9 @@ impl WindowsBackend {
                 enabled_hosts: vec![
                     "ms-teams.exe".to_string(),
                 ],
+            },
+            direct_mode: DirectModeConfig {
+                enabled_hosts: vec![],
             },
         }
     }

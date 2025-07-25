@@ -94,6 +94,7 @@ impl KeyboardManager {
                     installed: vec![],
                 },
                 composition_mode: Default::default(),
+                direct_mode: Default::default(),
             }
         })
     }

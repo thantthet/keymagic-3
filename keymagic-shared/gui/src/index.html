@@ -140,7 +140,7 @@
               </div>
             </section>
             
-            <section class="settings-section">
+            <section class="settings-section" id="composition-mode-section">
               <h2>Composition Mode</h2>
               <div class="setting-item">
                 <div class="composition-mode-settings">
@@ -159,6 +159,30 @@
                       <!-- Process items will be inserted here -->
                     </div>
                     <p class="setting-hint">These applications will show text with an underline while typing. All other applications will use direct text input.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+            
+            <section class="settings-section" id="direct-mode-section" style="display: none;">
+              <h2>Direct Mode App Bundles</h2>
+              <div class="setting-item">
+                <div class="direct-mode-settings">
+                  <p class="setting-description">Configure which applications use direct mode (text appears immediately) instead of composition mode.</p>
+                  <div class="process-list-container">
+                    <div class="process-list-header">
+                      <h3>App Bundles</h3>
+                      <button class="btn btn-secondary btn-sm" onclick="addHostToDirectMode()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M8 2a.5.5 0 01.5.5v5h5a.5.5 0 010 1h-5v5a.5.5 0 01-1 0v-5h-5a.5.5 0 010-1h5v-5A.5.5 0 018 2z"/>
+                        </svg>
+                        Add App Bundle
+                      </button>
+                    </div>
+                    <div class="process-list" id="direct-mode-process-list">
+                      <!-- Process items will be inserted here -->
+                    </div>
+                    <p class="setting-hint">These applications will use direct text input. All other applications will show text with an underline while typing.</p>
                   </div>
                 </div>
               </div>

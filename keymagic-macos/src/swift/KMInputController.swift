@@ -606,7 +606,7 @@ class KMInputController: IMKInputController {
         
         // Detect client bundle ID and set input mode
         currentBundleId = getClientBundleIdentifier(client)
-        useCompositionMode = KMConfiguration.shared.shouldUseCompositionMode(for: currentBundleId)
+        useCompositionMode = !KMConfiguration.shared.shouldUseDirectMode(for: currentBundleId)
         supportsTSMDocumentAccess = checkTSMDocumentAccess(client)
         
         LOG_DEBUG("Activated for bundle: \(currentBundleId), mode: \(useCompositionMode ? "Composition" : "Direct"), TSMDocumentAccess: \(supportsTSMDocumentAccess)")

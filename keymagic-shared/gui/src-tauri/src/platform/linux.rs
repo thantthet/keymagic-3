@@ -1,5 +1,5 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
+    CompositionModeConfig, DirectModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
@@ -56,6 +56,9 @@ impl LinuxBackend {
                 installed: Vec::new(),
             },
             composition_mode: CompositionModeConfig {
+                enabled_hosts: vec![],
+            },
+            direct_mode: DirectModeConfig {
                 enabled_hosts: vec![],
             },
         }

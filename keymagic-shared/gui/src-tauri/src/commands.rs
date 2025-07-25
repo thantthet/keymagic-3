@@ -652,6 +652,43 @@ pub fn remove_composition_mode_host(
     Ok(())
 }
 
+// Direct mode host management
+#[tauri::command]
+pub fn get_direct_mode_hosts(state: State<AppState>) -> Result<Vec<String>, String> {
+    let config = state.get_config();
+    Ok(config.direct_mode.enabled_hosts.clone())
+}
+
+#[tauri::command]
+pub fn add_direct_mode_host(
+    state: State<AppState>,
+    host_name: String,
+) -> Result<(), String> {
+    let mut config = state.get_config();
+    
+    // Add host if not already in list
+    if !config.direct_mode.enabled_hosts.contains(&host_name) {
+        config.direct_mode.enabled_hosts.push(host_name);
+        state.save_config(&config).map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_direct_mode_host(
+    state: State<AppState>,
+    host_name: String,
+) -> Result<(), String> {
+    let mut config = state.get_config();
+    
+    // Remove host from list
+    config.direct_mode.enabled_hosts.retain(|h| h != &host_name);
+    state.save_config(&config).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
 // Language profile commands (Windows-specific features)
 #[tauri::command]
 pub fn get_supported_languages(_state: State<AppState>) -> Result<Vec<(String, String)>, String> {

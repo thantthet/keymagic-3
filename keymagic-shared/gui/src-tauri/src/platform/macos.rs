@@ -1,5 +1,5 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, KeyboardsConfig,
+    CompositionModeConfig, DirectModeConfig, Config, GeneralConfig, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
@@ -58,6 +58,23 @@ impl MacOSBackend {
             },
             composition_mode: CompositionModeConfig {
                 enabled_hosts: vec![],
+            },
+            direct_mode: DirectModeConfig {
+                enabled_hosts: vec![
+                    "com.apple.Spotlight".to_string(),
+                    "com.apple.finder".to_string(),
+                    "com.apple.TextEdit".to_string(),
+                    "com.microsoft.Word".to_string(),
+                    "com.apple.Dictionary".to_string(),
+                    "ru.keepcoder.Telegram".to_string(),
+                    "com.tencent.xinWeChat".to_string(),
+                    "com.tinyspeck.slackmacgap".to_string(),
+                    "com.apple.Safari".to_string(),
+                    "com.google.Chrome".to_string(),
+                    "us.zoom.xos".to_string(),
+                    "com.apple.dt.Xcode".to_string(),
+                    "com.apple.AppStore".to_string(),
+                ],
             },
         }
     }
