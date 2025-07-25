@@ -50,6 +50,12 @@ class KMInputController: IMKInputController {
     private var configObserver: NSObjectProtocol?
     private var currentBundleId: String = "unknown"
     private var useCompositionMode: Bool = true
+    private var supportsTSMDocumentAccess: Bool = false
+    private var lastBackspaceTime: TimeInterval = 0
+    private static let backspaceIgnoreThreshold: TimeInterval = 0.05 // 50ms
+    private var hasAccessibilityPermission: Bool = false
+    private var accessibilityCheckTimer: Timer?
+    private static var hasPromptedForAccessibility: Bool = false
     
     // MARK: - Initialization
     
@@ -71,6 +77,9 @@ class KMInputController: IMKInputController {
             NotificationCenter.default.removeObserver(configObserver)
         }
         
+        accessibilityCheckTimer?.invalidate()
+        accessibilityCheckTimer = nil
+        
         if let engine = engine {
             keymagic_engine_free(engine)
         }
@@ -80,6 +89,11 @@ class KMInputController: IMKInputController {
     
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard event.type == .keyDown else {
+            return false
+        }
+        
+        guard let client = sender as? (IMKTextInput & NSObjectProtocol) else {
+            LOG_DEBUG("Invalid client type")
             return false
         }
         
@@ -99,13 +113,22 @@ class KMInputController: IMKInputController {
 
             // Commit and reset if in composition mode
             if useCompositionMode && !composingText.isEmpty {
-                commitAndReset(composingText, client: sender)
+                commitAndReset(composingText, client: client)
             } else if let engine = engine {
                 // Just reset engine if nothing to commit
                 keymagic_engine_reset(engine)
             }
             
             return false
+        }
+        
+        // Check if this is our own backspace event
+        if keycode == kVK_Delete {
+            let currentTime = Date().timeIntervalSince1970
+            if lastBackspaceTime > 0 && (currentTime - lastBackspaceTime) < Self.backspaceIgnoreThreshold {
+                LOG_DEBUG("Ignoring our own backspace event (within \(currentTime - lastBackspaceTime) seconds)")
+                return false
+            }
         }
         
         // Check if we have a valid engine
@@ -127,7 +150,7 @@ class KMInputController: IMKInputController {
 
             // Commit and reset if in composition mode
             if useCompositionMode && !composingText.isEmpty {
-                commitAndReset(composingText, client: sender)
+                commitAndReset(composingText, client: client)
             } else {
                 // Just reset engine if nothing to commit
                 keymagic_engine_reset(engine)
@@ -194,11 +217,11 @@ class KMInputController: IMKInputController {
                String(cString: composingTextPtr).count > 0 {
                 // Process output normally
                 LOG_DEBUG("Processing output with composing text")
-                processOutput(&output, keycode: keycode, client: sender)
+                processOutput(&output, keycode: keycode, client: client)
             } else {
                 // Engine has no composing text - clear preedit
                 LOG_DEBUG("Engine has no composing text, clearing preedit")
-                clearMarkedText(client: sender)
+                clearMarkedText(client: client)
                 composingText = ""
                 
                 // Reset engine for special keys
@@ -232,7 +255,7 @@ class KMInputController: IMKInputController {
     
     // MARK: - Output Processing
     
-    private func processOutput(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: Any!) {
+    private func processOutput(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: (IMKTextInput & NSObjectProtocol)) {
         LOG_DEBUG("processOutput called")
         
         if useCompositionMode {
@@ -242,10 +265,10 @@ class KMInputController: IMKInputController {
         }
     }
     
-    private func processOutputDirectMode(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: Any!) {
-        LOG_DEBUG("Direct mode - committing immediately")
+    private func processOutputDirectMode(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: (IMKTextInput & NSObjectProtocol)) {
+        LOG_DEBUG("Direct mode - committing immediately (TSMDocumentAccess: \(supportsTSMDocumentAccess))")
         
-        guard let client = sender as? IMKTextInput & NSObjectProtocol else { return }
+        let client = sender
         
         // Handle text replacement (delete + insert)
         if output.delete_count > 0 || output.text != nil {
@@ -291,7 +314,7 @@ class KMInputController: IMKInputController {
         }
     }
     
-    private func processOutputCompositionMode(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: Any!) {
+    private func processOutputCompositionMode(_ output: inout ProcessKeyOutput, keycode: UInt16, client sender: (IMKTextInput & NSObjectProtocol)) {
         // Update composing text from engine
         if let composingTextPtr = output.composing_text {
             composingText = String(cString: composingTextPtr)
@@ -322,70 +345,61 @@ class KMInputController: IMKInputController {
     private func deleteCharacters(count: UInt32, currentRange: NSRange, replacementRange: NSRange, client: IMKTextInput & NSObjectProtocol) {
         LOG_DEBUG("Pure deletion - attempting to delete \(count) characters")
         
-        // Always use extended replacement approach for better compatibility
-        if replacementRange.location > 0 {
-            // Read the character before the deletion range
-            let extendedRange = NSRange(
-                location: replacementRange.location - 1,
-                length: 1
-            )
+        // Check if we have accessibility permissions for CGEventPost
+        if hasAccessibilityPermission {
+            LOG_DEBUG("Using CGEventPost for deletion")
             
-            // Check if client responds to stringFromRange
-            if client.responds(to: #selector(IMKTextInput.string(from:actualRange:))) {
-                var actualRange = NSRange()
-                if let prefixChar = client.string(from: extendedRange, actualRange: &actualRange) {
-                    LOG_DEBUG("Read prefix character: '\(prefixChar)' from range \(extendedRange)")
-                    
-                    // Now do replacement with extended range
-                    let extendedReplacementRange = NSRange(
-                        location: replacementRange.location - 1,
-                        length: replacementRange.length + 1
-                    )
-                    
-                    // Insert the prefix character back (effectively deleting only the target text)
-                    client.insertText(prefixChar, replacementRange: extendedReplacementRange)
-                    LOG_DEBUG("Extended replacement completed")
-                } else {
-                    LOG_DEBUG("Could not read prefix character, falling back to setMarkedText approach")
-                    fallbackDeleteUsingMarkedText(replacementRange: replacementRange, client: client)
+            // Record the time we're sending backspaces
+            lastBackspaceTime = Date().timeIntervalSince1970
+            
+            // Use CGEventPost to simulate backspace key presses
+            for _ in 0..<count {
+                // Create a key down event for backspace
+                if let keyDownEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Delete), keyDown: true) {
+                    keyDownEvent.post(tap: .cghidEventTap)
                 }
-            } else {
-                LOG_DEBUG("Client doesn't support stringFromRange, falling back to setMarkedText approach")
-                fallbackDeleteUsingMarkedText(replacementRange: replacementRange, client: client)
+                
+                // Create a key up event for backspace
+                if let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Delete), keyDown: false) {
+                    keyUpEvent.post(tap: .cghidEventTap)
+                }
+                
+                // Small delay between keystrokes to ensure proper processing
+                Thread.sleep(forTimeInterval: 0.001) // 1ms
             }
+            
+            LOG_DEBUG("Sent \(count) backspace events via CGEventPost")
         } else {
-            // At beginning of text, try simple deletion first
-            LOG_DEBUG("At beginning of text, trying simple deletion")
+            LOG_DEBUG("No accessibility permission - using fallback deletion method")
+            
+            // Fallback: try to delete using text replacement
             client.insertText("", replacementRange: replacementRange)
             
-            // If that doesn't work, use setMarkedText approach
+            // Check if deletion worked
             let newRange = client.selectedRange()
             if newRange.location == currentRange.location {
-                LOG_DEBUG("Simple deletion failed, using setMarkedText approach")
-                fallbackDeleteUsingMarkedText(replacementRange: replacementRange, client: client)
+                LOG_DEBUG("Fallback deletion may have failed - some characters might not be deleted")
+                
+                // Last resort: use setMarkedText approach
+                // First, set marked text over the range we want to delete
+                client.setMarkedText("", 
+                                   selectionRange: NSRange(location: 0, length: 0), 
+                                   replacementRange: replacementRange)
+                
+                // Then unmark (commit empty text) which deletes the selected range
+                client.setMarkedText("", 
+                                   selectionRange: NSRange(location: 0, length: 0), 
+                                   replacementRange: NSRange(location: NSNotFound, length: 0))
+                
+                LOG_DEBUG("Attempted deletion using setMarkedText/unmarkText fallback")
             }
         }
     }
     
-    private func fallbackDeleteUsingMarkedText(replacementRange: NSRange, client: IMKTextInput & NSObjectProtocol) {
-        // Use setMarkedText/unmarkText as fallback
-        // First, set marked text over the range we want to delete
-        // This effectively "selects" the text
-        client.setMarkedText("", 
-                           selectionRange: NSRange(location: 0, length: 0), 
-                           replacementRange: replacementRange)
-        
-        // Then unmark (commit empty text) which deletes the selected range
-        client.setMarkedText("", 
-                           selectionRange: NSRange(location: 0, length: 0), 
-                           replacementRange: NSRange(location: NSNotFound, length: 0))
-        
-        LOG_DEBUG("Deletion attempted using setMarkedText/unmarkText")
-    }
     
     // MARK: - Composition Management
     
-    private func commitAndReset(_ text: String, client sender: Any!) {
+    private func commitAndReset(_ text: String, client sender: (IMKTextInput & NSObjectProtocol)) {
         LOG_DEBUG("Committing and resetting engine")
 
         // Commit the text
@@ -424,8 +438,8 @@ class KMInputController: IMKInputController {
         }
     }
     
-    private func updateMarkedText(_ text: String, client sender: Any!) {
-        guard let client = sender as? IMKTextInput & NSObjectProtocol else { return }
+    private func updateMarkedText(_ text: String, client sender: (IMKTextInput & NSObjectProtocol)) {
+        let client = sender
         
         let attributes: [NSAttributedString.Key: Any] = [
             .underlineStyle: NSUnderlineStyle.single.rawValue,
@@ -444,8 +458,8 @@ class KMInputController: IMKInputController {
         LOG_DEBUG("Cursor at \(utf16Count)")
     }
     
-    private func commitText(_ text: String, client sender: Any!) {
-        guard let client = sender as? IMKTextInput & NSObjectProtocol else { return }
+    private func commitText(_ text: String, client sender: (IMKTextInput & NSObjectProtocol)) {
+        let client = sender
         
         LOG_TEXT("Attempting to commit marked text", text)
         
@@ -455,8 +469,8 @@ class KMInputController: IMKInputController {
         LOG_TEXT("Committed marked text", text)
     }
     
-    private func clearMarkedText(client sender: Any!) {
-        guard let client = sender as? IMKTextInput & NSObjectProtocol else { return }
+    private func clearMarkedText(client sender: (IMKTextInput & NSObjectProtocol)) {
+        let client = sender
         
         if !composingText.isEmpty {
             LOG_DEBUG("Cleared marked text")
@@ -467,45 +481,112 @@ class KMInputController: IMKInputController {
     
     // MARK: - Process Detection
     
-    private func getClientBundleIdentifier(_ client: Any) -> String {
-        // Try multiple approaches to get the client bundle identifier
-        
-        // Approach 1: Try to get bundle identifier directly from client
-        if let clientProxy = client as? NSObject {
-            // Try bundleIdentifier
-            if clientProxy.responds(to: Selector(("bundleIdentifier"))) {
-                if let bundleId = clientProxy.value(forKey: "bundleIdentifier") as? String {
-                    LOG_DEBUG("Got bundle identifier from client: \(bundleId)")
-                    return bundleId
-                }
-            }
-            
-            // Try client() method which might return the actual application
-            if clientProxy.responds(to: Selector(("client"))) {
-                if let actualClient = clientProxy.perform(Selector(("client")))?.takeUnretainedValue() as? NSObject {
-                    LOG_DEBUG("Got actual client: \(actualClient)")
-                    
-                    // Try to get bundle identifier from actual client
-                    if actualClient.responds(to: Selector(("bundleIdentifier"))) {
-                        if let bundleId = actualClient.value(forKey: "bundleIdentifier") as? String {
-                            LOG_DEBUG("Got bundle identifier from actual client: \(bundleId)")
-                            return bundleId
-                        }
-                    }
-                }
-            }
+    private func getClientBundleIdentifier(_ client: (IMKTextInput & NSObjectProtocol)) -> String {
+        // Get bundle identifier directly from client
+        if let bundleId = client.bundleIdentifier() {
+            LOG_DEBUG("Got bundle identifier from client: \(bundleId)")
+            return bundleId
         }
         
-        // Approach 2: Use the frontmost application as fallback
-        if let frontApp = NSWorkspace.shared.frontmostApplication {
-            if let bundleId = frontApp.bundleIdentifier {
-                LOG_DEBUG("Using frontmost app bundle ID: \(bundleId)")
-                return bundleId
-            }
+        // Fallback: Use the frontmost application
+        if let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
+            LOG_DEBUG("Using frontmost app bundle ID: \(bundleId)")
+            return bundleId
         }
         
         LOG_DEBUG("Could not determine client bundle identifier")
         return "unknown"
+    }
+    
+    private func checkTSMDocumentAccess(_ client: (IMKTextInput & NSObjectProtocol)) -> Bool {
+        // Check if the client supports TSMDocumentAccess using the proper API
+        let supportsAccess = client.supportsProperty(TSMDocumentPropertyTag(kTSMDocumentSupportDocumentAccessPropertyTag))
+        
+        if supportsAccess {
+            LOG_DEBUG("Client supports TSMDocumentAccess property")
+        } else {
+            LOG_DEBUG("Client does not support TSMDocumentAccess")
+        }
+        
+        // Also check other useful properties for debugging
+        let supportsTextService = client.supportsProperty(TSMDocumentPropertyTag(kTSMDocumentTextServicePropertyTag))
+        let supportsUnicode = client.supportsProperty(TSMDocumentPropertyTag(kTSMDocumentUnicodePropertyTag))
+        
+        LOG_DEBUG("Client TSM properties - Access: \(supportsAccess), TextService: \(supportsTextService), Unicode: \(supportsUnicode)")
+        
+        return supportsAccess
+    }
+    
+    // MARK: - Accessibility Permissions
+    
+    private func checkAccessibilityPermissions() -> Bool {
+        // Check if we have accessibility permissions
+        let trusted = AXIsProcessTrusted()
+        LOG_DEBUG("Accessibility permission status: \(trusted)")
+        return trusted
+    }
+    
+    private func requestAccessibilityPermissions() {
+        LOG_DEBUG("Checking accessibility permissions for direct mode")
+        
+        // First, just check if we already have permissions
+        let trusted = AXIsProcessTrusted()
+        hasAccessibilityPermission = trusted
+        
+        if trusted {
+            LOG_DEBUG("Accessibility permissions already granted")
+            stopAccessibilityCheckTimer()
+            return
+        }
+        
+        // If not trusted and we haven't prompted yet, show the prompt
+        if !Self.hasPromptedForAccessibility {
+            LOG_DEBUG("First time requesting accessibility permissions - showing system prompt")
+            
+            // Create options dictionary to show prompt
+            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            
+            // This will show the prompt asynchronously
+            _ = AXIsProcessTrustedWithOptions(options)
+            
+            // Mark that we've prompted
+            Self.hasPromptedForAccessibility = true
+            
+            LOG_DEBUG("System prompt shown to user")
+        } else {
+            LOG_DEBUG("Already prompted for accessibility permissions in this session")
+        }
+        
+        // Start a timer to periodically check if permissions were granted
+        startAccessibilityCheckTimer()
+        
+        LOG_DEBUG("Direct input mode will use fallback methods until accessibility permissions are granted")
+    }
+    
+    private func startAccessibilityCheckTimer() {
+        // Stop any existing timer
+        stopAccessibilityCheckTimer()
+        
+        // Start a new timer to check every 2 seconds
+        accessibilityCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Check if permissions have been granted
+            let trusted = AXIsProcessTrusted()
+            
+            if trusted && !self.hasAccessibilityPermission {
+                LOG_DEBUG("Accessibility permissions have been granted!")
+                self.hasAccessibilityPermission = true
+                
+                // Stop the timer
+                self.stopAccessibilityCheckTimer()
+            }
+        }
+    }
+    
+    private func stopAccessibilityCheckTimer() {
+        accessibilityCheckTimer?.invalidate()
+        accessibilityCheckTimer = nil
     }
     
     // MARK: - State Management
@@ -515,13 +596,26 @@ class KMInputController: IMKInputController {
         
         LOG_DEBUG("Focus in")
         
-        // Detect client bundle ID and set input mode
-        if let client = sender {
-            currentBundleId = getClientBundleIdentifier(client)
-            useCompositionMode = KMConfiguration.shared.shouldUseCompositionMode(for: currentBundleId)
+        guard let client = sender as? (IMKTextInput & NSObjectProtocol) else {
+            // Reset engine state even if no valid client
+            if let engine = engine {
+                keymagic_engine_reset(engine)
+            }
+            return
         }
         
-        LOG_DEBUG("Activated for bundle: \(currentBundleId), mode: \(useCompositionMode ? "Composition" : "Direct")")
+        // Detect client bundle ID and set input mode
+        currentBundleId = getClientBundleIdentifier(client)
+        useCompositionMode = KMConfiguration.shared.shouldUseCompositionMode(for: currentBundleId)
+        supportsTSMDocumentAccess = checkTSMDocumentAccess(client)
+        
+        LOG_DEBUG("Activated for bundle: \(currentBundleId), mode: \(useCompositionMode ? "Composition" : "Direct"), TSMDocumentAccess: \(supportsTSMDocumentAccess)")
+        
+        // Check accessibility permissions if in direct mode
+        if !useCompositionMode {
+            // Request/check permissions (this will only prompt once per session)
+            requestAccessibilityPermissions()
+        }
         
         // Reset engine state
         if let engine = engine {
@@ -529,15 +623,27 @@ class KMInputController: IMKInputController {
         }
         
         // Clear any existing composition
-        clearMarkedText(client: sender)
+        clearMarkedText(client: client)
     }
     
     override func deactivateServer(_ sender: Any!) {
         LOG_DEBUG("Focus out")
 
+        // Stop accessibility check timer
+        stopAccessibilityCheckTimer()
+
+        guard let client = sender as? (IMKTextInput & NSObjectProtocol) else {
+            // Still reset engine even without valid client
+            if let engine = engine {
+                keymagic_engine_reset(engine)
+            }
+            super.deactivateServer(sender)
+            return
+        }
+        
         // Commit and reset if in composition mode
         if useCompositionMode && !composingText.isEmpty {
-            commitAndReset(composingText, client: sender)
+            commitAndReset(composingText, client: client)
         } else if let engine = engine {
             // Just reset engine if nothing to commit
             keymagic_engine_reset(engine)
@@ -549,9 +655,17 @@ class KMInputController: IMKInputController {
     override func commitComposition(_ sender: Any!) {
         LOG_DEBUG("Reset")
 
+        guard let client = sender as? (IMKTextInput & NSObjectProtocol) else {
+            // Still reset engine even without valid client
+            if let engine = engine {
+                keymagic_engine_reset(engine)
+            }
+            return
+        }
+        
         // Commit and reset if in composition mode
         if useCompositionMode && !composingText.isEmpty {
-            commitAndReset(composingText, client: sender)
+            commitAndReset(composingText, client: client)
         } else if let engine = engine {
             // Just reset engine if nothing to commit
             keymagic_engine_reset(engine)
