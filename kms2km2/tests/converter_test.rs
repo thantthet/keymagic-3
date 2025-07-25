@@ -436,8 +436,13 @@ fn test_state_transitions() {
 }
 
 #[test]
-#[ignore = "Include directive not yet implemented"]
 fn test_include_directive() {
+    use std::env;
+    
+    // Create a temp directory in the current directory
+    let temp_dir = env::temp_dir().join("kms2km2_test");
+    fs::create_dir_all(&temp_dir).unwrap();
+    
     // Create an include file
     let include_content = r#"
 // Included rules
@@ -445,8 +450,8 @@ fn test_include_directive() {
 "include2" => "included_output2"
 "#;
     
-    let include_path = Path::new("target/included.kms");
-    fs::write(include_path, include_content).expect("Failed to write include file");
+    let include_path = temp_dir.join("included.kms");
+    fs::write(&include_path, include_content).expect("Failed to write include file");
     
     // Create main file with include
     let kms_content = r#"
@@ -456,22 +461,21 @@ fn test_include_directive() {
 
 "main1" => "main_output1"
 
-include("target/included.kms")
+include("included.kms")
 
 "main2" => "main_output2"
 "#;
     
-    let input_path = Path::new("target/include_test.kms");
-    fs::write(input_path, kms_content).expect("Failed to write test KMS");
+    let input_path = temp_dir.join("include_test.kms");
+    fs::write(&input_path, kms_content).expect("Failed to write test KMS");
     
-    let km2 = compile_kms_file(input_path).expect("Failed to compile KMS");
+    let km2 = compile_kms_file(&input_path).expect("Failed to compile KMS");
     
     // Should have rules from both main and included files
-    assert!(km2.rules.len() >= 4, "Expected at least 4 rules (2 main + 2 included)");
+    assert_eq!(km2.rules.len(), 4, "Expected exactly 4 rules (2 main + 2 included), got {}", km2.rules.len());
     
     // Clean up
-    let _ = fs::remove_file(input_path);
-    let _ = fs::remove_file(include_path);
+    let _ = fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
