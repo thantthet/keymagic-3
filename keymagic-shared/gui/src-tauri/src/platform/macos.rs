@@ -56,13 +56,7 @@ impl MacOSBackend {
                 installed: Vec::new(),
             },
             composition_mode: CompositionModeConfig {
-                enabled_processes: vec![
-                    "Safari".to_string(),
-                    "Chrome".to_string(),
-                    "Firefox".to_string(),
-                    "Code".to_string(),
-                    "TextEdit".to_string(),
-                ],
+                enabled_hosts: vec![],
             },
         }
     }

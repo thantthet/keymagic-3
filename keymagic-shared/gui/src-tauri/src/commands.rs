@@ -320,18 +320,18 @@ pub fn open_keyboards_folder(_state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_composition_mode_processes(state: State<AppState>) -> Result<Vec<String>, String> {
+pub fn get_composition_mode_hosts(state: State<AppState>) -> Result<Vec<String>, String> {
     let config = state.get_config();
-    Ok(config.composition_mode.enabled_processes.clone())
+    Ok(config.composition_mode.enabled_hosts.clone())
 }
 
 #[tauri::command]
-pub fn set_composition_mode_processes(
+pub fn set_composition_mode_hosts(
     state: State<AppState>,
-    processes: Vec<String>,
+    hosts: Vec<String>,
 ) -> Result<(), String> {
     let mut config = state.get_config();
-    config.composition_mode.enabled_processes = processes;
+    config.composition_mode.enabled_hosts = hosts;
     state.save_config(&config).map_err(|e| e.to_string())
 }
 
@@ -621,17 +621,17 @@ pub fn run_command(command: String, args: Vec<String>) -> Result<(), String> {
     }
 }
 
-// Composition mode process management
+// Composition mode host management
 #[tauri::command]
-pub fn add_composition_mode_process(
+pub fn add_composition_mode_host(
     state: State<AppState>,
-    process_name: String,
+    host_name: String,
 ) -> Result<(), String> {
     let mut config = state.get_config();
     
-    // Add process if not already in list
-    if !config.composition_mode.enabled_processes.contains(&process_name) {
-        config.composition_mode.enabled_processes.push(process_name);
+    // Add host if not already in list
+    if !config.composition_mode.enabled_hosts.contains(&host_name) {
+        config.composition_mode.enabled_hosts.push(host_name);
         state.save_config(&config).map_err(|e| e.to_string())?;
     }
     
@@ -639,14 +639,14 @@ pub fn add_composition_mode_process(
 }
 
 #[tauri::command]
-pub fn remove_composition_mode_process(
+pub fn remove_composition_mode_host(
     state: State<AppState>,
-    process_name: String,
+    host_name: String,
 ) -> Result<(), String> {
     let mut config = state.get_config();
     
-    // Remove process from list
-    config.composition_mode.enabled_processes.retain(|p| p != &process_name);
+    // Remove host from list
+    config.composition_mode.enabled_hosts.retain(|h| h != &host_name);
     state.save_config(&config).map_err(|e| e.to_string())?;
     
     Ok(())

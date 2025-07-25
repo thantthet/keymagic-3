@@ -56,13 +56,7 @@ impl LinuxBackend {
                 installed: Vec::new(),
             },
             composition_mode: CompositionModeConfig {
-                enabled_processes: vec![
-                    "firefox".to_string(),
-                    "chromium".to_string(),
-                    "chrome".to_string(),
-                    "code".to_string(),
-                    "gedit".to_string(),
-                ],
+                enabled_hosts: vec![],
             },
         }
     }

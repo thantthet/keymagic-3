@@ -52,7 +52,7 @@ pub struct InstalledKeyboard {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CompositionModeConfig {
-    pub enabled_processes: Vec<String>,
+    pub enabled_hosts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

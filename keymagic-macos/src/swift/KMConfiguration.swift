@@ -31,7 +31,7 @@ import Foundation
     }
     
     private struct CompositionModeConfig: Codable {
-        var enabled_processes: [String]
+        var enabled_hosts: [String]
     }
     
     // MARK: - Singleton
@@ -58,6 +58,22 @@ import Foundation
                 "filename": keyboard.filename,
                 "hash": keyboard.hash
             ]
+        }
+    }
+    
+    // MARK: - Composition Mode Management
+    @objc public func shouldUseCompositionMode(for bundleId: String) -> Bool {
+        NSLog("KeyMagic: Bundle ID: \(bundleId)")
+        NSLog("KeyMagic: Composition mode: \(config?.composition_mode)")
+        // If no composition mode config, default to direct mode
+        guard let compositionMode = config?.composition_mode else {
+            return false
+        }
+        
+        // Check if the bundle ID is in the enabled list (case-insensitive)
+        let lowercaseBundleId = bundleId.lowercased()
+        return compositionMode.enabled_hosts.contains { enabledHost in
+            enabledHost.lowercased() == lowercaseBundleId
         }
     }
     
@@ -130,7 +146,7 @@ import Foundation
                 installed: []
             ),
             composition_mode: CompositionModeConfig(
-                enabled_processes: ["Safari", "Chrome", "Firefox", "Code", "TextEdit"]
+                enabled_hosts: []
             )
         )
     }
@@ -229,7 +245,7 @@ import Foundation
                 last_used: [],
                 installed: []
             ),
-            composition_mode: nil
+            composition_mode: CompositionModeConfig(enabled_hosts: [])
         )
         
         // Parse active keyboard
@@ -268,6 +284,37 @@ import Foundation
             }
             
             config.keyboards.installed = installedKeyboards
+        }
+        
+        // Parse composition mode enabled hosts
+        if let compositionModeStart = toml.range(of: "[composition_mode]") {
+            var enabledHosts: [String] = []
+            
+            let searchStart = compositionModeStart.upperBound
+            
+            // Look for enabled_hosts field
+            if let enabledStart = toml.range(of: "enabled_hosts = [", range: searchStart..<toml.endIndex) {
+                // Find the closing bracket
+                if let closingBracket = toml.range(of: "]", range: enabledStart.upperBound..<toml.endIndex) {
+                    let arrayContent = String(toml[enabledStart.upperBound..<closingBracket.lowerBound])
+                    
+                    // Parse the array content
+                    let hostNames = arrayContent.components(separatedBy: ",")
+                    for hostName in hostNames {
+                        let trimmed = hostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") {
+                            let name = String(trimmed.dropFirst().dropLast())
+                            if !name.isEmpty {
+                                enabledHosts.append(name)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if !enabledHosts.isEmpty {
+                config.composition_mode = CompositionModeConfig(enabled_hosts: enabledHosts)
+            }
         }
         
         return config

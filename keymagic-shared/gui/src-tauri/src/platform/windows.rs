@@ -62,10 +62,8 @@ impl WindowsBackend {
                 installed: Vec::new(),
             },
             composition_mode: CompositionModeConfig {
-                enabled_processes: vec![
-                    "firefox.exe".to_string(),
-                    "chrome.exe".to_string(),
-                    "Code.exe".to_string(),
+                enabled_hosts: vec![
+                    "ms-teams.exe".to_string(),
                 ],
             },
         }
@@ -141,11 +139,11 @@ impl Platform for WindowsBackend {
             }
         }
         
-        // Load composition mode processes from Settings registry
+        // Load composition mode hosts from Settings registry
         if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
-            if let Ok(processes) = settings_key.get_value::<String, _>("CompositionModeProcesses") {
+            if let Ok(hosts) = settings_key.get_value::<String, _>("CompositionModeHosts") {
                 // Split by semicolon or newline
-                config.composition_mode.enabled_processes = processes
+                config.composition_mode.enabled_hosts = hosts
                     .split(|c| c == ';' || c == '\n')
                     .filter(|s| !s.trim().is_empty())
                     .map(|s| s.trim().to_string())
@@ -204,11 +202,11 @@ impl Platform for WindowsBackend {
             }
         }
         
-        // Save composition mode processes as multi-string
-        if !config.composition_mode.enabled_processes.is_empty() {
+        // Save composition mode hosts as multi-string
+        if !config.composition_mode.enabled_hosts.is_empty() {
             // Note: winreg doesn't support REG_MULTI_SZ directly, so we'll save as semicolon-delimited
-            let processes_str = config.composition_mode.enabled_processes.join(";");
-            settings_key.set_value("CompositionModeProcesses", &processes_str)?;
+            let hosts_str = config.composition_mode.enabled_hosts.join(";");
+            settings_key.set_value("CompositionModeHosts", &hosts_str)?;
         }
         
         Ok(())

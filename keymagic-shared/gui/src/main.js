@@ -44,7 +44,7 @@ window.switchPage = function(pageName) {
   
   // Load composition mode settings for settings page
   if (pageName === 'settings') {
-    loadCompositionModeProcesses();
+    loadCompositionModeHosts();
   }
 }
 
@@ -357,32 +357,32 @@ async function loadSettings() {
     // Load current version
     await loadCurrentVersion();
     
-    // Load composition mode processes
-    await loadCompositionModeProcesses();
+    // Load composition mode hosts
+    await loadCompositionModeHosts();
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
 }
 
-// Composition Mode Process Management
-async function loadCompositionModeProcesses() {
+// Composition Mode Host Management
+async function loadCompositionModeHosts() {
   try {
-    const processes = await invoke('get_composition_mode_processes');
-    renderProcessList(processes);
+    const hosts = await invoke('get_composition_mode_hosts');
+    renderHostList(hosts);
   } catch (error) {
-    console.error('Failed to load composition mode processes:', error);
-    showError('Failed to load composition mode processes');
+    console.error('Failed to load composition mode hosts:', error);
+    showError('Failed to load composition mode hosts');
   }
 }
 
-function renderProcessList(processes) {
-  const processList = document.getElementById('composition-mode-process-list');
-  if (!processList) return;
+function renderHostList(hosts) {
+  const hostList = document.getElementById('composition-mode-process-list');
+  if (!hostList) return;
   
-  processList.innerHTML = '';
+  hostList.innerHTML = '';
   
-  if (processes.length === 0) {
-    processList.innerHTML = `
+  if (hosts.length === 0) {
+    hostList.innerHTML = `
       <div class="process-list-empty">
         <p>No applications configured for composition mode.<br>
         All applications will use direct input mode.</p>
@@ -391,72 +391,72 @@ function renderProcessList(processes) {
     return;
   }
   
-  processes.forEach(processName => {
+  hosts.forEach(hostName => {
     const item = document.createElement('div');
     item.className = 'process-item';
     item.innerHTML = `
-      <span class="process-name">${processName}</span>
-      <button class="btn-remove" onclick="removeProcessFromCompositionMode('${processName.replace(/'/g, "\\'")}')">Remove</button>
+      <span class="process-name">${hostName}</span>
+      <button class="btn-remove" onclick="removeHostFromCompositionMode('${hostName.replace(/'/g, "\\'")}')">Remove</button>
     `;
-    processList.appendChild(item);
+    hostList.appendChild(item);
   });
 }
 
-async function addProcessToCompositionMode() {
-  const processName = await showProcessInputDialog();
-  if (!processName) return;
+async function addHostToCompositionMode() {
+  const hostName = await showHostInputDialog();
+  if (!hostName) return;
   
   try {
-    await invoke('add_composition_mode_process', { processName });
-    await loadCompositionModeProcesses();
-    showSuccess(`Added "${processName}" to composition mode`);
+    await invoke('add_composition_mode_host', { hostName });
+    await loadCompositionModeHosts();
+    showSuccess(`Added "${hostName}" to composition mode`);
   } catch (error) {
-    console.error('Failed to add process:', error);
-    showError('Failed to add process to composition mode');
+    console.error('Failed to add host:', error);
+    showError('Failed to add host to composition mode');
   }
 }
 
-async function removeProcessFromCompositionMode(processName) {
+async function removeHostFromCompositionMode(hostName) {
   try {
-    await invoke('remove_composition_mode_process', { processName });
-    await loadCompositionModeProcesses();
-    showSuccess(`Removed "${processName}" from composition mode`);
+    await invoke('remove_composition_mode_host', { hostName });
+    await loadCompositionModeHosts();
+    showSuccess(`Removed "${hostName}" from composition mode`);
   } catch (error) {
-    console.error('Failed to remove process:', error);
-    showError('Failed to remove process from composition mode');
+    console.error('Failed to remove host:', error);
+    showError('Failed to remove host from composition mode');
   }
 }
 
-function showProcessInputDialog() {
+function showHostInputDialog() {
   return new Promise((resolve) => {
     // Store resolve function for later use
-    window._processInputResolve = resolve;
+    window._hostInputResolve = resolve;
     
     showModal(
       'Add Application',
       `
-        <p>Enter the executable name of the application (e.g., "ms-teams.exe"):</p>
-        <input type="text" id="process-name-input" class="modal-input" placeholder="application.exe" 
+        <p>Enter the application identifier (e.g., "ms-teams.exe" on Windows, "com.apple.Safari" on macOS):</p>
+        <input type="text" id="host-name-input" class="modal-input" placeholder="application identifier" 
                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
         <p class="modal-hint">The application will use composition mode (underlined text while typing).</p>
       `,
       `
-        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddProcess();">Cancel</button>
-        <button class="btn btn-primary" onclick="window.confirmAddProcess();">Add</button>
+        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddHost();">Cancel</button>
+        <button class="btn btn-primary" onclick="window.confirmAddHost();">Add</button>
       `
     );
     
     // Focus the input field
     setTimeout(() => {
-      const input = document.getElementById('process-name-input');
+      const input = document.getElementById('host-name-input');
       if (input) {
         input.focus();
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
-            window.confirmAddProcess();
+            window.confirmAddHost();
           } else if (e.key === 'Escape') {
             hideModal();
-            window.cancelAddProcess();
+            window.cancelAddHost();
           }
         });
       }
@@ -464,29 +464,29 @@ function showProcessInputDialog() {
   });
 }
 
-window.confirmAddProcess = function() {
-  const input = document.getElementById('process-name-input');
-  const processName = input ? input.value.trim() : '';
+window.confirmAddHost = function() {
+  const input = document.getElementById('host-name-input');
+  const hostName = input ? input.value.trim() : '';
   
-  if (processName) {
+  if (hostName) {
     hideModal();
-    if (window._processInputResolve) {
-      window._processInputResolve(processName);
-      delete window._processInputResolve;
+    if (window._hostInputResolve) {
+      window._hostInputResolve(hostName);
+      delete window._hostInputResolve;
     }
   }
 };
 
-window.cancelAddProcess = function() {
-  if (window._processInputResolve) {
-    window._processInputResolve(null);
-    delete window._processInputResolve;
+window.cancelAddHost = function() {
+  if (window._hostInputResolve) {
+    window._hostInputResolve(null);
+    delete window._hostInputResolve;
   }
 };
 
 // Make these functions available globally
-window.addProcessToCompositionMode = addProcessToCompositionMode;
-window.removeProcessFromCompositionMode = removeProcessFromCompositionMode;
+window.addHostToCompositionMode = addHostToCompositionMode;
+window.removeHostFromCompositionMode = removeHostFromCompositionMode;
 
 
 // Modal functions
