@@ -118,8 +118,8 @@ class KMInputController: IMKInputController {
             LOG_DEBUG("Skipping Command key combination")
 
             // Commit and reset if in composition mode
-            if useCompositionMode && !composingText.isEmpty {
-                commitAndReset(composingText, client: client)
+            if useCompositionMode {
+                commitAndReset(client: client)
             } else if let engine = engine {
                 // Just reset engine if nothing to commit
                 keymagic_engine_reset(engine)
@@ -147,8 +147,8 @@ class KMInputController: IMKInputController {
             LOG_DEBUG("Unknown keycode \(keycode) - cannot convert to VirtualKey")
 
             // Commit and reset if in composition mode
-            if useCompositionMode && !composingText.isEmpty {
-                commitAndReset(composingText, client: client)
+            if useCompositionMode {
+                commitAndReset(client: client)
             } else {
                 // Just reset engine if nothing to commit
                 keymagic_engine_reset(engine)
@@ -225,9 +225,8 @@ class KMInputController: IMKInputController {
                 LOG_DEBUG("Engine did not process the key")
                 
                 // Clear any existing preedit in composition mode
-                if useCompositionMode && !composingText.isEmpty {
-                    clearMarkedText(client: client)
-                    composingText = ""
+                if useCompositionMode {
+                    commitAndReset(client: client)
                 }
                 
                 // Reset engine for special keys that weren't processed
@@ -352,11 +351,8 @@ class KMInputController: IMKInputController {
             if !composingText.isEmpty {
                 LOG_DEBUG("Committing composition")
                 
-                // Update marked text with final composing text before committing
-                updateMarkedText(composingText, client: sender)
-                
                 // Commit and reset
-                commitAndReset(composingText, client: sender)
+                commitAndReset(client: sender)
             }
         } else {
             // Just update preedit display
@@ -582,11 +578,14 @@ class KMInputController: IMKInputController {
     
     // MARK: - Composition Management
     
-    private func commitAndReset(_ text: String, client sender: (IMKTextInput & NSObjectProtocol)) {
+    private func commitAndReset(client sender: (IMKTextInput & NSObjectProtocol)) {
         LOG_DEBUG("Committing and resetting engine")
 
         // Commit the text
-        commitText(text, client: sender)
+        commitText(composingText, client: sender)
+
+        // Clear composing text
+        composingText = ""
         
         // Reset engine
         if let engine = engine {
@@ -744,8 +743,8 @@ class KMInputController: IMKInputController {
         }
         
         // Commit and reset if in composition mode
-        if useCompositionMode && !composingText.isEmpty {
-            commitAndReset(composingText, client: client)
+        if useCompositionMode {
+            commitAndReset(client: client)
         } else if let engine = engine {
             // Just reset engine if nothing to commit
             keymagic_engine_reset(engine)
@@ -766,8 +765,8 @@ class KMInputController: IMKInputController {
         }
         
         // Commit and reset if in composition mode
-        if useCompositionMode && !composingText.isEmpty {
-            commitAndReset(composingText, client: client)
+        if useCompositionMode {
+            commitAndReset(client: client)
         } else if let engine = engine {
             // Just reset engine if nothing to commit
             keymagic_engine_reset(engine)
