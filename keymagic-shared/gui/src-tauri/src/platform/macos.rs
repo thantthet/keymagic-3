@@ -3,6 +3,7 @@ use super::{
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
+use plist;
 use std::fs;
 use std::path::PathBuf;
 
@@ -38,7 +39,7 @@ impl MacOSBackend {
     }
     
     fn get_config_path(&self) -> PathBuf {
-        self.config_dir.join("config.toml")
+        self.config_dir.join("config.plist")
     }
     
     fn default_config() -> Config {
@@ -72,19 +73,23 @@ impl Platform for MacOSBackend {
             return Ok(config);
         }
         
-        let contents = fs::read_to_string(&config_path)
-            .context("Failed to read config file")?;
+        // Load from plist
+        let value = plist::from_file(&config_path)
+            .context("Failed to read plist config file")?;
         
-        toml::from_str(&contents).context("Failed to parse config file")
+        plist::from_value(&value).context("Failed to parse plist config")
     }
     
     fn save_config(&self, config: &Config) -> Result<()> {
         let config_path = self.get_config_path();
-        let contents = toml::to_string_pretty(config)
-            .context("Failed to serialize config")?;
         
-        fs::write(&config_path, contents)
-            .context("Failed to write config file")?;
+        // Convert to plist Value
+        let value = plist::to_value(config)
+            .context("Failed to serialize config to plist value")?;
+        
+        // Write as binary plist for better performance and smaller size
+        plist::to_file_binary(&config_path, &value)
+            .context("Failed to write plist config file")?;
         
         Ok(())
     }

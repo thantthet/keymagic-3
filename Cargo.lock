@@ -2410,6 +2410,7 @@ dependencies = [
  "notify-rust",
  "objc",
  "once_cell",
+ "plist",
  "reqwest",
  "semver",
  "serde",
