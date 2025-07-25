@@ -581,7 +581,10 @@ function showDirectModeHostInputDialog() {
         input.focus();
         input.addEventListener('keypress', function(e) {
           if (e.key === 'Enter') {
-            confirmHostInput();
+            window.confirmAddHost();
+          } else if (e.key === 'Escape') {
+            hideModal();
+            window.cancelAddHost();
           }
         });
       }
