@@ -51,11 +51,10 @@ class KMInputController: IMKInputController {
     private var currentBundleId: String = "unknown"
     private var useCompositionMode: Bool = true
     private var supportsTSMDocumentAccess: Bool = false
-    private var lastBackspaceTime: TimeInterval = 0
-    private static let backspaceIgnoreThreshold: TimeInterval = 0.05 // 50ms
     private var hasAccessibilityPermission: Bool = false
     private var accessibilityCheckTimer: Timer?
     private static var hasPromptedForAccessibility: Bool = false
+    private var deleteFailedLastTime: Bool = false
     
     // MARK: - Initialization
     
@@ -88,7 +87,24 @@ class KMInputController: IMKInputController {
     // MARK: - Key Event Handling
     
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        
+        // Get keycode and modifiers
+        let keycode = event.keyCode
+        let modifiers = event.modifierFlags.rawValue
+        
+        // Clear delete failure flag on each key event
+        deleteFailedLastTime = false
+
         guard event.type == .keyDown else {
+            
+            if keycode == kVK_Delete, !useCompositionMode {
+                LOG_DEBUG("Backspace key up event - eating (direct mode)")
+                // some app like safari will process backspace key up event, so we need to eat it
+                return true
+            }
+
+            LOG_DEBUG("Ignoring key up event")
+
             return false
         }
         
@@ -96,10 +112,6 @@ class KMInputController: IMKInputController {
             LOG_DEBUG("Invalid client type")
             return false
         }
-        
-        // Get keycode and modifiers
-        let keycode = event.keyCode
-        let modifiers = event.modifierFlags.rawValue
         
         // Get character string
         let chars = event.characters ?? ""
@@ -122,14 +134,6 @@ class KMInputController: IMKInputController {
             return false
         }
         
-        // Check if this is our own backspace event
-        if keycode == kVK_Delete {
-            let currentTime = Date().timeIntervalSince1970
-            if lastBackspaceTime > 0 && (currentTime - lastBackspaceTime) < Self.backspaceIgnoreThreshold {
-                LOG_DEBUG("Ignoring our own backspace event (within \(currentTime - lastBackspaceTime) seconds)")
-                return false
-            }
-        }
         
         // Check if we have a valid engine
         guard let engine = engine else {
@@ -155,7 +159,7 @@ class KMInputController: IMKInputController {
                 // Just reset engine if nothing to commit
                 keymagic_engine_reset(engine)
             }
-
+            
             return false
         }
         
@@ -253,10 +257,23 @@ class KMInputController: IMKInputController {
             }
             
             let processed = output.is_processed != 0
+            
+            // In direct mode, insert ZWS for backspace and return false to prevent double deletion
+            // BUT skip the workaround if the last delete operation failed (let the app handle it)
+            if keycode == kVK_Delete && !useCompositionMode && event.type == .keyDown && processed && !deleteFailedLastTime {
+                LOG_DEBUG("Direct mode backspace - inserting ZWS and returning false")
+                client.insertText("\u{200B}", replacementRange: NSRange(location: NSNotFound, length: 0))
+                LOG_DEBUG("Key processing complete - consumed=FALSE (ZWS workaround)")
+                return false
+            } else if keycode == kVK_Delete && deleteFailedLastTime {
+                LOG_DEBUG("Last delete failed - letting backspace pass through without workaround")
+                return false
+            }
+            
             LOG_DEBUG("Key processing complete - consumed=\(processed ? "TRUE" : "FALSE")")
             return processed
         }
-        
+
         LOG_DEBUG("Engine process failed with result: \(result)")
         return false
     }
@@ -313,6 +330,10 @@ class KMInputController: IMKInputController {
                     if !textToInsert.isEmpty {
                         client.insertText(textToInsert, replacementRange: NSRange(location: NSNotFound, length: 0))
                     }
+                    // Set flag since we couldn't perform the deletion properly
+                    if output.delete_count > 0 && textToInsert.isEmpty {
+                        deleteFailedLastTime = true
+                    }
                 }
             } else {
                 // Just insert text without deletion
@@ -351,53 +372,103 @@ class KMInputController: IMKInputController {
     }
     
     private func deleteCharacters(count: UInt32, currentRange: NSRange, replacementRange: NSRange, client: IMKTextInput & NSObjectProtocol) {
-        LOG_DEBUG("Pure deletion - attempting to delete \(count) characters")
+        LOG_DEBUG("Pure deletion - attempting to delete \(count) UTF-16 units")
         
-        // Check if we have accessibility permissions for CGEventPost
-        if hasAccessibilityPermission {
-            LOG_DEBUG("Using CGEventPost for deletion")
-            
-            // Record the time we're sending backspaces
-            lastBackspaceTime = Date().timeIntervalSince1970
-            
-            // Use CGEventPost to simulate backspace key presses
-            for _ in 0..<count {
-                // Create a key down event for backspace
-                if let keyDownEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Delete), keyDown: true) {
-                    keyDownEvent.post(tap: .cgSessionEventTap)
-                }
-                
-                // Create a key up event for backspace
-                if let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Delete), keyDown: false) {
-                    keyUpEvent.post(tap: .cgSessionEventTap)
-                }
+        var remainingUtf16ToDelete = Int(count)
+        var totalUtf16Deleted = 0
+        
+        // Primary method: Get text before cursor and replace with truncated version
+        while remainingUtf16ToDelete > 0 && currentRange.location > totalUtf16Deleted {
+            // Calculate how much text to request (in UTF-16 units)
+            let requestLength = min(remainingUtf16ToDelete + 20, Int(currentRange.location) - totalUtf16Deleted)
+            if requestLength <= 0 {
+                LOG_DEBUG("No more text available to delete")
+                break
             }
             
-            LOG_DEBUG("Sent \(count) backspace events via CGEventPost")
-        } else {
-            LOG_DEBUG("No accessibility permission - using fallback deletion method")
+            let requestRange = NSRange(
+                location: currentRange.location - totalUtf16Deleted - requestLength,
+                length: requestLength
+            )
             
-            // Fallback: try to delete using text replacement
-            client.insertText("", replacementRange: replacementRange)
-            
-            // Check if deletion worked
-            let newRange = client.selectedRange()
-            if newRange.location == currentRange.location {
-                LOG_DEBUG("Fallback deletion may have failed - some characters might not be deleted")
+            var actualRange = NSRange()
+            if let textBeforeCursor = client.string(from: requestRange, actualRange: &actualRange),
+               !textBeforeCursor.isEmpty {
+                LOG_DEBUG("Got text: '\(textBeforeCursor)' (chars: \(textBeforeCursor.count), utf16: \(textBeforeCursor.utf16.count), actual range: \(actualRange))")
                 
-                // Last resort: use setMarkedText approach
-                // First, set marked text over the range we want to delete
-                client.setMarkedText("", 
-                                   selectionRange: NSRange(location: 0, length: 0), 
-                                   replacementRange: replacementRange)
+                // Work directly with UTF-16 representation
+                let utf16Array = Array(textBeforeCursor.utf16)
+                let utf16Count = utf16Array.count
                 
-                // Then unmark (commit empty text) which deletes the selected range
-                client.setMarkedText("", 
-                                   selectionRange: NSRange(location: 0, length: 0), 
-                                   replacementRange: NSRange(location: NSNotFound, length: 0))
+                // Calculate how many UTF-16 units we can delete
+                let utf16ToDelete = min(remainingUtf16ToDelete, utf16Count)
                 
-                LOG_DEBUG("Attempted deletion using setMarkedText/unmarkText fallback")
+                // Prevent deleting all UTF-16 units (would result in empty insertText)
+                let safeUtf16ToDelete = (utf16ToDelete == utf16Count && utf16Count > 0) 
+                    ? max(0, utf16ToDelete - 1)
+                    : utf16ToDelete
+                
+                if safeUtf16ToDelete > 0 {
+                    // Create truncated UTF-16 array
+                    let truncatedUtf16 = Array(utf16Array.dropLast(safeUtf16ToDelete))
+                    
+                    // Convert back to String
+                    let truncatedText = String(utf16CodeUnits: truncatedUtf16, count: truncatedUtf16.count)
+                    let truncatedUtf16Count = truncatedUtf16.count
+                    
+                    LOG_DEBUG("Replacing with truncated text: '\(truncatedText)' (deleted \(safeUtf16ToDelete) utf16 units, remaining utf16 length: \(truncatedUtf16Count))")
+                    
+                    // Store the expected cursor position after deletion
+                    let expectedLocation = actualRange.location + truncatedUtf16Count
+                    
+                    // Replace the actual range with truncated text
+                    client.insertText(truncatedText, replacementRange: actualRange)
+                    
+                    // Verify the deletion happened by checking cursor position
+                    let newRange = client.selectedRange()
+                    if newRange.location == expectedLocation {
+                        // Success - cursor is where we expect
+                        remainingUtf16ToDelete -= safeUtf16ToDelete
+                        totalUtf16Deleted += safeUtf16ToDelete
+                        
+                        LOG_DEBUG("Deletion verified - cursor moved to expected position \(expectedLocation)")
+                        LOG_DEBUG("Deleted \(safeUtf16ToDelete) utf16 units, remaining: \(remainingUtf16ToDelete)")
+                    } else {
+                        // Deletion might have failed
+                        LOG_DEBUG("Deletion verification failed - expected cursor at \(expectedLocation), but got \(newRange.location)")
+                        
+                        // Try to calculate actual deletion based on cursor movement (in UTF-16 units)
+                        let actuallyDeletedUtf16 = Int(currentRange.location) - Int(newRange.location) - totalUtf16Deleted
+                        if actuallyDeletedUtf16 > 0 {
+                            remainingUtf16ToDelete -= actuallyDeletedUtf16
+                            totalUtf16Deleted += actuallyDeletedUtf16
+                            LOG_DEBUG("Partial deletion detected - actually deleted \(actuallyDeletedUtf16) utf16 units")
+                        } else {
+                            LOG_DEBUG("No deletion detected - stopping")
+                            break
+                        }
+                    }
+                    
+                    // Small delay to let the change propagate
+                    Thread.sleep(forTimeInterval: 0.001)
+                } else {
+                    LOG_DEBUG("Cannot delete from this text chunk (would result in empty string)")
+                    break
+                }
+            } else {
+                LOG_DEBUG("Failed to get text from client or got empty text")
+                break
             }
+        }
+        
+        if totalUtf16Deleted > 0 {
+            LOG_DEBUG("Successfully deleted \(totalUtf16Deleted) UTF-16 units using text replacement")
+        }
+        
+        if remainingUtf16ToDelete > 0 {
+            LOG_DEBUG("Could not delete all requested UTF-16 units. Deleted: \(totalUtf16Deleted), Failed: \(remainingUtf16ToDelete)")
+            // Set flag to indicate deletion failure
+            deleteFailedLastTime = true
         }
     }
     
@@ -435,38 +506,49 @@ class KMInputController: IMKInputController {
         
         // First, try to get text matching engine composing length
         let engineLength = engineComposingText.count
-        let lengthToGet = min(engineLength, Int(selectedRange.location))
+        let engineUtf16Length = engineComposingText.utf16.count
+        
+        // Request based on UTF-16 length (add some extra to ensure we get enough)
+        let lengthToGet = min(engineUtf16Length + 10, Int(selectedRange.location))
         let rangeBeforeCursor = NSRange(location: selectedRange.location - lengthToGet, length: lengthToGet)
         
         // Get the text from client
         var actualRange = NSRange()
         if let textBeforeCursor = client.string(from: rangeBeforeCursor, actualRange: &actualRange) {
-            LOG_DEBUG("Text before cursor: '\(textBeforeCursor)' (actual range: \(actualRange))")
+            LOG_DEBUG("Text before cursor: '\(textBeforeCursor)' (chars: \(textBeforeCursor.count), utf16: \(textBeforeCursor.utf16.count), actual range: \(actualRange))")
             
-            // Check if we got the full engine text length
-            if actualRange.length == engineLength {
-                // We got the full length, do direct comparison
-                if textBeforeCursor == engineComposingText {
-                    LOG_DEBUG("Engine state matches client text")
+            // For comparison, we need to check if we got enough text
+            let textUtf16Length = textBeforeCursor.utf16.count
+            
+            // Check if we got text that could match the engine text
+            if textUtf16Length >= engineUtf16Length {
+                // Extract the suffix that matches engine text UTF-16 length
+                let suffixStartUtf16 = textBeforeCursor.utf16.index(textBeforeCursor.utf16.endIndex, offsetBy: -engineUtf16Length)
+                let suffixText = String(textBeforeCursor.utf16[suffixStartUtf16...])!
+                
+                if suffixText == engineComposingText {
+                    LOG_DEBUG("Engine state matches client text (suffix match)")
                     return  // No sync needed
                 } else {
-                    LOG_DEBUG("Engine state does not match (full comparison)")
+                    LOG_DEBUG("Engine state does not match (full UTF-16 comparison)")
                     // Will sync below
                 }
+            } else if textBeforeCursor == engineComposingText {
+                // Got less text, but it exactly matches engine text
+                LOG_DEBUG("Engine state matches client text (exact match)")
+                return  // No sync needed
+            } else if engineComposingText.hasSuffix(textBeforeCursor) {
+                // Engine text has document text as suffix
+                LOG_DEBUG("Engine state has document text as suffix - keeping engine state")
+                return  // Keep current engine state
             } else {
-                // We got less than requested, check if engine text has this as suffix
-                if engineComposingText.hasSuffix(textBeforeCursor) {
-                    LOG_DEBUG("Engine state has document text as suffix - keeping engine state")
-                    return  // Keep current engine state
-                } else {
-                    LOG_DEBUG("Engine state does not match (partial comparison)")
-                    // Will sync below
-                }
+                LOG_DEBUG("Engine state does not match (partial comparison)")
+                // Will sync below
             }
             
             // If we reach here, texts don't match and we need to sync
-            // Get up to 20 characters before cursor for context (or less if not available)
-            let contextLength = min(20, Int(selectedRange.location))
+            // Get up to 40 UTF-16 units before cursor for context (roughly 20 chars, but safe for emoji)
+            let contextLength = min(40, Int(selectedRange.location))
             let contextRange = NSRange(location: selectedRange.location - contextLength, length: contextLength)
             
             var contextActualRange = NSRange()
@@ -481,9 +563,9 @@ class KMInputController: IMKInputController {
                 keymagic_engine_reset(engine)
             }
         } else if selectedRange.location > 0 {
-            // Engine has composing text but we got less than expected from document
+            // Engine has composing text but we couldn't get text from document
             // Try to sync with whatever text is available
-            let availableLength = min(20, Int(selectedRange.location))
+            let availableLength = min(40, Int(selectedRange.location))  // 40 UTF-16 units
             let availableRange = NSRange(location: selectedRange.location - availableLength, length: availableLength)
             
             var availableActualRange = NSRange()
