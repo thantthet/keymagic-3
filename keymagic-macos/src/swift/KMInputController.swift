@@ -185,6 +185,11 @@ class KMInputController: IMKInputController {
         LOG_DEBUG("Character: \(character) ('\(character > 0 ? String(UnicodeScalar(UInt8(character))) : "none")')")
         #endif
         
+        // Synchronize engine state with client text before processing in direct mode
+        if !useCompositionMode {
+            synchronizeEngineWithClient(client: client)
+        }
+        
         // Prepare output structure
         var output = ProcessKeyOutput()
         
@@ -205,6 +210,7 @@ class KMInputController: IMKInputController {
         if result == KeyMagicResult_Success {
             LOG_DEBUG("Engine process successful")
             LOG_DEBUG("Output - is_processed: \(output.is_processed)")
+            LOG_TEXT("Output - composing_text", String(cString: output.composing_text!))
             
             // Log output details
             if let textPtr = output.text {
@@ -212,24 +218,26 @@ class KMInputController: IMKInputController {
                 LOG_TEXT("Output text", text)
             }
             
-            // Handle output based on composing text
-            if let composingTextPtr = output.composing_text, 
-               String(cString: composingTextPtr).count > 0 {
-                // Process output normally
-                LOG_DEBUG("Processing output with composing text")
+            // Process output if the key was handled by the engine
+            if output.is_processed != 0 {
+                LOG_DEBUG("Engine processed the key - handling output")
                 processOutput(&output, keycode: keycode, client: client)
             } else {
-                // Engine has no composing text - clear preedit
-                LOG_DEBUG("Engine has no composing text, clearing preedit")
-                clearMarkedText(client: client)
-                composingText = ""
+                // Engine didn't process the key - ensure clean state
+                LOG_DEBUG("Engine did not process the key")
                 
-                // Reset engine for special keys
+                // Clear any existing preedit in composition mode
+                if useCompositionMode && !composingText.isEmpty {
+                    clearMarkedText(client: client)
+                    composingText = ""
+                }
+                
+                // Reset engine for special keys that weren't processed
                 switch Int(keycode) {
                 case kVK_Return,
                      kVK_Tab,
                      kVK_Escape:
-                    LOG_DEBUG("Resetting engine for special key")
+                    LOG_DEBUG("Resetting engine for unprocessed special key")
                     keymagic_engine_reset(engine)
                 default:
                     break
@@ -356,16 +364,13 @@ class KMInputController: IMKInputController {
             for _ in 0..<count {
                 // Create a key down event for backspace
                 if let keyDownEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Delete), keyDown: true) {
-                    keyDownEvent.post(tap: .cghidEventTap)
+                    keyDownEvent.post(tap: .cgSessionEventTap)
                 }
                 
                 // Create a key up event for backspace
                 if let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Delete), keyDown: false) {
-                    keyUpEvent.post(tap: .cghidEventTap)
+                    keyUpEvent.post(tap: .cgSessionEventTap)
                 }
-                
-                // Small delay between keystrokes to ensure proper processing
-                Thread.sleep(forTimeInterval: 0.001) // 1ms
             }
             
             LOG_DEBUG("Sent \(count) backspace events via CGEventPost")
@@ -393,6 +398,108 @@ class KMInputController: IMKInputController {
                 
                 LOG_DEBUG("Attempted deletion using setMarkedText/unmarkText fallback")
             }
+        }
+    }
+    
+    // MARK: - Engine State Synchronization
+    
+    private func synchronizeEngineWithClient(client: IMKTextInput & NSObjectProtocol) {
+        guard let engine = engine else { return }
+        
+        // Get engine's current composing text
+        let composingTextPtr = keymagic_engine_get_composition(engine)
+        if composingTextPtr == nil {
+            // Engine has no composing text, nothing to synchronize
+            return
+        }
+        
+        defer {
+            keymagic_free_string(composingTextPtr)
+        }
+        
+        let engineComposingText = String(cString: composingTextPtr!)
+        if engineComposingText.isEmpty {
+            return
+        }
+        
+        LOG_DEBUG("Engine composing text: '\(engineComposingText)'")
+        
+        // Get text from client before cursor
+        let selectedRange = client.selectedRange()
+        if selectedRange.location == NSNotFound || selectedRange.location == 0 {
+            // No valid cursor position or cursor at beginning
+            LOG_DEBUG("No text before cursor to compare")
+            keymagic_engine_reset(engine)
+            return
+        }
+        
+        // First, try to get text matching engine composing length
+        let engineLength = engineComposingText.count
+        let lengthToGet = min(engineLength, Int(selectedRange.location))
+        let rangeBeforeCursor = NSRange(location: selectedRange.location - lengthToGet, length: lengthToGet)
+        
+        // Get the text from client
+        var actualRange = NSRange()
+        if let textBeforeCursor = client.string(from: rangeBeforeCursor, actualRange: &actualRange) {
+            LOG_DEBUG("Text before cursor: '\(textBeforeCursor)' (actual range: \(actualRange))")
+            
+            // Check if we got the full engine text length
+            if actualRange.length == engineLength {
+                // We got the full length, do direct comparison
+                if textBeforeCursor == engineComposingText {
+                    LOG_DEBUG("Engine state matches client text")
+                    return  // No sync needed
+                } else {
+                    LOG_DEBUG("Engine state does not match (full comparison)")
+                    // Will sync below
+                }
+            } else {
+                // We got less than requested, check if engine text has this as suffix
+                if engineComposingText.hasSuffix(textBeforeCursor) {
+                    LOG_DEBUG("Engine state has document text as suffix - keeping engine state")
+                    return  // Keep current engine state
+                } else {
+                    LOG_DEBUG("Engine state does not match (partial comparison)")
+                    // Will sync below
+                }
+            }
+            
+            // If we reach here, texts don't match and we need to sync
+            // Get up to 20 characters before cursor for context (or less if not available)
+            let contextLength = min(20, Int(selectedRange.location))
+            let contextRange = NSRange(location: selectedRange.location - contextLength, length: contextLength)
+            
+            var contextActualRange = NSRange()
+            if let contextText = client.string(from: contextRange, actualRange: &contextActualRange) {
+                LOG_DEBUG("Syncing engine with document context: '\(contextText)'")
+                contextText.withCString { textPtr in
+                    _ = keymagic_engine_set_composition(engine, textPtr)
+                }
+            } else {
+                // If we can't get context, just reset
+                LOG_DEBUG("Could not get document context - resetting engine")
+                keymagic_engine_reset(engine)
+            }
+        } else if selectedRange.location > 0 {
+            // Engine has composing text but we got less than expected from document
+            // Try to sync with whatever text is available
+            let availableLength = min(20, Int(selectedRange.location))
+            let availableRange = NSRange(location: selectedRange.location - availableLength, length: availableLength)
+            
+            var availableActualRange = NSRange()
+            if let availableText = client.string(from: availableRange, actualRange: &availableActualRange) {
+                LOG_DEBUG("Syncing engine with available document text: '\(availableText)'")
+                availableText.withCString { textPtr in
+                    _ = keymagic_engine_set_composition(engine, textPtr)
+                }
+            } else {
+                LOG_DEBUG("No text available - resetting engine")
+                keymagic_engine_reset(engine)
+            }
+        } else {
+            // Cursor at beginning, reset engine
+            LOG_DEBUG("Cursor at beginning - resetting engine")
+            keymagic_engine_reset(engine)
         }
     }
     
