@@ -9,6 +9,17 @@ pub struct KmsFile {
     pub includes: Vec<String>,
 }
 
+impl KmsFile {
+    pub fn new() -> Self {
+        Self {
+            options: HashMap::new(),
+            variables: Vec::new(),
+            rules: Vec::new(),
+            includes: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VariableDecl {
     pub name: String,
@@ -49,15 +60,4 @@ pub enum OutputElement {
     BackRef(usize),             // $1, $2, etc.
     Null,
     State(String),              // ('state_name')
-}
-
-impl KmsFile {
-    pub fn new() -> Self {
-        Self {
-            options: HashMap::new(),
-            variables: Vec::new(),
-            rules: Vec::new(),
-            includes: Vec::new(),
-        }
-    }
 }
