@@ -1,25 +1,47 @@
 import Foundation
 
 /// KeyMagic configuration management for macOS IMK
-/// Reads configuration from the same location as GUI: ~/Library/Preferences/net.keymagic/config.toml
-@objc public class KMConfiguration: NSObject {
+/// Reads configuration from the same location as GUI: ~/Library/Preferences/net.keymagic/config.plist
+public class KMConfiguration {
+    // Pure Swift structs with Codable for automatic serialization
     private struct Config: Codable {
         var general: GeneralConfig
         var keyboards: KeyboardsConfig
-        var composition_mode: CompositionModeConfig?
+        var compositionMode: CompositionModeConfig?
+        
+        private enum CodingKeys: String, CodingKey {
+            case general
+            case keyboards
+            case compositionMode = "composition_mode"
+        }
     }
     
     private struct GeneralConfig: Codable {
-        var start_with_system: Bool
-        var check_for_updates: Bool
-        var last_update_check: String?
-        var last_scanned_version: String?
+        var startWithSystem: Bool
+        var checkForUpdates: Bool
+        var lastUpdateCheck: String?
+        var lastScannedVersion: String?
+        var updateRemindAfter: String?
+        
+        private enum CodingKeys: String, CodingKey {
+            case startWithSystem = "start_with_system"
+            case checkForUpdates = "check_for_updates"
+            case lastUpdateCheck = "last_update_check"
+            case lastScannedVersion = "last_scanned_version"
+            case updateRemindAfter = "update_remind_after"
+        }
     }
     
     private struct KeyboardsConfig: Codable {
         var active: String?
-        var last_used: [String]
+        var lastUsed: [String]
         var installed: [InstalledKeyboard]
+        
+        private enum CodingKeys: String, CodingKey {
+            case active
+            case lastUsed = "last_used"
+            case installed
+        }
     }
     
     private struct InstalledKeyboard: Codable {
@@ -31,11 +53,15 @@ import Foundation
     }
     
     private struct CompositionModeConfig: Codable {
-        var enabled_hosts: [String]
+        var enabledHosts: [String]
+        
+        private enum CodingKeys: String, CodingKey {
+            case enabledHosts = "enabled_hosts"
+        }
     }
     
     // MARK: - Singleton
-    @objc public static let shared = KMConfiguration()
+    public static let shared = KMConfiguration()
     
     // MARK: - Properties
     private let configDir: URL
@@ -45,11 +71,11 @@ import Foundation
     private var config: Config?
     
     // MARK: - Public Properties
-    @objc public var activeKeyboardId: String? {
+    public var activeKeyboardId: String? {
         return config?.keyboards.active
     }
     
-    @objc public var installedKeyboards: [[String: String]] {
+    public var installedKeyboards: [[String: String]] {
         guard let keyboards = config?.keyboards.installed else { return [] }
         return keyboards.map { keyboard in
             [
@@ -62,35 +88,34 @@ import Foundation
     }
     
     // MARK: - Composition Mode Management
-    @objc public func shouldUseCompositionMode(for bundleId: String) -> Bool {
+    public func shouldUseCompositionMode(for bundleId: String) -> Bool {
         NSLog("KeyMagic: Bundle ID: \(bundleId)")
-        NSLog("KeyMagic: Composition mode: \(config?.composition_mode)")
+        NSLog("KeyMagic: Composition mode: \(String(describing: config?.compositionMode))")
         // If no composition mode config, default to direct mode
-        guard let compositionMode = config?.composition_mode else {
+        guard let compositionMode = config?.compositionMode else {
             return false
         }
         
         // Check if the bundle ID is in the enabled list (case-insensitive)
         let lowercaseBundleId = bundleId.lowercased()
-        return compositionMode.enabled_hosts.contains { enabledHost in
+        return compositionMode.enabledHosts.contains { enabledHost in
             enabledHost.lowercased() == lowercaseBundleId
         }
     }
     
     // MARK: - Initialization
-    private override init() {
+    private init() {
         // Setup directories following GUI convention
         let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
         
         // Config: ~/Library/Preferences/net.keymagic/
         self.configDir = libraryDir.appendingPathComponent("Preferences/net.keymagic")
-        self.configPath = configDir.appendingPathComponent("config.toml")
+        self.configPath = configDir.appendingPathComponent("config.plist")
         
         // Data: ~/Library/Application Support/KeyMagic/
         self.dataDir = libraryDir.appendingPathComponent("Application Support/KeyMagic")
         self.keyboardsDir = dataDir.appendingPathComponent("Keyboards")
         
-        super.init()
         
         // Create directories if needed
         createDirectoriesIfNeeded()
@@ -114,45 +139,59 @@ import Foundation
     }
     
     // MARK: - Configuration Loading
-    @objc public func loadConfig() {
-        do {
-            if FileManager.default.fileExists(atPath: configPath.path) {
+    public func loadConfig() {
+        if FileManager.default.fileExists(atPath: configPath.path) {
+            do {
                 let data = try Data(contentsOf: configPath)
-                if let tomlString = String(data: data, encoding: .utf8) {
-                    config = try parseToml(tomlString)
-                    NSLog("KeyMagic: Loaded config with active keyboard: \(activeKeyboardId ?? "none")")
-                }
-            } else {
-                // Create default config if it doesn't exist
+                let decoder = PropertyListDecoder()
+                config = try decoder.decode(Config.self, from: data)
+                NSLog("KeyMagic: Loaded config with active keyboard: \(activeKeyboardId ?? "none")")
+            } catch {
+                NSLog("KeyMagic: Failed to load config: \(error)")
                 createDefaultConfig()
             }
-        } catch {
-            NSLog("KeyMagic: Failed to load config: \(error)")
+        } else {
+            // Create default config if it doesn't exist
             createDefaultConfig()
+        }
+    }
+    
+    private func saveConfig() {
+        guard let config = config else { return }
+        
+        do {
+            let encoder = PropertyListEncoder()
+            encoder.outputFormat = .binary
+            let data = try encoder.encode(config)
+            try data.write(to: configPath)
+        } catch {
+            NSLog("KeyMagic: Failed to save config: \(error)")
         }
     }
     
     private func createDefaultConfig() {
         config = Config(
             general: GeneralConfig(
-                start_with_system: false,
-                check_for_updates: true,
-                last_update_check: nil,
-                last_scanned_version: nil
+                startWithSystem: false,
+                checkForUpdates: true,
+                lastUpdateCheck: nil,
+                lastScannedVersion: nil,
+                updateRemindAfter: nil
             ),
             keyboards: KeyboardsConfig(
                 active: nil,
-                last_used: [],
+                lastUsed: [],
                 installed: []
             ),
-            composition_mode: CompositionModeConfig(
-                enabled_hosts: []
+            compositionMode: CompositionModeConfig(
+                enabledHosts: []
             )
         )
+        saveConfig()
     }
     
     // MARK: - Keyboard File Management
-    @objc public func getKeyboardPath(for keyboardId: String) -> String? {
+    public func getKeyboardPath(for keyboardId: String) -> String? {
         // First check if there's a matching installed keyboard
         if let keyboard = config?.keyboards.installed.first(where: { $0.id == keyboardId }) {
             let path = keyboardsDir.appendingPathComponent(keyboard.filename).path
@@ -184,7 +223,7 @@ import Foundation
         return nil
     }
     
-    @objc public func getAllKeyboardFiles() -> [String] {
+    public func getAllKeyboardFiles() -> [String] {
         do {
             let files = try FileManager.default.contentsOfDirectory(at: keyboardsDir,
                                                                    includingPropertiesForKeys: nil)
@@ -226,139 +265,5 @@ import Foundation
         }
         
         configMonitor?.resume()
-    }
-    
-    // MARK: - TOML Parsing
-    // Simple TOML parser for our specific config structure
-    // In production, we should use a proper TOML library
-    private func parseToml(_ toml: String) throws -> Config {
-        // This is a simplified parser - in production use a proper TOML library
-        var config = Config(
-            general: GeneralConfig(
-                start_with_system: false,
-                check_for_updates: true,
-                last_update_check: nil,
-                last_scanned_version: nil
-            ),
-            keyboards: KeyboardsConfig(
-                active: nil,
-                last_used: [],
-                installed: []
-            ),
-            composition_mode: CompositionModeConfig(enabled_hosts: [])
-        )
-        
-        // Parse active keyboard
-        if let match = toml.range(of: #"active = "(.+?)""#, options: .regularExpression) {
-            let value = String(toml[match])
-            if let activeMatch = value.range(of: #""(.+?)""#, options: .regularExpression) {
-                let active = String(value[activeMatch])
-                config.keyboards.active = active.replacingOccurrences(of: "\"", with: "")
-            }
-        }
-        
-        // Parse installed keyboards array
-        if let installedStart = toml.range(of: "[[keyboards.installed]]") {
-            var installedKeyboards: [InstalledKeyboard] = []
-            var searchRange = installedStart.upperBound..<toml.endIndex
-            
-            while let nextStart = toml.range(of: "[[keyboards.installed]]", range: searchRange) {
-                // Parse one keyboard entry
-                let entryEnd = toml.range(of: "[[keyboards.installed]]", 
-                                         range: nextStart.upperBound..<toml.endIndex)?.lowerBound ?? toml.endIndex
-                let entry = String(toml[nextStart.lowerBound..<entryEnd])
-                
-                if let keyboard = parseKeyboardEntry(entry) {
-                    installedKeyboards.append(keyboard)
-                }
-                
-                searchRange = nextStart.upperBound..<toml.endIndex
-            }
-            
-            // Parse the last entry if exists
-            if searchRange.lowerBound < toml.endIndex {
-                let lastEntry = String(toml[searchRange])
-                if let keyboard = parseKeyboardEntry(lastEntry) {
-                    installedKeyboards.append(keyboard)
-                }
-            }
-            
-            config.keyboards.installed = installedKeyboards
-        }
-        
-        // Parse composition mode enabled hosts
-        if let compositionModeStart = toml.range(of: "[composition_mode]") {
-            var enabledHosts: [String] = []
-            
-            let searchStart = compositionModeStart.upperBound
-            
-            // Look for enabled_hosts field
-            if let enabledStart = toml.range(of: "enabled_hosts = [", range: searchStart..<toml.endIndex) {
-                // Find the closing bracket
-                if let closingBracket = toml.range(of: "]", range: enabledStart.upperBound..<toml.endIndex) {
-                    let arrayContent = String(toml[enabledStart.upperBound..<closingBracket.lowerBound])
-                    
-                    // Parse the array content
-                    let hostNames = arrayContent.components(separatedBy: ",")
-                    for hostName in hostNames {
-                        let trimmed = hostName.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") {
-                            let name = String(trimmed.dropFirst().dropLast())
-                            if !name.isEmpty {
-                                enabledHosts.append(name)
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if !enabledHosts.isEmpty {
-                config.composition_mode = CompositionModeConfig(enabled_hosts: enabledHosts)
-            }
-        }
-        
-        return config
-    }
-    
-    private func parseKeyboardEntry(_ entry: String) -> InstalledKeyboard? {
-        var id: String?
-        var name: String?
-        var filename: String?
-        var hash: String?
-        
-        // Extract fields using simple regex
-        if let match = entry.range(of: #"id = "(.+?)""#, options: .regularExpression) {
-            let value = String(entry[match])
-            if let valueMatch = value.range(of: #""(.+?)""#, options: .regularExpression) {
-                id = String(value[valueMatch]).replacingOccurrences(of: "\"", with: "")
-            }
-        }
-        
-        if let match = entry.range(of: #"name = "(.+?)""#, options: .regularExpression) {
-            let value = String(entry[match])
-            if let valueMatch = value.range(of: #""(.+?)""#, options: .regularExpression) {
-                name = String(value[valueMatch]).replacingOccurrences(of: "\"", with: "")
-            }
-        }
-        
-        if let match = entry.range(of: #"filename = "(.+?)""#, options: .regularExpression) {
-            let value = String(entry[match])
-            if let valueMatch = value.range(of: #""(.+?)""#, options: .regularExpression) {
-                filename = String(value[valueMatch]).replacingOccurrences(of: "\"", with: "")
-            }
-        }
-        
-        if let match = entry.range(of: #"hash = "(.+?)""#, options: .regularExpression) {
-            let value = String(entry[match])
-            if let valueMatch = value.range(of: #""(.+?)""#, options: .regularExpression) {
-                hash = String(value[valueMatch]).replacingOccurrences(of: "\"", with: "")
-            }
-        }
-        
-        guard let id = id, let name = name, let filename = filename, let hash = hash else {
-            return nil
-        }
-        
-        return InstalledKeyboard(id: id, name: name, filename: filename, hotkey: nil, hash: hash)
     }
 }
