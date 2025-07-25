@@ -45,6 +45,8 @@ pub struct KeyboardInfo {
     pub filename: String,
     pub path: PathBuf,
     pub hotkey: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_hotkey: Option<String>,
     pub hash: String,
     pub is_active: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -113,14 +115,15 @@ impl KeyboardManager {
             let path = self.platform.get_keyboards_dir().join(&installed.filename);
             if path.exists() {
                 // Load the keyboard file to get metadata
-                let (description, icon_data) = if let Ok(layout) = self.load_keyboard_file(&path) {
+                let (description, icon_data, default_hotkey) = if let Ok(layout) = self.load_keyboard_file(&path) {
                     let metadata = layout.metadata();
                     (
                         metadata.description().map(|s| s.to_string()),
-                        metadata.icon().map(|data| data.to_vec())
+                        metadata.icon().map(|data| data.to_vec()),
+                        metadata.hotkey()
                     )
                 } else {
-                    (None, None)
+                    (None, None, None)
                 };
                 
                 keyboards.insert(
@@ -131,6 +134,7 @@ impl KeyboardManager {
                         filename: installed.filename.clone(),
                         path,
                         hotkey: installed.hotkey.clone(),
+                        default_hotkey,
                         hash: installed.hash.clone(),
                         is_active: false,
                         description,
@@ -177,7 +181,8 @@ impl KeyboardManager {
                     name,
                     filename,
                     path: path.clone(),
-                    hotkey: default_hotkey,
+                    hotkey: None,  // User customization, initially None
+                    default_hotkey,
                     hash,
                     is_active: false,
                     description,
@@ -361,7 +366,8 @@ impl KeyboardManager {
             name,
             filename: final_filename,
             path: dest_path,
-            hotkey: default_hotkey,
+            hotkey: None,  // User customization, initially None
+            default_hotkey,
             hash,
             is_active: false,
             description,

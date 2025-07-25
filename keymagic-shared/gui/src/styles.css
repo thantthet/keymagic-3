@@ -286,10 +286,23 @@ body {
   display: flex;
   gap: 10px;
   margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.modal-compact .hotkey-input-container {
+  margin: 16px 0;
+  gap: 8px;
+}
+
+.modal-compact .hotkey-input-container .btn-secondary {
+  flex: 0 0 auto;
+  min-width: auto;
+  white-space: nowrap;
 }
 
 .hotkey-input {
   flex: 1;
+  min-width: 200px;
   padding: 12px;
   font-size: 16px;
   border: 2px solid var(--border-color);
@@ -872,6 +885,15 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Compact modal for smaller dialogs like hotkey configuration */
+.modal-compact .modal-content {
+  max-width: 480px;
+}
+
+.modal-compact .modal-body {
+  padding: 16px 20px;
 }
 
 .modal-header {
@@ -1693,12 +1715,14 @@ a {
 }
 
 .validation-success,
-.validation-error {
+.validation-error,
+.validation-warning {
   padding: 12px 16px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   font-size: 14px;
+  border-radius: 6px;
 }
 
 .validation-success {
@@ -1709,6 +1733,12 @@ a {
 .validation-error {
   background-color: #ffebee;
   color: #c62828;
+}
+
+.validation-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
 }
 
 .validation-success svg,

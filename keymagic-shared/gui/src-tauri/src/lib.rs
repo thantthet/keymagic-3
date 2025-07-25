@@ -179,6 +179,7 @@ pub fn run() {
             commands::import_keyboard,
             commands::remove_keyboard,
             commands::update_hotkey,
+            commands::validate_hotkey,
             commands::check_for_updates,
             commands::restart_app,
             commands::quit_app,

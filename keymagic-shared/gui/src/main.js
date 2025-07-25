@@ -614,6 +614,8 @@ function showModal(title, content, footer) {
 
 window.hideModal = function() {
   modal.classList.remove('show');
+  // Remove any special modal classes
+  modal.classList.remove('modal-compact');
 }
 
 
@@ -724,6 +726,9 @@ window.configureHotkey = function(keyboardId) {
     statusText = '<span style="color: var(--text-secondary)">Currently: No hotkey available</span>';
   }
   
+  // Add compact class to modal for hotkey configuration
+  modal.classList.add('modal-compact');
+  
   showModal(
     'Configure Hotkey',
     `
@@ -740,6 +745,7 @@ window.configureHotkey = function(keyboardId) {
           ''
         }
       </div>
+      <div id="hotkey-validation-error" class="validation-error" style="display: none; margin-top: 10px;"></div>
       <p class="hotkey-hint">Press the desired key combination (e.g., Ctrl+Shift+M) or click Clear to remove hotkey</p>
       ${keyboard.default_hotkey ? 
         `<p class="hotkey-default">Default hotkey: ${keyboard.default_hotkey}</p>` : 
@@ -762,6 +768,12 @@ window.configureHotkey = function(keyboardId) {
 function recordHotkey(e) {
   e.preventDefault();
   e.stopPropagation();
+  
+  // Clear any validation error
+  const errorDiv = document.getElementById('hotkey-validation-error');
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
   
   recordedKeys = [];
   
@@ -809,6 +821,11 @@ function recordHotkey(e) {
 window.clearHotkey = function() {
   recordedKeys = [];
   document.getElementById('hotkey-input').value = '';
+  // Clear any validation error
+  const errorDiv = document.getElementById('hotkey-validation-error');
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
 }
 
 window.useDefaultHotkey = function() {
@@ -816,6 +833,11 @@ window.useDefaultHotkey = function() {
     // Set special marker to indicate we want to use default
     recordedKeys = ['USE_DEFAULT'];
     document.getElementById('hotkey-input').value = currentHotkeyKeyboard.default_hotkey;
+    // Clear any validation error
+    const errorDiv = document.getElementById('hotkey-validation-error');
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
   }
 }
 
@@ -827,6 +849,28 @@ window.cancelHotkeyConfig = function() {
   currentHotkeyKeyboard = null;
   recordedKeys = [];
   hideModal();
+}
+
+// Validate hotkey using backend logic
+async function validateHotkey(hotkeyString, recordedKeys) {
+  if (!hotkeyString) {
+    return { valid: true }; // Empty hotkey is valid (removes hotkey)
+  }
+  
+  // Special case for "use default" - don't validate the displayed string
+  if (recordedKeys && recordedKeys.length === 1 && recordedKeys[0] === 'USE_DEFAULT') {
+    return { valid: true };
+  }
+  
+  try {
+    await invoke('validate_hotkey', { hotkey: hotkeyString });
+    return { valid: true };
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: error.toString().replace('Error: ', '')
+    };
+  }
 }
 
 window.saveHotkey = async function() {
@@ -851,6 +895,32 @@ window.saveHotkey = async function() {
       } else {
         // User set a custom hotkey
         hotkeyValue = recordedKeys.join('+');
+        
+        // Validate the hotkey before saving
+        const validation = await validateHotkey(hotkeyValue, recordedKeys);
+        
+        if (!validation.valid) {
+          // Show error in the modal
+          const errorDiv = document.getElementById('hotkey-validation-error');
+          if (errorDiv) {
+            errorDiv.textContent = validation.error;
+            errorDiv.style.display = 'block';
+            errorDiv.className = 'validation-error';
+          }
+          return; // Don't close the dialog
+        }
+        
+        // Check if hotkey has modifiers (warning only)
+        const hasModifier = /Ctrl|Alt|Shift|Win|Cmd|Meta/i.test(hotkeyValue);
+        if (!hasModifier) {
+          const errorDiv = document.getElementById('hotkey-validation-error');
+          if (errorDiv) {
+            errorDiv.textContent = '⚠️ Warning: Hotkey without modifiers may interfere with normal typing. Consider adding Ctrl, Alt, or Shift.';
+            errorDiv.style.display = 'block';
+            errorDiv.className = 'validation-warning';
+          }
+        }
+        
         successMessage = 'Hotkey configured';
       }
       
@@ -865,15 +935,17 @@ window.saveHotkey = async function() {
       await updateTrayMenu();
       
       showSuccess(successMessage);
+      
+      // Only close modal on success
+      currentHotkeyKeyboard = null;
+      recordedKeys = [];
+      hideModal();
     } catch (error) {
       console.error('Failed to save hotkey:', error);
-      showError('Failed to save hotkey');
+      showError('Failed to save hotkey: ' + (error.message || error));
+      // Don't close the dialog on error
     }
   }
-  
-  currentHotkeyKeyboard = null;
-  recordedKeys = [];
-  hideModal();
 }
 
 // Function to open Windows input settings

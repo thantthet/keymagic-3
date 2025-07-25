@@ -255,6 +255,22 @@ pub fn get_registered_hotkeys(app: AppHandle) -> Result<HashMap<String, String>,
 }
 
 #[tauri::command]
+pub fn validate_hotkey(app: AppHandle, hotkey: String) -> Result<(), String> {
+    // Empty hotkey is always valid
+    if hotkey.is_empty() {
+        return Ok(());
+    }
+    
+    if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
+        hotkey_manager
+            .validate_hotkey(&hotkey)
+            .map_err(|e| e.to_string())
+    } else {
+        Err("Hotkey manager not available".to_string())
+    }
+}
+
+#[tauri::command]
 pub fn refresh_hotkeys(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
         hotkey_manager
