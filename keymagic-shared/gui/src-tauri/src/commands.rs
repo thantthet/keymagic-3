@@ -682,6 +682,7 @@ pub fn get_supported_languages(_state: State<AppState>) -> Result<Vec<(String, S
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub fn get_enabled_languages(state: State<AppState>) -> Result<Vec<String>, String> {
     #[cfg(target_os = "windows")]
     {
@@ -716,6 +717,7 @@ pub fn search_languages(_state: State<AppState>, query: String) -> Result<Vec<(S
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub fn set_enabled_languages(
     state: State<AppState>,
     languages: Vec<String>,
