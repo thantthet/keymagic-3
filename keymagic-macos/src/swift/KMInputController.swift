@@ -1010,6 +1010,16 @@ class KMInputController: IMKInputController {
     }
     
     private func selectKeyboardById(_ keyboardId: String) {
+        // Commit any ongoing composition before switching keyboards
+        if useCompositionMode, let currentClient = client() {
+            LOG_DEBUG("Committing composition before keyboard switch")
+            commitAndReset(client: currentClient)
+        } else if let engine = engine {
+            // Just reset engine if not in composition mode
+            LOG_DEBUG("Resetting engine before keyboard switch (direct mode)")
+            keymagic_engine_reset(engine)
+        }
+        
         // Update configuration
         let config = KMConfiguration.shared
         if let keyboardPath = config.getKeyboardPath(for: keyboardId) {
