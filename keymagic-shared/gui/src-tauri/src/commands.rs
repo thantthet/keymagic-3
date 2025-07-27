@@ -53,10 +53,6 @@ pub fn set_active_keyboard(
         .set_active_keyboard(&keyboard_id)
         .map_err(|e| e.to_string())?;
     
-    // Update tray menu
-    if let Err(e) = crate::tray::update_tray_menu(&app) {
-        log::error!("Failed to update tray menu: {}", e);
-    }
     
     // Emit event to notify all UI components
     let _ = app.emit("active_keyboard_changed", &keyboard_id);
@@ -197,12 +193,6 @@ pub fn import_keyboard(
         .import_keyboard(&file_path)
         .map_err(|e| e.to_string())?;
     
-    // Refresh hotkeys if the imported keyboard has a hotkey
-    if keyboard_info.hotkey.is_some() {
-        if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
-            let _ = hotkey_manager.refresh_hotkeys(&app, state.inner().clone());
-        }
-    }
     
     Ok(keyboard_info)
 }
@@ -213,10 +203,6 @@ pub fn remove_keyboard(
     state: State<AppState>,
     keyboard_id: String,
 ) -> Result<(), String> {
-    // Unregister the hotkey before removing the keyboard
-    if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
-        let _ = hotkey_manager.unregister_hotkey(&app, &keyboard_id);
-    }
     
     state
         .remove_keyboard(&keyboard_id)
@@ -225,7 +211,6 @@ pub fn remove_keyboard(
 
 #[tauri::command]
 pub fn update_hotkey(
-    app: AppHandle,
     state: State<AppState>,
     keyboard_id: String,
     hotkey: Option<String>,
@@ -233,26 +218,9 @@ pub fn update_hotkey(
     // Update the keyboard hotkey
     state
         .update_hotkey(&keyboard_id, hotkey)
-        .map_err(|e| e.to_string())?;
-    
-    // Refresh hotkeys with the hotkey manager
-    if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
-        hotkey_manager
-            .refresh_hotkeys(&app, state.inner().clone())
-            .map_err(|e| format!("Failed to refresh hotkeys: {}", e))?;
-    }
-    
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn get_registered_hotkeys(app: AppHandle) -> Result<HashMap<String, String>, String> {
-    if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
-        Ok(hotkey_manager.get_registered_shortcuts())
-    } else {
-        Ok(HashMap::new())
-    }
-}
 
 #[tauri::command]
 pub fn validate_hotkey(app: AppHandle, hotkey: String) -> Result<(), String> {
@@ -270,15 +238,6 @@ pub fn validate_hotkey(app: AppHandle, hotkey: String) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-pub fn refresh_hotkeys(app: AppHandle, state: State<AppState>) -> Result<(), String> {
-    if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
-        hotkey_manager
-            .refresh_hotkeys(&app, state.inner().clone())
-            .map_err(|e| format!("Failed to refresh hotkeys: {}", e))?;
-    }
-    Ok(())
-}
 
 
 #[tauri::command]
@@ -410,11 +369,6 @@ pub fn get_start_with_system(
     }
 }
 
-#[tauri::command]
-pub fn update_tray_menu(app_handle: tauri::AppHandle) -> Result<(), String> {
-    crate::tray::update_tray_menu(&app_handle)
-        .map_err(|e| e.to_string())
-}
 
 // Version info
 #[tauri::command]
@@ -552,17 +506,7 @@ pub fn import_bundled_keyboard(
     let keyboard_info = state.import_keyboard(&keyboard_file)
         .map_err(|e| format!("Failed to import keyboard: {}", e))?;
     
-    // Update tray menu
-    if let Err(e) = crate::tray::update_tray_menu(&app_handle) {
-        log::error!("Failed to update tray menu: {}", e);
-    }
     
-    // Refresh hotkeys
-    if let Some(hotkey_manager) = app_handle.try_state::<Arc<HotkeyManager>>() {
-        if let Err(e) = hotkey_manager.refresh_hotkeys(&app_handle, state.inner().clone()) {
-            log::error!("Failed to refresh hotkeys: {}", e);
-        }
-    }
     
     Ok(keyboard_info)
 }

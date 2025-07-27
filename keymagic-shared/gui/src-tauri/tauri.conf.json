@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "KeyMagic",
+        "title": "KeyMagic 3 - Configurator",
         "width": 900,
         "height": 600,
         "resizable": true,
