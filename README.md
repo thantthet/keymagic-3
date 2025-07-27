@@ -27,11 +27,14 @@ keymagic-v3/
 │   │       ├── kms2km2.rs   # CLI converter
 │   │       └── km2_dump.rs  # KM2 file dumper
 │   └── tests/
-├── keymagic-ibus/           # Linux IBus integration (placeholder)
-├── keymagic-macos/          # macOS IMK integration (placeholder)
+├── keymagic-shared/         # Cross-platform shared components
+│   └── gui/                 # Unified Tauri-based GUI
+│       ├── src-tauri/      # Backend logic
+│       └── src/            # Frontend UI
+├── keymagic-ibus/           # Linux IBus integration
+├── keymagic-macos/          # macOS IMK integration
 └── keymagic-windows/        # Windows implementation
     ├── tsf/                 # Text Services Framework IME
-    ├── gui-tauri/          # Configuration Manager GUI
     └── installer/          # Windows installer scripts
 ```
 
@@ -51,12 +54,18 @@ Following the Software Design Document (SDD.md), the project is structured as:
    - Compiler to KM2 binary format
    - Binary writer with proper endianness
 
-3. **Platform Integrations**:
-   - keymagic-ibus: Linux desktop support via IBus (placeholder)
-   - keymagic-macos: macOS support via Input Method Kit (placeholder)
+3. **keymagic-shared**: Cross-platform shared components
+   - Unified Tauri-based GUI for all platforms
+   - Common configuration management
+   - Keyboard layout management
+   - Hotkey configuration
+   - System tray integration
+
+4. **Platform Integrations**:
+   - keymagic-ibus: Linux desktop support via IBus
+   - keymagic-macos: macOS support via Input Method Kit
    - keymagic-windows: Windows support with:
      - TSF (Text Services Framework) IME implementation
-     - Tauri-based Configuration Manager GUI
      - Inno Setup installer
 
 ## Building
@@ -142,15 +151,23 @@ After installation:
 
 - ✅ Phase 1: KMS to KM2 Converter (Complete)
 - ✅ Phase 2: Core Engine Development (Complete)
-- ⏳ Phase 3: Linux Integration (Planned)
-- ⏳ Phase 4: macOS Integration (Planned)
+- ✅ Phase 3: Linux Integration (Complete)
+  - IBus engine implementation
+  - Cross-platform GUI foundation
+- ✅ Phase 4: macOS Integration (Complete)
+  - Input Method Kit implementation
+  - Hotkey support
+  - Keyboard switching notifications
 - ✅ Phase 5: Windows Integration (Complete)
   - ✅ Phase 5.1: Foundation Setup
   - ✅ Phase 5.2: Core TSF Functionality
   - ✅ Phase 5.3: GUI Configuration Manager
   - ✅ Phase 5.4: System Integration
   - ✅ Phase 5.5: Installer and Deployment
-- ⏳ Phase 6: Advanced Features & Optimization (Planned)
+- ✅ Cross-Platform GUI Migration (Complete)
+  - Unified Tauri-based GUI for all platforms
+  - Platform-specific features and adaptations
+- ⏳ Phase 6: Advanced Features & Optimization (In Progress)
 
 ## Features
 
@@ -168,24 +185,43 @@ After installation:
 - Command-line interface
 - Cross-platform support
 
-### Windows Implementation
+### Cross-Platform GUI
+- **Unified Configuration Manager**:
+  - Modern Tauri-based interface shared across all platforms
+  - Keyboard management (add/remove/activate)
+  - Hotkey configuration with platform-specific key displays
+  - System tray integration
+  - Auto-update mechanism
+  - Dark mode support
+  - Platform-specific adaptations (e.g., macOS menu bar, Windows tray)
+
+### Platform Implementations
+
+#### Windows
 - **Text Services Framework (TSF) IME**:
   - Full TSF integration with Windows
   - Composition string management
   - Keyboard switching via registry
   - Multi-threaded, thread-safe design
-- **Configuration Manager GUI**:
-  - Modern Tauri-based interface
-  - Keyboard management (add/remove/activate)
-  - Hotkey configuration
-  - System tray integration
-  - Auto-update mechanism
-  - Dark mode support
+  - Preserved key support for hotkeys
 - **Windows Installer**:
   - Inno Setup based installer
   - Auto-start with Windows
   - Registry integration
   - Clean uninstallation
+
+#### macOS
+- **Input Method Kit (IMK)**:
+  - Native IMK integration
+  - Keyboard switching notifications
+  - Hotkey support with system event monitoring
+  - Automatic composition commit on keyboard switch
+
+#### Linux
+- **IBus Engine**:
+  - Full IBus integration
+  - Keyboard input processing
+  - System-wide input method support
 
 ## License
 
