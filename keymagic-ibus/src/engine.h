@@ -44,6 +44,12 @@ struct _KeyMagicEngine {
     /* Property management for keyboard switching */
     IBusPropList* prop_list;            /* List of properties (keyboards with hotkeys) */
     GHashTable* keyboard_properties;    /* Maps property key to keyboard ID */
+    
+    /* Hotkey management */
+    GHashTable* keyboard_hotkeys;       /* Maps hotkey (modifiers|keyval) to keyboard ID */
+    
+    /* Timeout management */
+    guint aux_text_timeout_id;          /* Timeout ID for hiding auxiliary text */
 };
 
 struct _KeyMagicEngineClass {

@@ -1,6 +1,7 @@
 #include "engine.h"
 #include "config.h"
 #include "ffi_bridge.h"
+#include "keycode_map.h"
 #include <string.h>
 #include <glib/gstdio.h>
 
@@ -26,6 +27,12 @@
 /* File monitor event callback */
 static void config_file_changed_cb(GFileMonitor* monitor, GFile* file, GFile* other_file,
                                    GFileMonitorEvent event_type, gpointer user_data);
+
+/* Hotkey handling */
+static gpointer create_hotkey_hash(guint modifiers, guint keyval);
+
+/* Timeout callback for hiding auxiliary text */
+static gboolean aux_text_timeout_cb(gpointer user_data);
 
 /* Engine method implementations */
 static void keymagic_engine_class_init(KeyMagicEngineClass* klass);
@@ -92,6 +99,11 @@ keymagic_engine_init(KeyMagicEngine* engine)
     engine->prop_list = NULL;
     engine->keyboard_properties = g_hash_table_new_full(g_str_hash, g_str_equal,
                                                         g_free, g_free);
+    engine->keyboard_hotkeys = g_hash_table_new_full(g_direct_hash, g_direct_equal,
+                                                     NULL, g_free);
+    
+    /* Initialize timeout management */
+    engine->aux_text_timeout_id = 0;
     
     /* Set up configuration path and monitoring */
     engine->config_path = keymagic_config_get_default_path();
@@ -129,6 +141,12 @@ keymagic_engine_finalize(GObject* object)
     
     g_debug("%s: Finalizing KeyMagic 3 engine", LOG_TAG);
     
+    /* Cancel any pending timeout */
+    if (engine->aux_text_timeout_id > 0) {
+        g_source_remove(engine->aux_text_timeout_id);
+        engine->aux_text_timeout_id = 0;
+    }
+    
     /* Cleanup engine */
     keymagic_engine_unload_keyboard(engine);
     
@@ -153,6 +171,10 @@ keymagic_engine_finalize(GObject* object)
     if (engine->keyboard_properties) {
         g_hash_table_destroy(engine->keyboard_properties);
         engine->keyboard_properties = NULL;
+    }
+    if (engine->keyboard_hotkeys) {
+        g_hash_table_destroy(engine->keyboard_hotkeys);
+        engine->keyboard_hotkeys = NULL;
     }
     
     /* Call parent finalize */
@@ -297,6 +319,115 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
         case IBUS_KEY_Scroll_Lock:
             g_debug("%s: Ignoring modifier key: keyval=%u", LOG_TAG, keyval);
             return FALSE;
+    }
+    
+    /* Check for hotkey match first (before loading keyboard) */
+    if (engine->keyboard_hotkeys && g_hash_table_size(engine->keyboard_hotkeys) > 0) {
+        /* Normalize keyval for hotkey matching */
+        guint normalized_keyval = keyval;
+        guint normalized_modifiers = modifiers;
+        
+        /* If Shift is pressed and we have an uppercase letter, convert to lowercase
+         * and ensure Shift modifier is set for consistent hotkey matching */
+        if (keyval >= IBUS_KEY_A && keyval <= IBUS_KEY_Z) {
+            /* Convert uppercase to lowercase */
+            normalized_keyval = keyval + (IBUS_KEY_a - IBUS_KEY_A);
+            normalized_modifiers |= IBUS_SHIFT_MASK;
+        }
+        /* Handle shifted number keys */
+        else if (modifiers & IBUS_SHIFT_MASK) {
+            switch (keyval) {
+                case IBUS_KEY_exclam:       normalized_keyval = IBUS_KEY_1; break;
+                case IBUS_KEY_at:           normalized_keyval = IBUS_KEY_2; break;
+                case IBUS_KEY_numbersign:   normalized_keyval = IBUS_KEY_3; break;
+                case IBUS_KEY_dollar:       normalized_keyval = IBUS_KEY_4; break;
+                case IBUS_KEY_percent:      normalized_keyval = IBUS_KEY_5; break;
+                case IBUS_KEY_asciicircum:  normalized_keyval = IBUS_KEY_6; break;
+                case IBUS_KEY_ampersand:    normalized_keyval = IBUS_KEY_7; break;
+                case IBUS_KEY_asterisk:     normalized_keyval = IBUS_KEY_8; break;
+                case IBUS_KEY_parenleft:    normalized_keyval = IBUS_KEY_9; break;
+                case IBUS_KEY_parenright:   normalized_keyval = IBUS_KEY_0; break;
+                /* Shifted OEM keys */
+                case IBUS_KEY_colon:        normalized_keyval = IBUS_KEY_semicolon; break;
+                case IBUS_KEY_plus:         normalized_keyval = IBUS_KEY_equal; break;
+                case IBUS_KEY_less:         normalized_keyval = IBUS_KEY_comma; break;
+                case IBUS_KEY_underscore:   normalized_keyval = IBUS_KEY_minus; break;
+                case IBUS_KEY_greater:      normalized_keyval = IBUS_KEY_period; break;
+                case IBUS_KEY_question:     normalized_keyval = IBUS_KEY_slash; break;
+                case IBUS_KEY_asciitilde:   normalized_keyval = IBUS_KEY_grave; break;
+                case IBUS_KEY_braceleft:    normalized_keyval = IBUS_KEY_bracketleft; break;
+                case IBUS_KEY_bar:          normalized_keyval = IBUS_KEY_backslash; break;
+                case IBUS_KEY_braceright:   normalized_keyval = IBUS_KEY_bracketright; break;
+                case IBUS_KEY_quotedbl:     normalized_keyval = IBUS_KEY_apostrophe; break;
+            }
+        }
+        
+        /* Create hash from normalized key event */
+        gpointer hotkey_hash = create_hotkey_hash(normalized_modifiers, normalized_keyval);
+        
+        /* Debug logging for hotkey matching */
+        g_debug("%s: Checking hotkey - original keyval=0x%X (%u), normalized_keyval=0x%X (%u), modifiers=0x%X", 
+                LOG_TAG, keyval, keyval, normalized_keyval, normalized_keyval, normalized_modifiers);
+        
+        const gchar* keyboard_id = g_hash_table_lookup(engine->keyboard_hotkeys, hotkey_hash);
+        
+        if (keyboard_id) {
+            g_debug("%s: Hotkey matched for keyboard: %s", LOG_TAG, keyboard_id);
+            
+            /* Switch to the keyboard */
+            if (g_strcmp0(keyboard_id, engine->active_keyboard_id) != 0) {
+                /* Commit any pending preedit text before switching */
+                if (engine->preedit_visible && engine->preedit_text) {
+                    keymagic_engine_commit_preedit(engine);
+                }
+                
+                /* Update active keyboard */
+                g_free(engine->active_keyboard_id);
+                engine->active_keyboard_id = g_strdup(keyboard_id);
+                engine->keyboard_changed = TRUE;
+                
+                /* Load the keyboard immediately */
+                if (keymagic_ibus_engine_load_keyboard(engine, keyboard_id)) {
+                    
+                    /* Show notification using auxiliary text */
+                    gchar* message = NULL;
+                    
+                    /* Try to get display name from config */
+                    KeyMagicConfig* config = keymagic_config_load(engine->config_path);
+                    if (config) {
+                        InstalledKeyboard* kb_info = keymagic_config_get_keyboard_info(config, keyboard_id);
+                        if (kb_info && kb_info->name) {
+                            message = g_strdup_printf("Switched to: %s", kb_info->name);
+                        }
+                        keymagic_config_free(config);
+                    }
+                    
+                    /* Fallback to keyboard ID if no display name found */
+                    if (!message) {
+                        message = g_strdup_printf("Switched to: %s", keyboard_id);
+                    }
+                    
+                    IBusText* text = ibus_text_new_from_string(message);
+                    ibus_engine_update_auxiliary_text((IBusEngine*)engine, text, TRUE);
+                    g_free(message);
+                    
+                    /* Cancel any existing timeout */
+                    if (engine->aux_text_timeout_id > 0) {
+                        g_source_remove(engine->aux_text_timeout_id);
+                    }
+                    
+                    /* Hide notification after 2 seconds */
+                    engine->aux_text_timeout_id = g_timeout_add_seconds(2, 
+                        aux_text_timeout_cb, engine);
+                    
+                    /* Update configuration file */
+                    keymagic_config_update_active_keyboard(engine->config_path, keyboard_id);
+                }
+            }
+            
+            /* Consume the hotkey - don't pass it to the application */
+            return TRUE;
+        }
     }
     
     /* Load keyboard on-demand if needed */
@@ -617,6 +748,29 @@ keymagic_engine_should_commit(guint keyval, gboolean is_processed, const gchar* 
 }
 
 /**
+ * Timeout callback for hiding auxiliary text
+ */
+static gboolean
+aux_text_timeout_cb(gpointer user_data)
+{
+    KeyMagicEngine* engine = KEYMAGIC_ENGINE(user_data);
+    
+    /* Check if engine is still valid */
+    if (!KEYMAGIC_IS_ENGINE(engine)) {
+        return G_SOURCE_REMOVE;
+    }
+    
+    /* Hide auxiliary text */
+    ibus_engine_hide_auxiliary_text(IBUS_ENGINE(engine));
+    
+    /* Clear timeout ID */
+    engine->aux_text_timeout_id = 0;
+    
+    /* Remove this timeout */
+    return G_SOURCE_REMOVE;
+}
+
+/**
  * Config file change callback
  */
 static void
@@ -637,6 +791,72 @@ config_file_changed_cb(GFileMonitor* monitor G_GNUC_UNUSED, GFile* file,
         /* Reload configuration */
         keymagic_engine_load_config(engine);
     }
+}
+
+/**
+ * Parse hotkey string into modifiers and keyval
+ * 
+ * Uses the Rust FFI to parse hotkey strings like "Ctrl+Shift+M" into IBus modifiers and keyval.
+ * 
+ * @param hotkey_str Hotkey string (e.g., "Ctrl+Shift+M")
+ * @param modifiers_out Output for modifier flags
+ * @param keyval_out Output for key value
+ * @return TRUE if parsing succeeded, FALSE otherwise
+ */
+static gboolean
+parse_hotkey_string(const gchar* hotkey_str, guint* modifiers_out, guint* keyval_out)
+{
+    g_return_val_if_fail(hotkey_str != NULL, FALSE);
+    g_return_val_if_fail(modifiers_out != NULL, FALSE);
+    g_return_val_if_fail(keyval_out != NULL, FALSE);
+    
+    *modifiers_out = 0;
+    *keyval_out = 0;
+    
+    /* Parse using Rust FFI */
+    gint key_code;
+    gboolean ctrl, alt, shift, meta;
+    
+    if (!keymagic_ffi_parse_hotkey(hotkey_str, &key_code, &ctrl, &alt, &shift, &meta)) {
+        return FALSE;
+    }
+    
+    /* Convert VirtualKey to IBus keyval */
+    guint keyval = keymagic_map_virtual_key_to_ibus((guint16)key_code);
+    if (keyval == 0) {
+        return FALSE;
+    }
+
+    /* Build modifier mask */
+    guint modifiers = 0;
+    if (ctrl) modifiers |= IBUS_CONTROL_MASK;
+    if (shift) modifiers |= IBUS_SHIFT_MASK;
+    if (alt) modifiers |= IBUS_MOD1_MASK;
+    if (meta) modifiers |= IBUS_SUPER_MASK;
+    
+    /* Must have at least one modifier */
+    if (modifiers == 0) {
+        return FALSE;
+    }
+    
+    *modifiers_out = modifiers;
+    *keyval_out = keyval;
+    return TRUE;
+}
+
+/**
+ * Create hotkey hash value from modifiers and keyval
+ * 
+ * Combines modifiers and keyval into a single value for hash table lookup.
+ * Uses upper 16 bits for modifiers, lower 16 bits for keyval.
+ */
+static gpointer
+create_hotkey_hash(guint modifiers, guint keyval)
+{
+    /* Mask out irrelevant modifier bits and combine with keyval */
+    guint relevant_modifiers = modifiers & (IBUS_CONTROL_MASK | IBUS_SHIFT_MASK | 
+                                           IBUS_MOD1_MASK | IBUS_SUPER_MASK);
+    return GUINT_TO_POINTER((relevant_modifiers << 16) | (keyval & 0xFFFF));
 }
 
 /**
@@ -729,17 +949,14 @@ keymagic_engine_update_properties(KeyMagicEngine* engine)
     
     g_debug("%s: Updating keyboard properties with hotkeys", LOG_TAG);
     
-    /* Clean up existing properties */
-    if (engine->prop_list) {
-        g_object_unref(engine->prop_list);
-        engine->prop_list = NULL;
-    }
-    
     /* Create new property list */
     engine->prop_list = ibus_prop_list_new();
     
     /* Clear keyboard properties mapping */
     g_hash_table_remove_all(engine->keyboard_properties);
+    
+    /* Clear hotkey mappings */
+    g_hash_table_remove_all(engine->keyboard_hotkeys);
     
     /* Load configuration to get installed keyboards */
     KeyMagicConfig* config = keymagic_config_load(engine->config_path);
@@ -775,6 +992,44 @@ keymagic_engine_update_properties(KeyMagicEngine* engine)
                 g_hash_table_insert(engine->keyboard_properties, 
                                    g_strdup(prop_key), 
                                    g_strdup(kb->id));
+                
+                /* Register hotkey if available */
+                gchar* hotkey_str = NULL;
+                if (kb->hotkey == NULL) {
+                    /* Try to get from KM2 file */
+                    gchar* km2_path = NULL;
+                    if (kb->filename && keyboards_dir) {
+                        km2_path = g_build_filename(keyboards_dir, kb->filename, NULL);
+                    }
+                    
+                    if (km2_path && g_file_test(km2_path, G_FILE_TEST_EXISTS)) {
+                        void* km2_handle = keymagic_ffi_km2_load(km2_path);
+                        if (km2_handle) {
+                            hotkey_str = keymagic_ffi_km2_get_hotkey(km2_handle);
+                            keymagic_ffi_km2_free(km2_handle);
+                        }
+                    }
+                    g_free(km2_path);
+                } else if (strlen(kb->hotkey) > 0) {
+                    hotkey_str = g_strdup(kb->hotkey);
+                }
+                
+                /* Parse and register hotkey */
+                if (hotkey_str && strlen(hotkey_str) > 0) {
+                    guint modifiers, keyval;
+                    if (parse_hotkey_string(hotkey_str, &modifiers, &keyval)) {
+                        gpointer hotkey_hash = create_hotkey_hash(modifiers, keyval);
+                        g_hash_table_insert(engine->keyboard_hotkeys, 
+                                           hotkey_hash, 
+                                           g_strdup(kb->id));
+                        g_debug("%s: Registered hotkey %s for keyboard %s - keyval=0x%X (%u), modifiers=0x%X, hash=%p", 
+                                LOG_TAG, hotkey_str, kb->id, keyval, keyval, modifiers, hotkey_hash);
+                    } else {
+                        g_warning("%s: Failed to parse hotkey '%s' for keyboard %s", 
+                                  LOG_TAG, hotkey_str, kb->id);
+                    }
+                }
+                g_free(hotkey_str);
                 
                 keyboard_count++;
             }
@@ -815,6 +1070,11 @@ keymagic_engine_activate_property(KeyMagicEngine* engine, const gchar* prop_name
     }
     
     g_debug("%s: Switching to keyboard: %s", LOG_TAG, keyboard_id);
+    
+    /* Commit any pending preedit text before switching */
+    if (engine->preedit_visible && engine->preedit_text) {
+        keymagic_engine_commit_preedit(engine);
+    }
     
     /* Update active keyboard in configuration */
     g_free(engine->active_keyboard_id);

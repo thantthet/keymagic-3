@@ -74,6 +74,18 @@ typedef struct {
     int is_processed;
 } RustProcessKeyOutput;
 
+/* HotkeyInfo structure from Rust FFI */
+typedef struct {
+    int key_code;       /* VirtualKey as int */
+    int ctrl;           /* 0 or 1 */
+    int alt;            /* 0 or 1 */
+    int shift;          /* 0 or 1 */
+    int meta;           /* 0 or 1 */
+} HotkeyInfo;
+
+/* External hotkey parsing FFI function */
+extern int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info);
+
 /**
  * Load keyboard from .km2 file
  */
@@ -398,4 +410,42 @@ keymagic_ffi_km2_get_hotkey(void* handle)
     keymagic_free_string(hotkey);
     
     return result;
+}
+
+/**
+ * Parse hotkey string using Rust FFI
+ * 
+ * @param hotkey_str Hotkey string (e.g., "Ctrl+Shift+M")
+ * @param key_code_out Output for VirtualKey code
+ * @param ctrl_out Output for Ctrl modifier
+ * @param alt_out Output for Alt modifier  
+ * @param shift_out Output for Shift modifier
+ * @param meta_out Output for Meta/Super modifier
+ * @return TRUE if parsing succeeded, FALSE otherwise
+ */
+gboolean
+keymagic_ffi_parse_hotkey(const gchar* hotkey_str, gint* key_code_out,
+                         gboolean* ctrl_out, gboolean* alt_out,
+                         gboolean* shift_out, gboolean* meta_out)
+{
+    g_return_val_if_fail(hotkey_str != NULL, FALSE);
+    g_return_val_if_fail(key_code_out != NULL, FALSE);
+    g_return_val_if_fail(ctrl_out != NULL, FALSE);
+    g_return_val_if_fail(alt_out != NULL, FALSE);
+    g_return_val_if_fail(shift_out != NULL, FALSE);
+    g_return_val_if_fail(meta_out != NULL, FALSE);
+    
+    HotkeyInfo info = {0};
+    int result = keymagic_parse_hotkey(hotkey_str, &info);
+    
+    if (result == 1) {
+        *key_code_out = info.key_code;
+        *ctrl_out = (info.ctrl != 0);
+        *alt_out = (info.alt != 0);
+        *shift_out = (info.shift != 0);
+        *meta_out = (info.meta != 0);
+        return TRUE;
+    }
+    
+    return FALSE;
 }

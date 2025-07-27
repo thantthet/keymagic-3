@@ -146,6 +146,21 @@ gchar* keymagic_ffi_km2_get_description(void* handle);
  */
 gchar* keymagic_ffi_km2_get_hotkey(void* handle);
 
+/**
+ * Parse hotkey string using Rust FFI
+ * 
+ * @param hotkey_str Hotkey string (e.g., "Ctrl+Shift+M")
+ * @param key_code_out Output for VirtualKey code
+ * @param ctrl_out Output for Ctrl modifier
+ * @param alt_out Output for Alt modifier  
+ * @param shift_out Output for Shift modifier
+ * @param meta_out Output for Meta/Super modifier
+ * @return TRUE if parsing succeeded, FALSE otherwise
+ */
+gboolean keymagic_ffi_parse_hotkey(const gchar* hotkey_str, gint* key_code_out,
+                                  gboolean* ctrl_out, gboolean* alt_out,
+                                  gboolean* shift_out, gboolean* meta_out);
+
 G_END_DECLS
 
 #endif /* KEYMAGIC_FFI_BRIDGE_H */

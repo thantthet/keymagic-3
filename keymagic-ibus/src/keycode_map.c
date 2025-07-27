@@ -178,3 +178,129 @@ keymagic_map_ibus_keyval(guint keyval)
             return 0;
     }
 }
+
+/**
+ * Map KeyMagic VirtualKey code to IBus keyval
+ * 
+ * @param vk_code KeyMagic VirtualKey code
+ * @return IBus key value (X11 keysym), or 0 if no mapping exists
+ */
+guint
+keymagic_map_virtual_key_to_ibus(guint16 vk_code)
+{
+    switch (vk_code) {
+        /* Control keys */
+        case 2:  return IBUS_KEY_BackSpace;     /* VirtualKey::Back */
+        case 3:  return IBUS_KEY_Tab;           /* VirtualKey::Tab */
+        case 4:  return IBUS_KEY_Return;        /* VirtualKey::Return */
+        case 5:  return IBUS_KEY_Shift_L;       /* VirtualKey::Shift */
+        case 6:  return IBUS_KEY_Control_L;     /* VirtualKey::Control */
+        case 7:  return IBUS_KEY_Alt_L;         /* VirtualKey::Menu */
+        case 8:  return IBUS_KEY_Pause;         /* VirtualKey::Pause */
+        case 9:  return IBUS_KEY_Caps_Lock;     /* VirtualKey::Capital */
+        case 11: return IBUS_KEY_Escape;        /* VirtualKey::Escape */
+        case 12: return IBUS_KEY_space;         /* VirtualKey::Space */
+        case 13: return IBUS_KEY_Prior;         /* VirtualKey::Prior (Page Up) */
+        case 14: return IBUS_KEY_Next;          /* VirtualKey::Next (Page Down) */
+        case 15: return IBUS_KEY_Delete;        /* VirtualKey::Delete */
+        
+        /* Number keys */
+        case 16: return IBUS_KEY_0;             /* VirtualKey::Key0 */
+        case 17: return IBUS_KEY_1;             /* VirtualKey::Key1 */
+        case 18: return IBUS_KEY_2;             /* VirtualKey::Key2 */
+        case 19: return IBUS_KEY_3;             /* VirtualKey::Key3 */
+        case 20: return IBUS_KEY_4;             /* VirtualKey::Key4 */
+        case 21: return IBUS_KEY_5;             /* VirtualKey::Key5 */
+        case 22: return IBUS_KEY_6;             /* VirtualKey::Key6 */
+        case 23: return IBUS_KEY_7;             /* VirtualKey::Key7 */
+        case 24: return IBUS_KEY_8;             /* VirtualKey::Key8 */
+        case 25: return IBUS_KEY_9;             /* VirtualKey::Key9 */
+        
+        /* Letter keys */
+        case 26: return IBUS_KEY_a;             /* VirtualKey::KeyA */
+        case 27: return IBUS_KEY_b;             /* VirtualKey::KeyB */
+        case 28: return IBUS_KEY_c;             /* VirtualKey::KeyC */
+        case 29: return IBUS_KEY_d;             /* VirtualKey::KeyD */
+        case 30: return IBUS_KEY_e;             /* VirtualKey::KeyE */
+        case 31: return IBUS_KEY_f;             /* VirtualKey::KeyF */
+        case 32: return IBUS_KEY_g;             /* VirtualKey::KeyG */
+        case 33: return IBUS_KEY_h;             /* VirtualKey::KeyH */
+        case 34: return IBUS_KEY_i;             /* VirtualKey::KeyI */
+        case 35: return IBUS_KEY_j;             /* VirtualKey::KeyJ */
+        case 36: return IBUS_KEY_k;             /* VirtualKey::KeyK */
+        case 37: return IBUS_KEY_l;             /* VirtualKey::KeyL */
+        case 38: return IBUS_KEY_m;             /* VirtualKey::KeyM */
+        case 39: return IBUS_KEY_n;             /* VirtualKey::KeyN */
+        case 40: return IBUS_KEY_o;             /* VirtualKey::KeyO */
+        case 41: return IBUS_KEY_p;             /* VirtualKey::KeyP */
+        case 42: return IBUS_KEY_q;             /* VirtualKey::KeyQ */
+        case 43: return IBUS_KEY_r;             /* VirtualKey::KeyR */
+        case 44: return IBUS_KEY_s;             /* VirtualKey::KeyS */
+        case 45: return IBUS_KEY_t;             /* VirtualKey::KeyT */
+        case 46: return IBUS_KEY_u;             /* VirtualKey::KeyU */
+        case 47: return IBUS_KEY_v;             /* VirtualKey::KeyV */
+        case 48: return IBUS_KEY_w;             /* VirtualKey::KeyW */
+        case 49: return IBUS_KEY_x;             /* VirtualKey::KeyX */
+        case 50: return IBUS_KEY_y;             /* VirtualKey::KeyY */
+        case 51: return IBUS_KEY_z;             /* VirtualKey::KeyZ */
+        
+        /* Numpad keys */
+        case 52: return IBUS_KEY_KP_0;          /* VirtualKey::Numpad0 */
+        case 53: return IBUS_KEY_KP_1;          /* VirtualKey::Numpad1 */
+        case 54: return IBUS_KEY_KP_2;          /* VirtualKey::Numpad2 */
+        case 55: return IBUS_KEY_KP_3;          /* VirtualKey::Numpad3 */
+        case 56: return IBUS_KEY_KP_4;          /* VirtualKey::Numpad4 */
+        case 57: return IBUS_KEY_KP_5;          /* VirtualKey::Numpad5 */
+        case 58: return IBUS_KEY_KP_6;          /* VirtualKey::Numpad6 */
+        case 59: return IBUS_KEY_KP_7;          /* VirtualKey::Numpad7 */
+        case 60: return IBUS_KEY_KP_8;          /* VirtualKey::Numpad8 */
+        case 61: return IBUS_KEY_KP_9;          /* VirtualKey::Numpad9 */
+        
+        /* Numpad operators */
+        case 62: return IBUS_KEY_KP_Multiply;   /* VirtualKey::Multiply */
+        case 63: return IBUS_KEY_KP_Add;        /* VirtualKey::Add */
+        case 64: return IBUS_KEY_KP_Separator;  /* VirtualKey::Separator */
+        case 65: return IBUS_KEY_KP_Subtract;   /* VirtualKey::Subtract */
+        case 66: return IBUS_KEY_KP_Decimal;    /* VirtualKey::Decimal */
+        case 67: return IBUS_KEY_KP_Divide;     /* VirtualKey::Divide */
+        
+        /* Function keys */
+        case 68: return IBUS_KEY_F1;            /* VirtualKey::F1 */
+        case 69: return IBUS_KEY_F2;            /* VirtualKey::F2 */
+        case 70: return IBUS_KEY_F3;            /* VirtualKey::F3 */
+        case 71: return IBUS_KEY_F4;            /* VirtualKey::F4 */
+        case 72: return IBUS_KEY_F5;            /* VirtualKey::F5 */
+        case 73: return IBUS_KEY_F6;            /* VirtualKey::F6 */
+        case 74: return IBUS_KEY_F7;            /* VirtualKey::F7 */
+        case 75: return IBUS_KEY_F8;            /* VirtualKey::F8 */
+        case 76: return IBUS_KEY_F9;            /* VirtualKey::F9 */
+        case 77: return IBUS_KEY_F10;           /* VirtualKey::F10 */
+        case 78: return IBUS_KEY_F11;           /* VirtualKey::F11 */
+        case 79: return IBUS_KEY_F12;           /* VirtualKey::F12 */
+        
+        /* Modifier keys (left/right variants) */
+        case 80: return IBUS_KEY_Shift_L;       /* VirtualKey::LShift */
+        case 81: return IBUS_KEY_Shift_R;       /* VirtualKey::RShift */
+        case 82: return IBUS_KEY_Control_L;     /* VirtualKey::LControl */
+        case 83: return IBUS_KEY_Control_R;     /* VirtualKey::RControl */
+        case 84: return IBUS_KEY_Alt_L;         /* VirtualKey::LMenu */
+        case 85: return IBUS_KEY_Alt_R;         /* VirtualKey::RMenu */
+        
+        /* OEM keys */
+        case 86: return IBUS_KEY_semicolon;     /* VirtualKey::Oem1 (;:) */
+        case 87: return IBUS_KEY_plus;          /* VirtualKey::OemPlus */
+        case 88: return IBUS_KEY_comma;         /* VirtualKey::OemComma */
+        case 89: return IBUS_KEY_minus;         /* VirtualKey::OemMinus */
+        case 90: return IBUS_KEY_period;        /* VirtualKey::OemPeriod */
+        case 91: return IBUS_KEY_slash;         /* VirtualKey::Oem2 (/?) */
+        case 92: return IBUS_KEY_grave;         /* VirtualKey::Oem3 (`~) */
+        case 93: return IBUS_KEY_bracketleft;   /* VirtualKey::Oem4 ([{) */
+        case 94: return IBUS_KEY_backslash;     /* VirtualKey::Oem5 (\|) */
+        case 95: return IBUS_KEY_bracketright;  /* VirtualKey::Oem6 (]}) */
+        case 96: return IBUS_KEY_apostrophe;    /* VirtualKey::Oem7 ('") */
+        
+        /* Default: return 0 for unmapped keys */
+        default:
+            return 0;
+    }
+}
