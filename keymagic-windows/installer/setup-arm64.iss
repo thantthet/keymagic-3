@@ -63,10 +63,10 @@ Source: "..\tsf\build-arm64x\KeyMagicTSF_arm64.dll"; DestDir: "{app}\TSF\{#MyApp
 Source: "..\tsf\build-arm64x\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
 
 ; Resources
-Source: "..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Keyboard icon for TSF language profile (install to LOCALAPPDATA)
-Source: "..\resources\icons\keymagic-keyboard.ico"; DestDir: "{localappdata}\KeyMagic"; Flags: ignoreversion
+Source: "..\..\resources\icons\keymagic-keyboard.ico"; DestDir: "{localappdata}\KeyMagic"; Flags: ignoreversion
 
 ; Production keyboards (included with installer)
 Source: "keyboards\*.km2"; DestDir: "{app}\keyboards"; Flags: ignoreversion skipifsourcedoesntexist
@@ -89,8 +89,8 @@ Root: HKCU; Subkey: "Software\KeyMagic\Keyboards"; Flags: uninsdeletekeyifempty
 ; Set StartWithWindows to 1 on install
 Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: string; ValueName: "StartWithWindows"; ValueData: "1"; Flags: uninsdeletevalue
 
-; Set FirstRunScanKeyboards flag to trigger import wizard on first launch
-Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: dword; ValueName: "FirstRunScanKeyboards"; ValueData: "1"; Flags: createvalueifdoesntexist
+; Version-based first-run detection is now used instead of FirstRunScanKeyboards flag
+; The app will automatically detect first run based on version comparison
 
 ; Add to Windows Run registry for auto-start
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue

@@ -1,0 +1,44 @@
+# Test files
+test_ibus_engine.py
+test-config/
+test-keyboards/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Debug files
+*.log
+core
+core.*
+
+# Temporary files
+*.tmp
+*.bak
+.DS_Store
+
+# Installation artifacts
+install_manifest.txt
+
+# Dependencies (if any local libs downloaded)
+lib/
+deps/
+
+# Build and distribution directories
+dist/
+rpmbuild/
+*.deb
+*.rpm
+*.AppImage
+
+# IBus engine build artifacts
+build/
+ibus-engine-keymagic3
+
+# IBus package distribution directories
+dist/
+dist-amd64/
+dist-arm64/

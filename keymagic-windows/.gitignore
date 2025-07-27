@@ -1,0 +1,6 @@
+# build artifacts
+target
+tsf/build
+tsf/build-*/
+test-build/
+*.obj

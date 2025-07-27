@@ -35,11 +35,9 @@ core.*
 Thumbs.db
 .DS_Store
 ._*
-keymagic-windows/target
-keymagic-windows/tsf/build
-keymagic-windows/tsf/build-*/
-keymagic-windows/test-build/
-keymagic-windows/*.obj
 .claude
 CLAUDE.local.md
-build-*/
+
+# Node.js
+node_modules/
+package-lock.json

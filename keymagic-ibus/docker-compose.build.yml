@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  build-amd64:
+    build:
+      context: ..
+      dockerfile: keymagic-ibus/Dockerfile.build
+      args:
+        ARCH: amd64
+    platform: linux/amd64
+    volumes:
+      - ./dist-amd64:/build/keymagic-ibus/dist
+    command: ./keymagic-ibus/build-scripts/build-linux-package.sh
+
+  build-arm64:
+    build:
+      context: ..
+      dockerfile: keymagic-ibus/Dockerfile.build
+      args:
+        ARCH: arm64
+    platform: linux/arm64
+    volumes:
+      - ./dist-arm64:/build/keymagic-ibus/dist
+    command: ./keymagic-ibus/build-scripts/build-linux-package.sh
+
+  # Convenience service to build both architectures
+  build-all:
+    image: busybox
+    depends_on:
+      - build-amd64
+      - build-arm64
+    command: echo "All builds completed"

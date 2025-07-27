@@ -1,0 +1,14 @@
+{
+  "name": "keymagic-gui",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "cargo tauri dev",
+    "build": "cargo tauri build",
+    "preview": "cargo tauri preview"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

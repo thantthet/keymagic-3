@@ -1,0 +1,31 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=KeyMagic 3
+GenericName=Keyboard Input Method
+Comment=Configure KeyMagic 3 keyboard layouts
+Comment[my]=KeyMagic လက်ကွက်များကို ပြင်ဆင်ရန်
+Exec=keymagic3-gui
+Icon=keymagic3
+Terminal=false
+Categories=System;Settings;Utility;
+Keywords=keyboard;input;ime;myanmar;burmese;
+StartupNotify=true
+DBusActivatable=false
+
+# Translations
+Name[my]=ကီးမက်ဂစ် ၃
+GenericName[my]=လက်ကွက် ထည့်သွင်းနည်း
+
+# Actions for quick access
+Actions=keyboards;about;
+
+[Desktop Action keyboards]
+Name=Manage Keyboards
+Name[my]=လက်ကွက်များ စီမံရန်
+Exec=keymagic3-gui --page=keyboards
+
+[Desktop Action about]
+Name=About KeyMagic 3
+Name[my]=KeyMagic 3 အကြောင်း
+Exec=keymagic3-gui --page=about

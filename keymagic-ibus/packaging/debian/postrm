@@ -1,0 +1,35 @@
+#!/bin/sh
+# postrm script for keymagic3
+#
+# This script is executed after the package is removed
+
+set -e
+
+case "$1" in
+    purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        # Remove helper script
+        if [ -f /usr/bin/keymagic3-ibus-refresh ]; then
+            rm -f /usr/bin/keymagic3-ibus-refresh
+        fi
+        
+        # Notify about IBus cleanup
+        if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+            echo "KeyMagic 3 has been removed from IBus."
+            echo "Users may need to restart IBus or re-login to update the input method list."
+        fi
+
+        # Clean up any remaining configuration on purge
+        if [ "$1" = "purge" ]; then
+            # Remove user configurations if needed
+            # Note: Be careful not to remove user data
+            echo "Purging KeyMagic 3 configuration..."
+        fi
+        ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

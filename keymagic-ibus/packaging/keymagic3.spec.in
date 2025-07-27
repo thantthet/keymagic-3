@@ -1,0 +1,115 @@
+Name:           keymagic3
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        KeyMagic 3 - Smart keyboard input method
+License:        GPL-3.0
+URL:            https://github.com/thantthet/keymagic-3
+BuildArch:      @ARCH@
+
+Requires:       ibus
+Requires:       libgtk-3.so.0()(64bit)
+Requires:       libwebkit2gtk-4.1.so.0()(64bit)
+Requires:       libayatana-appindicator3.so.1()(64bit)
+
+%description
+KeyMagic 3 is a powerful and flexible input method that allows users to type
+in Myanmar and other complex scripts using standard keyboards.
+
+%prep
+# No prep needed as we're using pre-built binaries
+
+%build
+# No build needed as we're using pre-built binaries
+
+%install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/bin
+mkdir -p %{buildroot}/usr/lib/ibus-keymagic3
+mkdir -p %{buildroot}/usr/share/ibus/component
+mkdir -p %{buildroot}/usr/share/applications
+mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+mkdir -p %{buildroot}/usr/share/doc/keymagic3
+mkdir -p %{buildroot}/usr/share/keymagic3
+mkdir -p %{buildroot}/usr/share/keymagic3/keyboards
+
+# Copy files from our build
+cp "@PROJECT_ROOT@/target/release/keymagic-gui" %{buildroot}/usr/bin/keymagic3-gui
+cp "@PROJECT_ROOT@/keymagic-ibus/ibus-engine-keymagic3" %{buildroot}/usr/lib/ibus-keymagic3/
+cp "@PROJECT_ROOT@/keymagic-ibus/data/keymagic3.xml" %{buildroot}/usr/share/ibus/component/
+cp "@PROJECT_ROOT@/keymagic-ibus/data/keymagic3.desktop" %{buildroot}/usr/share/applications/ 2>/dev/null || true
+cp "@PROJECT_ROOT@/README.md" %{buildroot}/usr/share/doc/keymagic3/ 2>/dev/null || true
+
+# Copy helper script if exists
+if [ -f "@PROJECT_ROOT@/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" ]; then
+    cp "@PROJECT_ROOT@/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" %{buildroot}/usr/share/keymagic3/
+fi
+
+# Copy icon
+cp "@PROJECT_ROOT@/resources/icons/keymagic.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/keymagic3.png
+
+# Copy bundled keyboard files
+if [ -d "@PROJECT_ROOT@/keymagic-ibus/data/keyboards" ]; then
+    for km2_file in "@PROJECT_ROOT@/keymagic-ibus/data/keyboards"/*.km2; do
+        if [ -f "$km2_file" ]; then
+            cp "$km2_file" %{buildroot}/usr/share/keymagic3/keyboards/
+        fi
+    done
+fi
+
+%files
+%defattr(-,root,root,-)
+/usr/bin/keymagic3-gui
+/usr/lib/ibus-keymagic3/ibus-engine-keymagic3
+/usr/share/ibus/component/keymagic3.xml
+/usr/share/applications/keymagic3.desktop
+%doc /usr/share/doc/keymagic3/
+/usr/share/keymagic3/
+/usr/share/icons/hicolor/256x256/apps/keymagic3.png
+
+%post
+# Install IBus refresh helper if it exists
+if [ -f /usr/share/keymagic3/keymagic3-ibus-refresh ]; then
+    install -m 755 /usr/share/keymagic3/keymagic3-ibus-refresh /usr/bin/keymagic3-ibus-refresh || true
+fi
+
+# Register with IBus
+if command -v ibus write-cache >/dev/null 2>&1; then
+    ibus write-cache
+fi
+
+# Launch KeyMagic3 GUI if we're in a graphical session
+if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+    # Check if we're running as root (during package installation)
+    if [ "$SUDO_USER" ]; then
+        # Launch as the sudo user, not root
+        su -c "nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 &" "$SUDO_USER" || true
+    elif [ "$USER" != "root" ]; then
+        # Launch directly if not root
+        nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 & || true
+    fi
+fi
+
+# Update icon cache
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+fi
+
+# Update desktop database
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database /usr/share/applications || true
+fi
+
+%postun
+# Cleanup IBus cache
+if [ "$1" = "0" ] && command -v ibus write-cache >/dev/null 2>&1; then
+    ibus write-cache
+fi
+
+# Remove helper script
+if [ "$1" = "0" ] && [ -f /usr/bin/keymagic3-ibus-refresh ]; then
+    rm -f /usr/bin/keymagic3-ibus-refresh
+fi
+
+%changelog
+* @DATE@ Thant Thet Khin Zaw <contact@keymagic.net> - @VERSION@-1
+- Initial release of KeyMagic 3

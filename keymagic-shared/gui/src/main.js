@@ -6,6 +6,7 @@ let keyboards = [];
 let activeKeyboardId = null;
 let selectedKeyboardId = null;
 let recentlyAddedKeyboardIds = new Set(); // Track recently added keyboards
+let platformInfo = null; // Platform capabilities
 // DOM Elements
 let keyboardList;
 let addKeyboardBtn;
@@ -157,9 +158,16 @@ function createKeyboardCard(keyboard) {
 }
 
 function createIconElement(iconData) {
-  // Convert icon data to base64 and create img element
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(iconData)));
-  return `<img src="data:image/png;base64,${base64}" alt="Keyboard icon" style="width: 100%; height: 100%; object-fit: contain;">`;
+  // Handle both base64 string and raw bytes
+  let base64;
+  if (typeof iconData === 'string') {
+    // Already base64 encoded
+    base64 = iconData;
+  } else {
+    // Convert raw bytes to base64
+    base64 = btoa(String.fromCharCode(...new Uint8Array(iconData)));
+  }
+  return `<img src="data:image/bmp;base64,${base64}" alt="Keyboard icon" style="width: 100%; height: 100%; object-fit: contain;">`;
 }
 
 function createDefaultIcon() {
@@ -292,15 +300,15 @@ function setupEventListeners() {
       
       if (selected) {
         try {
-          const keyboardId = await invoke('add_keyboard', { path: selected });
+          const keyboard = await invoke('import_keyboard', { filePath: selected });
           // Mark this keyboard as recently added
-          recentlyAddedKeyboardIds.add(keyboardId);
+          recentlyAddedKeyboardIds.add(keyboard.id);
           await loadKeyboards();
           await updateTrayMenu();
           showSuccess('Keyboard added successfully');
           // Remove "just added" label after 60 seconds (1 minute)
           setTimeout(() => {
-            recentlyAddedKeyboardIds.delete(keyboardId);
+            recentlyAddedKeyboardIds.delete(keyboard.id);
             renderKeyboardList();
           }, 60000);
         } catch (error) {
@@ -318,7 +326,7 @@ function setupEventListeners() {
   // Setting change handlers
   document.getElementById('start-with-windows').addEventListener('change', async (e) => {
     try {
-      await invoke('set_setting', { key: 'StartWithWindows', value: e.target.checked ? '1' : '0' });
+      await invoke('set_start_with_system', { enabled: e.target.checked });
       showSuccess('Setting saved');
     } catch (error) {
       console.error('Failed to save setting:', error);
@@ -341,9 +349,9 @@ function setupEventListeners() {
 // Settings
 async function loadSettings() {
   try {
-    const startWithWindows = await invoke('get_setting', { key: 'StartWithWindows' });
+    const startWithSystem = await invoke('get_start_with_system');
     
-    document.getElementById('start-with-windows').checked = startWithWindows === '1';
+    document.getElementById('start-with-windows').checked = startWithSystem;
     
     
     // Load current version
@@ -494,19 +502,8 @@ function showModal(title, content, footer) {
   modal.classList.add('show');
 }
 
-window.hideModal = async function() {
+window.hideModal = function() {
   modal.classList.remove('show');
-  
-  // Resume hotkeys if we were in hotkey configuration mode
-  if (currentHotkeyKeyboard) {
-    try {
-      await invoke('resume_hotkeys');
-    } catch (error) {
-      console.error('Failed to resume hotkeys:', error);
-    }
-    currentHotkeyKeyboard = null;
-    recordedKeys = [];
-  }
 }
 
 
@@ -583,19 +580,12 @@ function showError(message) {
 let currentHotkeyKeyboard = null;
 let recordedKeys = [];
 
-window.configureHotkey = async function(keyboardId) {
+window.configureHotkey = function(keyboardId) {
   const keyboard = keyboards.find(k => k.id === keyboardId);
   if (!keyboard) return;
   
   currentHotkeyKeyboard = keyboard;
   recordedKeys = [];
-  
-  // Pause hotkeys while configuring
-  try {
-    await invoke('pause_hotkeys');
-  } catch (error) {
-    console.error('Failed to pause hotkeys:', error);
-  }
   
   // Determine initial display value and state
   let initialValue = '';
@@ -719,19 +709,11 @@ window.useDefaultHotkey = function() {
   }
 }
 
-window.cancelHotkeyConfig = async function() {
+window.cancelHotkeyConfig = function() {
   const input = document.getElementById('hotkey-input');
   if (input) {
     input.removeEventListener('keydown', recordHotkey);
   }
-  
-  // Resume hotkeys
-  try {
-    await invoke('resume_hotkeys');
-  } catch (error) {
-    console.error('Failed to resume hotkeys:', error);
-  }
-  
   currentHotkeyKeyboard = null;
   recordedKeys = [];
   hideModal();
@@ -762,7 +744,7 @@ window.saveHotkey = async function() {
         successMessage = 'Hotkey configured';
       }
       
-      await invoke('set_keyboard_hotkey', {
+      await invoke('update_hotkey', {
         keyboardId: currentHotkeyKeyboard.id,
         hotkey: hotkeyValue
       });
@@ -779,13 +761,6 @@ window.saveHotkey = async function() {
     }
   }
   
-  // Resume hotkeys
-  try {
-    await invoke('resume_hotkeys');
-  } catch (error) {
-    console.error('Failed to resume hotkeys:', error);
-  }
-  
   currentHotkeyKeyboard = null;
   recordedKeys = [];
   hideModal();
@@ -793,6 +768,11 @@ window.saveHotkey = async function() {
 
 // Function to open Windows input settings
 window.openWindowsInputSettings = async function() {
+  if (platformInfo && platformInfo.os !== 'windows') {
+    showError('This feature is only available on Windows');
+    return;
+  }
+  
   try {
     // Use rundll32 to open the language settings
     await invoke('run_command', {
@@ -856,20 +836,27 @@ window.checkForUpdates = async function() {
 window.showUpdateWindow = async function(updateInfo) {
   try {
     // Check if we should show the update (remind me later logic)
-    const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
-    if (remindAfterStr) {
-      const remindAfter = parseInt(remindAfterStr);
-      if (!isNaN(remindAfter) && Date.now() < remindAfter) {
-        // Still in "remind later" period, don't show window
-        console.log('Update window skipped due to remind later setting');
-        return;
+    try {
+      const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
+      if (remindAfterStr) {
+        const remindAfter = parseInt(remindAfterStr);
+        if (!isNaN(remindAfter) && Date.now() < remindAfter) {
+          // Still in "remind later" period, don't show window
+          console.log('Update window skipped due to remind later setting');
+          return;
+        }
       }
+    } catch (e) {
+      // If get_setting fails, continue showing the update
+      console.log('Could not check remind later setting:', e);
     }
     
-    // Create update window
     const { WebviewWindow } = window.__TAURI__.webviewWindow;
     
-    const updateWindow = new WebviewWindow('update-window', {
+    // Create update window with unique label using timestamp
+    const windowLabel = `update-window-${Date.now()}`;
+    
+    const updateWindow = new WebviewWindow(windowLabel, {
       url: `update-window.html?updateInfo=${encodeURIComponent(JSON.stringify(updateInfo))}`,
       title: 'KeyMagic Update Available',
       width: 600,
@@ -893,8 +880,13 @@ async function loadCurrentVersion() {
   try {
     const currentVersionElement = document.getElementById('current-version');
     if (currentVersionElement) {
-      const version = await invoke('get_app_version');
-      currentVersionElement.textContent = version;
+      try {
+        const version = await invoke('get_app_version');
+        currentVersionElement.textContent = version;
+      } catch (error) {
+        console.error('Failed to get app version:', error);
+        currentVersionElement.textContent = '2.0.0';
+      }
     }
   } catch (error) {
     console.error('Failed to load current version:', error);
@@ -910,8 +902,13 @@ async function loadAboutVersion() {
   try {
     const aboutVersionElement = document.getElementById('about-version');
     if (aboutVersionElement) {
-      const version = await invoke('get_app_version');
-      aboutVersionElement.textContent = version;
+      try {
+        const version = await invoke('get_app_version');
+        aboutVersionElement.textContent = version;
+      } catch (error) {
+        console.error('Failed to get app version:', error);
+        aboutVersionElement.textContent = '2.0.0';
+      }
     }
   } catch (error) {
     console.error('Failed to load about version:', error);
@@ -958,6 +955,10 @@ let languageSearchTimeout = null;
 let hasPendingLanguageChanges = false;
 
 async function loadLanguageProfiles() {
+  // Skip if platform doesn't support language profiles
+  if (!platformInfo || !platformInfo.features.language_profiles) {
+    return;
+  }
   try {
     // Get all supported languages
     allLanguages = await invoke('get_supported_languages');
@@ -1216,12 +1217,82 @@ window.cancelLanguageChanges = function() {
   showSuccess('Changes cancelled');
 }
 
+// Platform detection
+async function loadPlatformInfo() {
+  try {
+    platformInfo = await invoke('get_platform_info');
+    console.log('Platform info:', platformInfo);
+    
+    // Update UI based on platform
+    updatePlatformSpecificUI();
+  } catch (error) {
+    console.error('Failed to load platform info:', error);
+    // Default to basic features
+    platformInfo = {
+      os: 'unknown',
+      features: {
+        language_profiles: false,
+        composition_mode: false,
+        global_hotkeys: false,
+        system_tray: true
+      }
+    };
+  }
+}
+
+function updatePlatformSpecificUI() {
+  // Update "Start with Windows/System" text
+  const startWithSystemLabel = document.querySelector('#start-with-windows').nextElementSibling;
+  if (startWithSystemLabel) {
+    if (platformInfo.os === 'windows') {
+      startWithSystemLabel.textContent = 'Start with Windows';
+    } else if (platformInfo.os === 'macos') {
+      startWithSystemLabel.textContent = 'Start with macOS';
+    } else {
+      startWithSystemLabel.textContent = 'Start with system';
+    }
+  }
+  
+  // Hide language profiles section if not supported
+  const languageSection = document.querySelector('.settings-section:has(#language-search)');
+  if (languageSection && !platformInfo.features.language_profiles) {
+    languageSection.style.display = 'none';
+  } else if (languageSection) {
+    // Update language settings description based on platform
+    const langDesc = document.getElementById('language-settings-description');
+    if (langDesc) {
+      if (platformInfo.os === 'windows') {
+        langDesc.textContent = 'Manage which languages KeyMagic appears under in Windows language settings.';
+      } else if (platformInfo.os === 'macos') {
+        langDesc.textContent = 'Manage which languages KeyMagic appears under in macOS language settings.';
+      } else {
+        langDesc.textContent = 'Manage which languages KeyMagic appears under in system language settings.';
+      }
+    }
+  }
+  
+  // Hide composition mode section if not supported
+  const compositionSection = document.querySelector('.settings-section:has(#composition-mode-process-list)');
+  if (compositionSection && !platformInfo.features.composition_mode) {
+    compositionSection.style.display = 'none';
+  }
+  
+  // Hide Windows input settings button if not on Windows
+  const windowsSettingsBtn = document.querySelector('button[onclick="openWindowsInputSettings()"]');
+  if (windowsSettingsBtn && platformInfo.os !== 'windows') {
+    windowsSettingsBtn.style.display = 'none';
+  }
+}
+
 // Initialize
 async function init() {
   // Initialize DOM elements
   keyboardList = document.getElementById('keyboard-list');
   addKeyboardBtn = document.getElementById('add-keyboard-btn');
   modal = document.getElementById('modal');
+  
+  // Load platform info first
+  await loadPlatformInfo();
   
   // Set up event listeners
   setupEventListeners();
@@ -1240,9 +1311,9 @@ async function init() {
     
     try {
       // Add the keyboard
-      const keyboardId = await invoke('add_keyboard', { path: filePath });
+      const keyboard = await invoke('import_keyboard', { filePath: filePath });
       // Mark this keyboard as recently added
-      recentlyAddedKeyboardIds.add(keyboardId);
+      recentlyAddedKeyboardIds.add(keyboard.id);
       await loadKeyboards();
       await updateTrayMenu();
       showSuccess('Keyboard added successfully');
@@ -1256,7 +1327,7 @@ async function init() {
       
       // Remove "just added" label after 60 seconds (1 minute)
       setTimeout(() => {
-        recentlyAddedKeyboardIds.delete(keyboardId);
+        recentlyAddedKeyboardIds.delete(keyboard.id);
         renderKeyboardList();
       }, 60000);
     } catch (error) {
@@ -1268,7 +1339,11 @@ async function init() {
   try {
     await loadKeyboards();
     await loadSettings();
-    await loadLanguageProfiles();
+    
+    // Only load language profiles if supported
+    if (platformInfo && platformInfo.features.language_profiles) {
+      await loadLanguageProfiles();
+    }
     
     // Check for first run keyboard scan
     await checkFirstRunImport();
@@ -1295,17 +1370,10 @@ async function setupTrayEventListeners() {
     switchPage(page);
   });
   
-  // Listen for active keyboard changes from tray
+  // Listen for active keyboard changes from any source (tray, hotkey, or command)
   await listen('active_keyboard_changed', async (event) => {
     activeKeyboardId = event.payload;
     renderKeyboardList();
-  });
-  
-  // Listen for keyboard switched events from hotkeys
-  await listen('keyboard-switched', async (event) => {
-    activeKeyboardId = event.payload;
-    await loadKeyboards(); // Reload to get latest state
-    // TODO: Show HUD notification when implemented
   });
   
   // Listen for check for updates event from tray
@@ -1337,7 +1405,7 @@ async function updateTrayMenu() {
 // Import Wizard Functions
 async function checkFirstRunImport() {
   try {
-    const shouldShowWizard = await invoke('check_first_run_scan_keyboards');
+    const shouldShowWizard = await invoke('should_scan_bundled_keyboards');
     if (shouldShowWizard) {
       // Check if there are actually keyboards to import
       const bundledKeyboards = await invoke('get_bundled_keyboards');
@@ -1352,7 +1420,7 @@ async function checkFirstRunImport() {
         await showImportWizard();
       } else {
         // No keyboards to import, clear the flag without showing wizard
-        await invoke('clear_first_run_scan_keyboards');
+        await invoke('mark_bundled_keyboards_scanned');
         console.log('No keyboards to import, skipping wizard');
       }
     }

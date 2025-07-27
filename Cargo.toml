@@ -2,8 +2,8 @@
 members = [
     "keymagic-core",
     "kms2km2",
-    "keymagic-ibus",
     "keymagic-macos",
+    "keymagic-shared/gui/src-tauri",
 ]
 resolver = "2"
 
@@ -12,7 +12,7 @@ version = "0.1.0"
 authors = ["KeyMagic Contributors"]
 edition = "2021"
 license = "GPL-2.0"
-repository = "https://github.com/keymagic/keymagic-rust"
+repository = "https://github.com/thantthet/keymagic-3"
 
 [workspace.dependencies]
 byteorder = "1.5"

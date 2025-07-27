@@ -1,0 +1,91 @@
+# Git
+.git/
+.gitignore
+
+# Build artifacts
+target/
+dist/
+dist-*/
+rpmbuild/
+*.deb
+*.rpm
+*.AppImage
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+!BUILD.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+*.lock
+!Cargo.lock
+
+# Test outputs
+*.km2
+!kms2km2/tests/fixtures/*.km2
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Node.js (if any)
+node_modules/
+package-lock.json
+
+# OS specific
+Thumbs.db
+._*
+
+# Docker files (don't need these in build context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Virtual machines and large files
+*.iso
+*.vmdk
+*.qcow2
+
+# Local configuration
+.env
+.env.local
+CLAUDE.local.md
+.claude/
+
+# Cargo registry cache (will be downloaded fresh in container)
+.cargo/registry/
+.cargo/git/
+
+# Platform-specific build directories
+keymagic-windows/
+keymagic-macos/
+keymagic-linux/build/
+keymagic-ibus/build/
+keymagic-ibus/ibus-engine-keymagic
+keymagic-ibus/ibus-engine-keymagic3
+
+# Large test files or datasets
+test-data/
+benchmarks/
+
+# Backup files
+*.backup
+*.old
+backup/
