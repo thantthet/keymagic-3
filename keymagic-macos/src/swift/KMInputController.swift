@@ -1028,10 +1028,43 @@ class KMInputController: IMKInputController {
                 
                 // Save the active keyboard to config
                 config.setActiveKeyboard(keyboardId)
+                
+                // Show notification
+                showKeyboardSwitchNotification(keyboardId: keyboardId)
             }
         }
     }
     
+    
+    private func showKeyboardSwitchNotification(keyboardId: String) {
+        // Get keyboard name for display
+        var keyboardName = keyboardId
+        
+        // Try to get the actual keyboard name from metadata
+        if let keyboardPath = KMConfiguration.shared.getKeyboardPath(for: keyboardId),
+           let metadata = getMetadataFromKM2(id: keyboardId, path: keyboardPath),
+           let name = metadata.name {
+            keyboardName = name
+        }
+        
+        // For Input Methods, we'll use the old NSUserNotification API which doesn't require permissions
+        // This works well for transient notifications that don't need user interaction
+        let notification = NSUserNotification()
+        notification.title = "KeyMagic 3"
+        notification.informativeText = "Switched to: \(keyboardName)"
+        notification.soundName = nil // No sound for keyboard switches
+        
+        // Set notification to disappear automatically after a short time
+        notification.hasActionButton = false
+        
+        // Deliver the notification
+        NSUserNotificationCenter.default.deliver(notification)
+        
+        // Remove the notification after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            NSUserNotificationCenter.default.removeDeliveredNotification(notification)
+        }
+    }
     
     @objc private func showKeyMagicPreferences() {
         // Launch the GUI application
