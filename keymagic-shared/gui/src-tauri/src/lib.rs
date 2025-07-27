@@ -141,9 +141,16 @@ pub fn run() {
                 )?;
             }
             
-            // Initialize hotkeys after all plugins are loaded
-            hotkey_manager.initialize(app.handle(), keyboard_manager.clone())
-                .expect("Failed to initialize hotkey manager");
+            // Initialize hotkeys after all plugins are loaded (except on macOS where IME handles hotkeys)
+            #[cfg(not(target_os = "macos"))]
+            {
+                hotkey_manager.initialize(app.handle(), keyboard_manager.clone())
+                    .expect("Failed to initialize hotkey manager");
+            }
+            #[cfg(target_os = "macos")]
+            {
+                log::info!("Skipping hotkey registration on macOS - handled by IME");
+            }
             
             // Check for updates on startup (async)
             let app_handle = app.handle().clone();
@@ -179,12 +186,13 @@ pub fn run() {
             commands::import_keyboard,
             commands::remove_keyboard,
             commands::update_hotkey,
+            commands::validate_hotkey,
             commands::check_for_updates,
             commands::restart_app,
             commands::quit_app,
             commands::open_keyboards_folder,
-            commands::get_composition_mode_processes,
-            commands::set_composition_mode_processes,
+            commands::get_composition_mode_hosts,
+            commands::set_composition_mode_hosts,
             commands::set_start_with_system,
             commands::get_start_with_system,
             commands::update_tray_menu,
@@ -195,9 +203,14 @@ pub fn run() {
             commands::mark_bundled_keyboards_scanned,
             commands::get_setting,
             commands::set_setting,
+            commands::get_update_remind_after,
+            commands::set_update_remind_after,
             commands::run_command,
-            commands::add_composition_mode_process,
-            commands::remove_composition_mode_process,
+            commands::add_composition_mode_host,
+            commands::remove_composition_mode_host,
+            commands::get_direct_mode_hosts,
+            commands::add_direct_mode_host,
+            commands::remove_direct_mode_host,
             commands::get_supported_languages,
             commands::get_enabled_languages,
             commands::search_languages,
@@ -206,6 +219,9 @@ pub fn run() {
             commands::check_for_update,
             commands::get_registered_hotkeys,
             commands::refresh_hotkeys,
+            commands::convert_kms_to_km2,
+            commands::validate_kms_file,
+            commands::convert_kms_file,
         ])
         .on_window_event(|window, event| {
             use tauri::WindowEvent;

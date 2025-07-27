@@ -3,7 +3,7 @@
 //! This module provides a C-compatible API that can be used from any language
 //! that supports C FFI (Python, C, C++, etc.) across all platforms.
 
-use crate::{KeyInput, KeyMagicEngine, VirtualKey};
+use crate::{KeyInput, KeyMagicEngine, VirtualKey, Km2File};
 use crate::engine::{ModifierState, ActionType};
 use crate::km2::Km2Loader;
 use std::ffi::{CStr, CString};
@@ -468,6 +468,154 @@ pub extern "C" fn keymagic_engine_free_string(str: *mut c_char) {
         unsafe {
             let _ = CString::from_raw(str);
         }
+    }
+}
+
+/// Opaque handle for loaded KM2 file
+pub struct Km2FileHandle(Km2File);
+
+/// Load a KM2 file from path
+/// Returns NULL on failure
+#[no_mangle]
+pub extern "C" fn keymagic_km2_load(path: *const c_char) -> *mut Km2FileHandle {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let path_str = unsafe {
+        match CStr::from_ptr(path).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        }
+    };
+
+    match std::fs::read(path_str) {
+        Ok(data) => {
+            match crate::km2::Km2Loader::load(&data) {
+                Ok(km2) => Box::into_raw(Box::new(Km2FileHandle(km2))),
+                Err(_) => std::ptr::null_mut(),
+            }
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Free a loaded KM2 file
+#[no_mangle]
+pub extern "C" fn keymagic_km2_free(handle: *mut Km2FileHandle) {
+    if !handle.is_null() {
+        unsafe {
+            let _ = Box::from_raw(handle);
+        }
+    }
+}
+
+/// Get keyboard name from KM2 file
+/// Returns a newly allocated C string that must be freed with keymagic_free_string
+/// Returns NULL if no name is defined
+#[no_mangle]
+pub extern "C" fn keymagic_km2_get_name(handle: *mut Km2FileHandle) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    unsafe {
+        let km2 = &(*handle).0;
+        let metadata = km2.metadata();
+        
+        match metadata.name() {
+            Some(name) => match CString::new(name) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            },
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// Get keyboard description from KM2 file
+/// Returns a newly allocated C string that must be freed with keymagic_free_string
+/// Returns NULL if no description is defined
+#[no_mangle]
+pub extern "C" fn keymagic_km2_get_description(handle: *mut Km2FileHandle) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    unsafe {
+        let km2 = &(*handle).0;
+        let metadata = km2.metadata();
+        
+        match metadata.description() {
+            Some(desc) => match CString::new(desc) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            },
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// Get hotkey from KM2 file
+/// Returns a newly allocated C string that must be freed with keymagic_free_string
+/// Returns NULL if no hotkey is defined
+#[no_mangle]
+pub extern "C" fn keymagic_km2_get_hotkey(handle: *mut Km2FileHandle) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    unsafe {
+        let km2 = &(*handle).0;
+        let metadata = km2.metadata();
+        
+        match metadata.hotkey() {
+            Some(hotkey) => match CString::new(hotkey) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            },
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// Parsed hotkey information for FFI
+#[repr(C)]
+pub struct HotkeyInfo {
+    pub key_code: c_int,       // VirtualKey as int
+    pub ctrl: c_int,           // 0 or 1
+    pub alt: c_int,            // 0 or 1
+    pub shift: c_int,          // 0 or 1
+    pub meta: c_int,           // 0 or 1
+}
+
+/// Parse a hotkey string and return hotkey info
+/// Returns 1 on success, 0 on failure
+#[no_mangle]
+pub extern "C" fn keymagic_parse_hotkey(hotkey_str: *const c_char, info: *mut HotkeyInfo) -> c_int {
+    if hotkey_str.is_null() || info.is_null() {
+        return 0;
+    }
+
+    let hotkey_string = unsafe {
+        match CStr::from_ptr(hotkey_str).to_str() {
+            Ok(s) => s,
+            Err(_) => return 0,
+        }
+    };
+
+    match crate::hotkey::HotkeyBinding::parse(hotkey_string) {
+        Ok(binding) => {
+            unsafe {
+                (*info).key_code = binding.key as c_int;
+                (*info).ctrl = if binding.ctrl { 1 } else { 0 };
+                (*info).alt = if binding.alt { 1 } else { 0 };
+                (*info).shift = if binding.shift { 1 } else { 0 };
+                (*info).meta = if binding.meta { 1 } else { 0 };
+            }
+            1
+        }
+        Err(_) => 0,
     }
 }
 

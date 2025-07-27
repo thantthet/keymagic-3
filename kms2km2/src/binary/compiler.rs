@@ -380,6 +380,14 @@ impl Compiler {
     }
 
     fn load_icon_file(&self, icon_path: &str) -> std::result::Result<Vec<u8>, KmsError> {
+        // Check if icon path is empty
+        if icon_path.trim().is_empty() {
+            return Err(KmsError::Parse {
+                line: 0,
+                message: "Icon path cannot be empty (check @ICON in file header)".to_string(),
+            });
+        }
+        
         // Resolve the icon path relative to the base directory
         let full_path = if let Some(ref base_dir) = self.base_dir {
             base_dir.join(icon_path)
@@ -388,8 +396,51 @@ impl Compiler {
             PathBuf::from(icon_path)
         };
 
+        // Check if file exists
+        if !full_path.exists() {
+            return Err(KmsError::Parse {
+                line: 0,
+                message: format!("Icon file not found: {} (check @ICON in file header)", full_path.display()),
+            });
+        }
+
         // Read the icon file
-        fs::read(&full_path).map_err(|e| KmsError::from(e))
+        let data = fs::read(&full_path).map_err(|e| KmsError::from(e))?;
+        
+        // Validate file format by checking magic bytes
+        if data.len() < 8 {
+            return Err(KmsError::Parse {
+                line: 0,
+                message: format!("Icon file too small to be a valid image: {} (check @ICON in file header)", full_path.display()),
+            });
+        }
+        
+        // Check for common image format signatures
+        let is_valid_format = 
+            // PNG: 89 50 4E 47 0D 0A 1A 0A
+            (data.len() >= 8 && &data[0..8] == b"\x89PNG\r\n\x1a\n") ||
+            // BMP: 42 4D (BM)
+            (data.len() >= 2 && &data[0..2] == b"BM") ||
+            // JPEG: FF D8 FF
+            (data.len() >= 3 && &data[0..3] == b"\xFF\xD8\xFF");
+            
+        if !is_valid_format {
+            return Err(KmsError::Parse {
+                line: 0,
+                message: format!("Invalid image format. Icon must be PNG, BMP, or JPG/JPEG: {} (check @ICON in file header)", full_path.display()),
+            });
+        }
+        
+        // Check file size (limit to 1MB for icons)
+        const MAX_ICON_SIZE: usize = 1024 * 1024; // 1MB
+        if data.len() > MAX_ICON_SIZE {
+            return Err(KmsError::Parse {
+                line: 0,
+                message: format!("Icon file too large ({}KB). Maximum size is 1MB (check @ICON in file header)", data.len() / 1024),
+            });
+        }
+        
+        Ok(data)
     }
 
     fn scan_for_states(&mut self, pattern: &[PatternElement]) -> std::result::Result<(), KmsError> {

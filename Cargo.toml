@@ -2,7 +2,6 @@
 members = [
     "keymagic-core",
     "kms2km2",
-    "keymagic-macos",
     "keymagic-shared/gui/src-tauri",
 ]
 resolver = "2"

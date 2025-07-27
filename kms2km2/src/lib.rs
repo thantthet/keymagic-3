@@ -1,11 +1,12 @@
 pub mod lexer;
 pub mod parser;
 pub mod binary;
+pub mod include_processor;
 
 pub use keymagic_core::*;
 
 use std::path::Path;
-use std::fs::{File, read_to_string};
+use std::fs::File;
 use std::io::BufWriter;
 
 pub fn convert_kms_to_km2(input_path: &Path, output_path: &Path) -> std::result::Result<(), KmsError> {
@@ -22,13 +23,16 @@ pub fn convert_kms_to_km2(input_path: &Path, output_path: &Path) -> std::result:
 }
 
 pub fn compile_kms_file(input_path: &Path) -> std::result::Result<Km2File, KmsError> {
-    // Read input file
-    let input = read_to_string(input_path)?;
+    // Use include processor to handle includes
+    let mut processor = include_processor::IncludeProcessor::new();
+    let ast = processor.process_file(input_path)?;
     
-    // Get the parent directory of the input file for resolving relative paths
-    let base_dir = input_path.parent();
-    
-    compile_kms_with_base_dir(&input, base_dir)
+    // Compile to KM2
+    let mut compiler = binary::Compiler::new();
+    if let Some(dir) = input_path.parent() {
+        compiler = compiler.with_base_dir(dir);
+    }
+    compiler.compile(ast)
 }
 
 pub fn compile_kms(kms_content: &str) -> std::result::Result<Km2File, KmsError> {
@@ -36,9 +40,9 @@ pub fn compile_kms(kms_content: &str) -> std::result::Result<Km2File, KmsError> 
 }
 
 pub fn compile_kms_with_base_dir(kms_content: &str, base_dir: Option<&Path>) -> std::result::Result<Km2File, KmsError> {
-    // Parse KMS
-    let mut parser = parser::Parser::new(kms_content);
-    let ast = parser.parse()?;
+    // Use include processor to handle includes
+    let mut processor = include_processor::IncludeProcessor::new();
+    let ast = processor.process_string(kms_content, base_dir)?;
     
     // Compile to KM2
     let mut compiler = binary::Compiler::new();

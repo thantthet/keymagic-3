@@ -12,6 +12,7 @@
       <!-- Sidebar Navigation -->
       <nav class="sidebar">
         <div class="sidebar-header">
+          <img src="assets/keymagic-logo.png" alt="KeyMagic" class="sidebar-logo">
           <h2>KeyMagic</h2>
         </div>
         
@@ -37,6 +38,18 @@
             <span>About</span>
           </li>
         </ul>
+        
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">Developer Tools</div>
+          <ul class="nav-list nav-list-developer">
+            <li class="nav-item" data-page="converter">
+              <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M8 5a1 1 0 100 2h5.586l-1.293 1.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L13.586 5H8zm4 10a1 1 0 100-2H6.414l1.293-1.293a1 1 0 10-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L6.414 15H12z"/>
+              </svg>
+              <span>Create Keyboard</span>
+            </li>
+          </ul>
+        </div>
         
       </nav>
       
@@ -140,7 +153,7 @@
               </div>
             </section>
             
-            <section class="settings-section">
+            <section class="settings-section" id="composition-mode-section">
               <h2>Composition Mode</h2>
               <div class="setting-item">
                 <div class="composition-mode-settings">
@@ -148,7 +161,7 @@
                   <div class="process-list-container">
                     <div class="process-list-header">
                       <h3>Applications</h3>
-                      <button class="btn btn-secondary btn-sm" onclick="addProcessToCompositionMode()">
+                      <button class="btn btn-secondary btn-sm" onclick="addHostToCompositionMode()">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                           <path d="M8 2a.5.5 0 01.5.5v5h5a.5.5 0 010 1h-5v5a.5.5 0 01-1 0v-5h-5a.5.5 0 010-1h5v-5A.5.5 0 018 2z"/>
                         </svg>
@@ -159,6 +172,30 @@
                       <!-- Process items will be inserted here -->
                     </div>
                     <p class="setting-hint">These applications will show text with an underline while typing. All other applications will use direct text input.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+            
+            <section class="settings-section" id="direct-mode-section" style="display: none;">
+              <h2>Direct Mode App Bundles</h2>
+              <div class="setting-item">
+                <div class="direct-mode-settings">
+                  <p class="setting-description">Configure which applications use direct mode (text appears immediately) instead of composition mode.</p>
+                  <div class="process-list-container">
+                    <div class="process-list-header">
+                      <h3>App Bundles</h3>
+                      <button class="btn btn-secondary btn-sm" onclick="addHostToDirectMode()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M8 2a.5.5 0 01.5.5v5h5a.5.5 0 010 1h-5v5a.5.5 0 01-1 0v-5h-5a.5.5 0 010-1h5v-5A.5.5 0 018 2z"/>
+                        </svg>
+                        Add App Bundle
+                      </button>
+                    </div>
+                    <div class="process-list" id="direct-mode-process-list">
+                      <!-- Process items will be inserted here -->
+                    </div>
+                    <p class="setting-hint">These applications will use direct text input. All other applications will show text with an underline while typing.</p>
                   </div>
                 </div>
               </div>
@@ -184,6 +221,54 @@
               </div>
             </section>
             
+          </div>
+        </div>
+        
+        <!-- Converter Page -->
+        <div class="page" id="converter-page">
+          <div class="page-header">
+            <h1>Create KeyMagic Keyboard</h1>
+          </div>
+          
+          <div class="converter-content">
+            <section class="converter-section">
+              <h2>Build from KeyMagic Script</h2>
+              <p class="converter-description">Convert KeyMagic Script (.kms) files to binary keyboard (.km2) format.</p>
+              
+              <div class="converter-form">
+                <div class="file-input-section">
+                  <label for="kms-file-input" class="file-input-label">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M9 2a1 1 0 00-1 1v5H3a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V3a1 1 0 00-1-1z"/>
+                    </svg>
+                    Choose KMS File
+                  </label>
+                  <input type="file" id="kms-file-input" accept=".kms" style="display: none;">
+                  <div id="selected-file-info" class="selected-file-info"></div>
+                </div>
+                
+                <div id="validation-result" class="validation-result" style="display: none;"></div>
+                
+                <div class="converter-actions">
+                  <button class="btn btn-primary" id="convert-btn" disabled>
+                    Convert to KM2
+                  </button>
+                  <button class="btn btn-secondary" id="convert-and-import-btn" disabled>
+                    Convert & Import
+                  </button>
+                </div>
+                
+                <div id="conversion-result" class="conversion-result" style="display: none;"></div>
+              </div>
+            </section>
+            
+            <section class="converter-section">
+              <h2>About KeyMagic Files</h2>
+              <div class="info-box">
+                <p><strong>KMS (KeyMagic Keyboard Layout Script)</strong> files are text-based keyboard layout definitions written in a human-readable scripting language. They use simple syntax to define how keystrokes are transformed into characters, making it easy to create and modify keyboard layouts for various languages and writing systems.</p>
+                <p><strong>KM2 (KeyMagic Keyboard Layout Binary)</strong> files are the compiled version of KMS scripts. The compiler validates syntax, optimizes rules for fast pattern matching, and packages everything—including icons and resources—into a single binary file that KeyMagic loads at runtime.</p>
+              </div>
+            </section>
           </div>
         </div>
         

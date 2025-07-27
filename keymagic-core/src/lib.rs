@@ -3,6 +3,7 @@ pub mod error;
 pub mod km2;
 pub mod engine;
 pub mod ffi;
+pub mod hotkey;
 
 pub use types::*;
 

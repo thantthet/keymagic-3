@@ -1,8 +1,9 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, KeyboardsConfig,
+    CompositionModeConfig, DirectModeConfig, Config, GeneralConfig, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
+use plist;
 use std::fs;
 use std::path::PathBuf;
 
@@ -38,7 +39,7 @@ impl MacOSBackend {
     }
     
     fn get_config_path(&self) -> PathBuf {
-        self.config_dir.join("config.toml")
+        self.config_dir.join("config.plist")
     }
     
     fn default_config() -> Config {
@@ -48,6 +49,7 @@ impl MacOSBackend {
                 check_for_updates: true,
                 last_update_check: None,
                 last_scanned_version: None,
+                update_remind_after: None,
             },
             keyboards: KeyboardsConfig {
                 active: None,
@@ -55,12 +57,23 @@ impl MacOSBackend {
                 installed: Vec::new(),
             },
             composition_mode: CompositionModeConfig {
-                enabled_processes: vec![
-                    "Safari".to_string(),
-                    "Chrome".to_string(),
-                    "Firefox".to_string(),
-                    "Code".to_string(),
-                    "TextEdit".to_string(),
+                enabled_hosts: vec![],
+            },
+            direct_mode: DirectModeConfig {
+                enabled_hosts: vec![
+                    "com.apple.Spotlight".to_string(),
+                    "com.apple.finder".to_string(),
+                    "com.apple.TextEdit".to_string(),
+                    "com.microsoft.Word".to_string(),
+                    "com.apple.Dictionary".to_string(),
+                    "ru.keepcoder.Telegram".to_string(),
+                    "com.tencent.xinWeChat".to_string(),
+                    "com.tinyspeck.slackmacgap".to_string(),
+                    "com.apple.Safari".to_string(),
+                    "com.google.Chrome".to_string(),
+                    "us.zoom.xos".to_string(),
+                    "com.apple.dt.Xcode".to_string(),
+                    "com.apple.AppStore".to_string(),
                 ],
             },
         }
@@ -77,19 +90,23 @@ impl Platform for MacOSBackend {
             return Ok(config);
         }
         
-        let contents = fs::read_to_string(&config_path)
-            .context("Failed to read config file")?;
+        // Load from plist
+        let value = plist::from_file(&config_path)
+            .context("Failed to read plist config file")?;
         
-        toml::from_str(&contents).context("Failed to parse config file")
+        plist::from_value(&value).context("Failed to parse plist config")
     }
     
     fn save_config(&self, config: &Config) -> Result<()> {
         let config_path = self.get_config_path();
-        let contents = toml::to_string_pretty(config)
-            .context("Failed to serialize config")?;
         
-        fs::write(&config_path, contents)
-            .context("Failed to write config file")?;
+        // Convert to plist Value
+        let value = plist::to_value(config)
+            .context("Failed to serialize config to plist value")?;
+        
+        // Write as binary plist for better performance and smaller size
+        plist::to_file_binary(&config_path, &value)
+            .context("Failed to write plist config file")?;
         
         Ok(())
     }
@@ -178,25 +195,4 @@ impl Platform for MacOSBackend {
         None
     }
     
-    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
-        let current_version = env!("CARGO_PKG_VERSION");
-        
-        // Load config to check last scanned version
-        if let Ok(config) = self.load_config() {
-            if let Some(last_version) = config.general.last_scanned_version {
-                // Compare versions - if current > last, should scan for new keyboards
-                return Ok(super::compare_versions(&current_version, &last_version));
-            }
-        }
-        
-        // No version recorded = should scan
-        Ok(true)
-    }
-    
-    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
-        let mut config = self.load_config()?;
-        config.general.last_scanned_version = Some(env!("CARGO_PKG_VERSION").to_string());
-        self.save_config(&config)?;
-        Ok(())
-    }
 }

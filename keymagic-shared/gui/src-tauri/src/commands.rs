@@ -255,6 +255,22 @@ pub fn get_registered_hotkeys(app: AppHandle) -> Result<HashMap<String, String>,
 }
 
 #[tauri::command]
+pub fn validate_hotkey(app: AppHandle, hotkey: String) -> Result<(), String> {
+    // Empty hotkey is always valid
+    if hotkey.is_empty() {
+        return Ok(());
+    }
+    
+    if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
+        hotkey_manager
+            .validate_hotkey(&hotkey)
+            .map_err(|e| e.to_string())
+    } else {
+        Err("Hotkey manager not available".to_string())
+    }
+}
+
+#[tauri::command]
 pub fn refresh_hotkeys(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     if let Some(hotkey_manager) = app.try_state::<Arc<HotkeyManager>>() {
         hotkey_manager
@@ -320,18 +336,18 @@ pub fn open_keyboards_folder(_state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_composition_mode_processes(state: State<AppState>) -> Result<Vec<String>, String> {
+pub fn get_composition_mode_hosts(state: State<AppState>) -> Result<Vec<String>, String> {
     let config = state.get_config();
-    Ok(config.composition_mode.enabled_processes.clone())
+    Ok(config.composition_mode.enabled_hosts.clone())
 }
 
 #[tauri::command]
-pub fn set_composition_mode_processes(
+pub fn set_composition_mode_hosts(
     state: State<AppState>,
-    processes: Vec<String>,
+    hosts: Vec<String>,
 ) -> Result<(), String> {
     let mut config = state.get_config();
-    config.composition_mode.enabled_processes = processes;
+    config.composition_mode.enabled_hosts = hosts;
     state.save_config(&config).map_err(|e| e.to_string())
 }
 
@@ -409,9 +425,23 @@ pub fn get_app_version() -> Result<String, String> {
 // Import wizard commands
 #[tauri::command]
 pub fn should_scan_bundled_keyboards(state: State<AppState>) -> Result<bool, String> {
-    state.get_platform()
-        .should_scan_bundled_keyboards()
-        .map_err(|e| e.to_string())
+    // Check if we need to scan bundled keyboards based on version
+    let current_version = env!("CARGO_PKG_VERSION");
+    
+    let config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    
+    match &config.general.last_scanned_version {
+        Some(last_version) => {
+            // Use the compare_versions function from platform module
+            Ok(crate::platform::compare_versions(current_version, last_version))
+        }
+        None => {
+            // First run, should scan
+            Ok(true)
+        }
+    }
 }
 
 #[tauri::command]
@@ -539,8 +569,15 @@ pub fn import_bundled_keyboard(
 
 #[tauri::command]
 pub fn mark_bundled_keyboards_scanned(state: State<AppState>) -> Result<(), String> {
+    // Update the last scanned version to current version
+    let mut config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    
+    config.general.last_scanned_version = Some(env!("CARGO_PKG_VERSION").to_string());
+    
     state.get_platform()
-        .mark_bundled_keyboards_scanned()
+        .save_config(&config)
         .map_err(|e| e.to_string())
 }
 
@@ -557,6 +594,26 @@ pub fn get_setting(state: State<AppState>, key: String) -> Result<String, String
 pub fn set_setting(state: State<AppState>, key: String, value: String) -> Result<(), String> {
     state.get_platform()
         .set_setting(&key, &value)
+        .map_err(|e| e.to_string())
+}
+
+// Update reminder commands
+#[tauri::command]
+pub fn get_update_remind_after(state: State<AppState>) -> Result<Option<String>, String> {
+    let config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    Ok(config.general.update_remind_after)
+}
+
+#[tauri::command]
+pub fn set_update_remind_after(state: State<AppState>, value: Option<String>) -> Result<(), String> {
+    let mut config = state.get_platform()
+        .load_config()
+        .map_err(|e| e.to_string())?;
+    config.general.update_remind_after = value;
+    state.get_platform()
+        .save_config(&config)
         .map_err(|e| e.to_string())
 }
 
@@ -580,17 +637,17 @@ pub fn run_command(command: String, args: Vec<String>) -> Result<(), String> {
     }
 }
 
-// Composition mode process management
+// Composition mode host management
 #[tauri::command]
-pub fn add_composition_mode_process(
+pub fn add_composition_mode_host(
     state: State<AppState>,
-    process_name: String,
+    host_name: String,
 ) -> Result<(), String> {
     let mut config = state.get_config();
     
-    // Add process if not already in list
-    if !config.composition_mode.enabled_processes.contains(&process_name) {
-        config.composition_mode.enabled_processes.push(process_name);
+    // Add host if not already in list
+    if !config.composition_mode.enabled_hosts.contains(&host_name) {
+        config.composition_mode.enabled_hosts.push(host_name);
         state.save_config(&config).map_err(|e| e.to_string())?;
     }
     
@@ -598,14 +655,51 @@ pub fn add_composition_mode_process(
 }
 
 #[tauri::command]
-pub fn remove_composition_mode_process(
+pub fn remove_composition_mode_host(
     state: State<AppState>,
-    process_name: String,
+    host_name: String,
 ) -> Result<(), String> {
     let mut config = state.get_config();
     
-    // Remove process from list
-    config.composition_mode.enabled_processes.retain(|p| p != &process_name);
+    // Remove host from list
+    config.composition_mode.enabled_hosts.retain(|h| h != &host_name);
+    state.save_config(&config).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+// Direct mode host management
+#[tauri::command]
+pub fn get_direct_mode_hosts(state: State<AppState>) -> Result<Vec<String>, String> {
+    let config = state.get_config();
+    Ok(config.direct_mode.enabled_hosts.clone())
+}
+
+#[tauri::command]
+pub fn add_direct_mode_host(
+    state: State<AppState>,
+    host_name: String,
+) -> Result<(), String> {
+    let mut config = state.get_config();
+    
+    // Add host if not already in list
+    if !config.direct_mode.enabled_hosts.contains(&host_name) {
+        config.direct_mode.enabled_hosts.push(host_name);
+        state.save_config(&config).map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_direct_mode_host(
+    state: State<AppState>,
+    host_name: String,
+) -> Result<(), String> {
+    let mut config = state.get_config();
+    
+    // Remove host from list
+    config.direct_mode.enabled_hosts.retain(|h| h != &host_name);
     state.save_config(&config).map_err(|e| e.to_string())?;
     
     Ok(())
@@ -641,6 +735,7 @@ pub fn get_supported_languages(_state: State<AppState>) -> Result<Vec<(String, S
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub fn get_enabled_languages(state: State<AppState>) -> Result<Vec<String>, String> {
     #[cfg(target_os = "windows")]
     {
@@ -675,6 +770,7 @@ pub fn search_languages(_state: State<AppState>, query: String) -> Result<Vec<(S
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub fn set_enabled_languages(
     state: State<AppState>,
     languages: Vec<String>,
@@ -758,6 +854,107 @@ pub fn apply_language_changes_elevated(
 #[tauri::command]
 pub async fn check_for_update() -> Result<Option<UpdateInfo>, String> {
     check_for_updates().await
+}
+
+// KMS to KM2 converter commands
+#[tauri::command]
+pub fn convert_kms_to_km2(
+    input_path: String,
+    output_path: String,
+) -> Result<(), String> {
+    let input = std::path::PathBuf::from(&input_path);
+    let output = std::path::PathBuf::from(&output_path);
+    
+    // Ensure input file exists
+    if !input.exists() {
+        return Err(format!("Input file not found: {}", input_path));
+    }
+    
+    // Ensure it's a file, not a directory
+    if input.is_dir() {
+        return Err(format!("Input path is a directory, not a file: {}", input_path));
+    }
+    
+    // Ensure input has .kms extension
+    if input.extension().and_then(|s| s.to_str()) != Some("kms") {
+        return Err("Input file must have .kms extension".to_string());
+    }
+    
+    // Convert using kms2km2 crate
+    kms2km2::convert_kms_to_km2(&input, &output)
+        .map_err(|e| format!("Conversion failed: {}", e))
+}
+
+#[tauri::command]
+pub fn validate_kms_file(
+    file_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    
+    let path = std::path::PathBuf::from(&file_path);
+    
+    // Debug: Log the path
+    log::info!("Validating KMS file at path: {:?}", path);
+    
+    // Ensure file exists
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    
+    // Get file metadata
+    let metadata = match fs::metadata(&path) {
+        Ok(m) => m,
+        Err(e) => return Err(format!("Failed to get file metadata: {}", e))
+    };
+    
+    // Log file type
+    log::info!("File type - is_file: {}, is_dir: {}, is_symlink: {}", 
+        metadata.is_file(), 
+        metadata.is_dir(), 
+        metadata.file_type().is_symlink()
+    );
+    
+    // Ensure it's a file, not a directory
+    if metadata.is_dir() {
+        return Err(format!("Path is a directory, not a file: {}", file_path));
+    }
+    
+    // Ensure it has .kms extension
+    if path.extension().and_then(|s| s.to_str()) != Some("kms") {
+        return Err("File must have .kms extension".to_string());
+    }
+    
+    // Try to read the file content first to debug
+    match fs::read_to_string(&path) {
+        Ok(content) => {
+            log::info!("Successfully read file, content length: {} bytes", content.len());
+        }
+        Err(e) => {
+            return Err(format!("Failed to read file: {} (os error: {:?})", e, e.raw_os_error()));
+        }
+    }
+    
+    // Try to compile the KMS file to validate it
+    match kms2km2::compile_kms_file(&path) {
+        Ok(km2_file) => {
+            // Extract metadata for validation result
+            let metadata = km2_file.metadata();
+            let name = metadata.name().unwrap_or("Unnamed Keyboard".to_string());
+            let description = metadata.description().unwrap_or("No description".to_string());
+            
+            Ok(format!("Valid KMS file\nName: {}\nDescription: {}", name, description))
+        }
+        Err(e) => Err(format!("Invalid KMS file: {}", e))
+    }
+}
+
+#[tauri::command]
+pub fn convert_kms_file(
+    input_path: String,
+    output_path: String,
+) -> Result<(), String> {
+    // Use the existing convert_kms_to_km2 function
+    convert_kms_to_km2(input_path, output_path)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -2406,10 +2406,12 @@ dependencies = [
  "futures",
  "image",
  "keymagic-core",
+ "kms2km2",
  "log",
  "notify-rust",
  "objc",
  "once_cell",
+ "plist",
  "reqwest",
  "semver",
  "serde",
@@ -2427,13 +2429,6 @@ dependencies = [
  "toml 0.8.23",
  "windows 0.58.0",
  "winreg 0.52.0",
-]
-
-[[package]]
-name = "keymagic-macos"
-version = "0.1.0"
-dependencies = [
- "keymagic-core",
 ]
 
 [[package]]

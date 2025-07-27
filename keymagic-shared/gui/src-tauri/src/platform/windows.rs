@@ -1,5 +1,5 @@
 use super::{
-    CompositionModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
+    CompositionModeConfig, DirectModeConfig, Config, GeneralConfig, InstalledKeyboard, KeyboardsConfig,
     Platform, PlatformFeatures, PlatformInfo,
 };
 use anyhow::{Context, Result};
@@ -62,11 +62,12 @@ impl WindowsBackend {
                 installed: Vec::new(),
             },
             composition_mode: CompositionModeConfig {
-                enabled_processes: vec![
-                    "firefox.exe".to_string(),
-                    "chrome.exe".to_string(),
-                    "Code.exe".to_string(),
+                enabled_hosts: vec![
+                    "ms-teams.exe".to_string(),
                 ],
+            },
+            direct_mode: DirectModeConfig {
+                enabled_hosts: vec![],
             },
         }
     }
@@ -115,6 +116,10 @@ impl Platform for WindowsBackend {
                 config.general.last_update_check = Some(last_check);
             }
             
+            if let Ok(remind_after) = settings_key.get_value::<String, _>("UpdateRemindAfter") {
+                config.general.update_remind_after = Some(remind_after);
+            }
+            
             // Active keyboard is stored with DefaultKeyboard name
             if let Ok(active) = settings_key.get_value::<String, _>(DEFAULT_KEYBOARD_VALUE) {
                 config.keyboards.active = Some(active);
@@ -137,11 +142,11 @@ impl Platform for WindowsBackend {
             }
         }
         
-        // Load composition mode processes from Settings registry
+        // Load composition mode hosts from Settings registry
         if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
-            if let Ok(processes) = settings_key.get_value::<String, _>("CompositionModeProcesses") {
+            if let Ok(hosts) = settings_key.get_value::<String, _>("CompositionModeHosts") {
                 // Split by semicolon or newline
-                config.composition_mode.enabled_processes = processes
+                config.composition_mode.enabled_hosts = hosts
                     .split(|c| c == ';' || c == '\n')
                     .filter(|s| !s.trim().is_empty())
                     .map(|s| s.trim().to_string())
@@ -174,6 +179,10 @@ impl Platform for WindowsBackend {
             settings_key.set_value("LastUpdateCheck", last_check)?;
         }
         
+        if let Some(ref remind_after) = config.general.update_remind_after {
+            settings_key.set_value("UpdateRemindAfter", remind_after)?;
+        }
+        
         // Active keyboard uses DefaultKeyboard name
         if let Some(ref active) = config.keyboards.active {
             settings_key.set_value(DEFAULT_KEYBOARD_VALUE, active)?;
@@ -196,11 +205,11 @@ impl Platform for WindowsBackend {
             }
         }
         
-        // Save composition mode processes as multi-string
-        if !config.composition_mode.enabled_processes.is_empty() {
+        // Save composition mode hosts as multi-string
+        if !config.composition_mode.enabled_hosts.is_empty() {
             // Note: winreg doesn't support REG_MULTI_SZ directly, so we'll save as semicolon-delimited
-            let processes_str = config.composition_mode.enabled_processes.join(";");
-            settings_key.set_value("CompositionModeProcesses", &processes_str)?;
+            let hosts_str = config.composition_mode.enabled_hosts.join(";");
+            settings_key.set_value("CompositionModeHosts", &hosts_str)?;
         }
         
         Ok(())
@@ -352,32 +361,6 @@ impl Platform for WindowsBackend {
         }
     }
     
-    fn should_scan_bundled_keyboards(&self) -> Result<bool> {
-        let current_version = env!("CARGO_PKG_VERSION");
-        
-        // Check version-based approach
-        if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
-            if let Ok(last_version) = settings_key.get_value::<String, _>("LastScannedVersion") {
-                // Compare versions - if current > last, should scan for new keyboards
-                return Ok(super::compare_versions(&current_version, &last_version));
-            }
-        }
-        
-        // No version recorded = should scan
-        Ok(true)
-    }
-    
-    fn mark_bundled_keyboards_scanned(&self) -> Result<()> {
-        // Update to use version-based tracking
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let (settings_key, _) = hkcu
-            .create_subkey(SETTINGS_KEY)
-            .context("Failed to create Settings key")?;
-        
-        // Set current version
-        settings_key.set_value("LastScannedVersion", &env!("CARGO_PKG_VERSION"))?;
-        Ok(())
-    }
     
     fn get_bundled_keyboards_path(&self) -> Option<PathBuf> {
         // Get the installation directory

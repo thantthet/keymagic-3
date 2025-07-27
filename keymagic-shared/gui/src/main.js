@@ -7,6 +7,26 @@ let activeKeyboardId = null;
 let selectedKeyboardId = null;
 let recentlyAddedKeyboardIds = new Set(); // Track recently added keyboards
 let platformInfo = null; // Platform capabilities
+
+// Helper function to format hotkey for display based on platform
+function formatHotkeyForDisplay(hotkey) {
+  if (!hotkey || !platformInfo) return hotkey;
+  
+  // Replace generic meta key names with platform-specific ones
+  let formatted = hotkey;
+  
+  // Handle different meta key variations
+  if (platformInfo.os === 'windows') {
+    formatted = formatted.replace(/\b(Meta|Cmd|Command|Super)\b/gi, 'Win');
+  } else if (platformInfo.os === 'macos') {
+    formatted = formatted.replace(/\b(Meta|Win|Windows|Super)\b/gi, 'Cmd');
+  } else {
+    // Linux/other
+    formatted = formatted.replace(/\b(Meta|Win|Windows|Cmd|Command)\b/gi, 'Super');
+  }
+  
+  return formatted;
+}
 // DOM Elements
 let keyboardList;
 let addKeyboardBtn;
@@ -42,9 +62,13 @@ window.switchPage = function(pageName) {
     loadAboutVersion();
   }
   
-  // Load composition mode settings for settings page
+  // Load composition/direct mode settings for settings page
   if (pageName === 'settings') {
-    loadCompositionModeProcesses();
+    if (platformInfo.os === 'macos') {
+      loadDirectModeHosts();
+    } else {
+      loadCompositionModeHosts();
+    }
   }
 }
 
@@ -123,11 +147,11 @@ function createKeyboardCard(keyboard) {
             displayHotkey = 'No hotkey';
             displayClass += ' add-hotkey';
           } else {
-            displayHotkey = keyboard.hotkey;
+            displayHotkey = formatHotkeyForDisplay(keyboard.hotkey);
           }
         } else if (keyboard.default_hotkey) {
           // No custom hotkey, use default
-          displayHotkey = keyboard.default_hotkey;
+          displayHotkey = formatHotkeyForDisplay(keyboard.default_hotkey);
           displayTitle = 'Default hotkey - Click to configure';
         } else {
           // No custom hotkey and no default
@@ -357,32 +381,36 @@ async function loadSettings() {
     // Load current version
     await loadCurrentVersion();
     
-    // Load composition mode processes
-    await loadCompositionModeProcesses();
+    // Load composition/direct mode hosts based on platform
+    if (platformInfo.os === 'macos') {
+      await loadDirectModeHosts();
+    } else {
+      await loadCompositionModeHosts();
+    }
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
 }
 
-// Composition Mode Process Management
-async function loadCompositionModeProcesses() {
+// Composition Mode Host Management
+async function loadCompositionModeHosts() {
   try {
-    const processes = await invoke('get_composition_mode_processes');
-    renderProcessList(processes);
+    const hosts = await invoke('get_composition_mode_hosts');
+    renderHostList(hosts);
   } catch (error) {
-    console.error('Failed to load composition mode processes:', error);
-    showError('Failed to load composition mode processes');
+    console.error('Failed to load composition mode hosts:', error);
+    showError('Failed to load composition mode hosts');
   }
 }
 
-function renderProcessList(processes) {
-  const processList = document.getElementById('composition-mode-process-list');
-  if (!processList) return;
+function renderHostList(hosts) {
+  const hostList = document.getElementById('composition-mode-process-list');
+  if (!hostList) return;
   
-  processList.innerHTML = '';
+  hostList.innerHTML = '';
   
-  if (processes.length === 0) {
-    processList.innerHTML = `
+  if (hosts.length === 0) {
+    hostList.innerHTML = `
       <div class="process-list-empty">
         <p>No applications configured for composition mode.<br>
         All applications will use direct input mode.</p>
@@ -391,72 +419,72 @@ function renderProcessList(processes) {
     return;
   }
   
-  processes.forEach(processName => {
+  hosts.forEach(hostName => {
     const item = document.createElement('div');
     item.className = 'process-item';
     item.innerHTML = `
-      <span class="process-name">${processName}</span>
-      <button class="btn-remove" onclick="removeProcessFromCompositionMode('${processName.replace(/'/g, "\\'")}')">Remove</button>
+      <span class="process-name">${hostName}</span>
+      <button class="btn-remove" onclick="removeHostFromCompositionMode('${hostName.replace(/'/g, "\\'")}')">Remove</button>
     `;
-    processList.appendChild(item);
+    hostList.appendChild(item);
   });
 }
 
-async function addProcessToCompositionMode() {
-  const processName = await showProcessInputDialog();
-  if (!processName) return;
+async function addHostToCompositionMode() {
+  const hostName = await showHostInputDialog();
+  if (!hostName) return;
   
   try {
-    await invoke('add_composition_mode_process', { processName });
-    await loadCompositionModeProcesses();
-    showSuccess(`Added "${processName}" to composition mode`);
+    await invoke('add_composition_mode_host', { hostName });
+    await loadCompositionModeHosts();
+    showSuccess(`Added "${hostName}" to composition mode`);
   } catch (error) {
-    console.error('Failed to add process:', error);
-    showError('Failed to add process to composition mode');
+    console.error('Failed to add host:', error);
+    showError('Failed to add host to composition mode');
   }
 }
 
-async function removeProcessFromCompositionMode(processName) {
+async function removeHostFromCompositionMode(hostName) {
   try {
-    await invoke('remove_composition_mode_process', { processName });
-    await loadCompositionModeProcesses();
-    showSuccess(`Removed "${processName}" from composition mode`);
+    await invoke('remove_composition_mode_host', { hostName });
+    await loadCompositionModeHosts();
+    showSuccess(`Removed "${hostName}" from composition mode`);
   } catch (error) {
-    console.error('Failed to remove process:', error);
-    showError('Failed to remove process from composition mode');
+    console.error('Failed to remove host:', error);
+    showError('Failed to remove host from composition mode');
   }
 }
 
-function showProcessInputDialog() {
+function showHostInputDialog() {
   return new Promise((resolve) => {
     // Store resolve function for later use
-    window._processInputResolve = resolve;
+    window._hostInputResolve = resolve;
     
     showModal(
       'Add Application',
       `
-        <p>Enter the executable name of the application (e.g., "ms-teams.exe"):</p>
-        <input type="text" id="process-name-input" class="modal-input" placeholder="application.exe" 
+        <p>Enter the application identifier (e.g., "ms-teams.exe" on Windows, "com.apple.Safari" on macOS):</p>
+        <input type="text" id="host-name-input" class="modal-input" placeholder="application identifier" 
                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
         <p class="modal-hint">The application will use composition mode (underlined text while typing).</p>
       `,
       `
-        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddProcess();">Cancel</button>
-        <button class="btn btn-primary" onclick="window.confirmAddProcess();">Add</button>
+        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddHost();">Cancel</button>
+        <button class="btn btn-primary" onclick="window.confirmAddHost();">Add</button>
       `
     );
     
     // Focus the input field
     setTimeout(() => {
-      const input = document.getElementById('process-name-input');
+      const input = document.getElementById('host-name-input');
       if (input) {
         input.focus();
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
-            window.confirmAddProcess();
+            window.confirmAddHost();
           } else if (e.key === 'Escape') {
             hideModal();
-            window.cancelAddProcess();
+            window.cancelAddHost();
           }
         });
       }
@@ -464,29 +492,131 @@ function showProcessInputDialog() {
   });
 }
 
-window.confirmAddProcess = function() {
-  const input = document.getElementById('process-name-input');
-  const processName = input ? input.value.trim() : '';
+window.confirmAddHost = function() {
+  const input = document.getElementById('host-name-input');
+  const hostName = input ? input.value.trim() : '';
   
-  if (processName) {
+  if (hostName) {
     hideModal();
-    if (window._processInputResolve) {
-      window._processInputResolve(processName);
-      delete window._processInputResolve;
+    if (window._hostInputResolve) {
+      window._hostInputResolve(hostName);
+      delete window._hostInputResolve;
     }
   }
 };
 
-window.cancelAddProcess = function() {
-  if (window._processInputResolve) {
-    window._processInputResolve(null);
-    delete window._processInputResolve;
+window.cancelAddHost = function() {
+  if (window._hostInputResolve) {
+    window._hostInputResolve(null);
+    delete window._hostInputResolve;
   }
 };
 
+// Direct Mode Host Management (for macOS)
+async function loadDirectModeHosts() {
+  try {
+    const hosts = await invoke('get_direct_mode_hosts');
+    renderDirectModeHostList(hosts);
+  } catch (error) {
+    console.error('Failed to load direct mode hosts:', error);
+    showError('Failed to load direct mode hosts');
+  }
+}
+
+function renderDirectModeHostList(hosts) {
+  const hostList = document.getElementById('direct-mode-process-list');
+  if (!hostList) return;
+  
+  hostList.innerHTML = '';
+  
+  if (hosts.length === 0) {
+    hostList.innerHTML = `
+      <div class="process-list-empty">
+        <p>No app bundles configured for direct mode.<br>
+        All applications will use composition mode.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  hosts.forEach(hostName => {
+    const item = document.createElement('div');
+    item.className = 'process-item';
+    item.innerHTML = `
+      <span class="process-name">${hostName}</span>
+      <button class="btn btn-link" onclick="removeHostFromDirectMode('${hostName.replace(/'/g, "\\'")}')">Remove</button>
+    `;
+    hostList.appendChild(item);
+  });
+}
+
+async function addHostToDirectMode() {
+  const hostName = await showDirectModeHostInputDialog();
+  if (!hostName) return;
+  
+  try {
+    await invoke('add_direct_mode_host', { hostName });
+    await loadDirectModeHosts();
+    showSuccess(`Added "${hostName}" to direct mode`);
+  } catch (error) {
+    console.error('Failed to add host:', error);
+    showError('Failed to add host to direct mode');
+  }
+}
+
+async function removeHostFromDirectMode(hostName) {
+  try {
+    await invoke('remove_direct_mode_host', { hostName });
+    await loadDirectModeHosts();
+    showSuccess(`Removed "${hostName}" from direct mode`);
+  } catch (error) {
+    console.error('Failed to remove host:', error);
+    showError('Failed to remove host from direct mode');
+  }
+}
+
+function showDirectModeHostInputDialog() {
+  return new Promise((resolve) => {
+    // Store resolve function for later use
+    window._hostInputResolve = resolve;
+    
+    showModal(
+      'Add App Bundle',
+      `
+        <p>Enter the app bundle identifier (e.g., "com.apple.Safari", "com.microsoft.VSCode"):</p>
+        <input type="text" id="host-name-input" class="modal-input" placeholder="com.example.app" 
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <p class="modal-hint">The application will use direct mode (no underlined text while typing).</p>
+      `,
+      `
+        <button class="btn btn-secondary" onclick="hideModal(); window.cancelAddHost();">Cancel</button>
+        <button class="btn btn-primary" onclick="window.confirmAddHost();">Add</button>
+      `
+    );
+    
+    // Focus on input
+    setTimeout(() => {
+      const input = document.getElementById('host-name-input');
+      if (input) {
+        input.focus();
+        input.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            window.confirmAddHost();
+          } else if (e.key === 'Escape') {
+            hideModal();
+            window.cancelAddHost();
+          }
+        });
+      }
+    }, 100);
+  });
+}
+
 // Make these functions available globally
-window.addProcessToCompositionMode = addProcessToCompositionMode;
-window.removeProcessFromCompositionMode = removeProcessFromCompositionMode;
+window.addHostToCompositionMode = addHostToCompositionMode;
+window.removeHostFromCompositionMode = removeHostFromCompositionMode;
+window.addHostToDirectMode = addHostToDirectMode;
+window.removeHostFromDirectMode = removeHostFromDirectMode;
 
 
 // Modal functions
@@ -504,6 +634,8 @@ function showModal(title, content, footer) {
 
 window.hideModal = function() {
   modal.classList.remove('show');
+  // Remove any special modal classes
+  modal.classList.remove('modal-compact');
 }
 
 
@@ -599,13 +731,13 @@ window.configureHotkey = function(keyboardId) {
       statusText = '<span style="color: var(--warning-color)">Currently: No hotkey (explicitly disabled)</span>';
     } else {
       // Custom hotkey
-      initialValue = keyboard.hotkey;
+      initialValue = formatHotkeyForDisplay(keyboard.hotkey);
       recordedKeys = keyboard.hotkey.split('+');
       statusText = '<span style="color: var(--success-color)">Currently: Custom hotkey</span>';
     }
   } else if (keyboard.default_hotkey) {
     // Using default hotkey
-    initialValue = keyboard.default_hotkey;
+    initialValue = formatHotkeyForDisplay(keyboard.default_hotkey);
     recordedKeys = keyboard.default_hotkey.split('+');
     statusText = '<span style="color: var(--primary-color)">Currently: Using default hotkey</span>';
   } else {
@@ -613,6 +745,9 @@ window.configureHotkey = function(keyboardId) {
     initialValue = '';
     statusText = '<span style="color: var(--text-secondary)">Currently: No hotkey available</span>';
   }
+  
+  // Add compact class to modal for hotkey configuration
+  modal.classList.add('modal-compact');
   
   showModal(
     'Configure Hotkey',
@@ -630,9 +765,10 @@ window.configureHotkey = function(keyboardId) {
           ''
         }
       </div>
+      <div id="hotkey-validation-error" class="validation-error" style="display: none; margin-top: 10px;"></div>
       <p class="hotkey-hint">Press the desired key combination (e.g., Ctrl+Shift+M) or click Clear to remove hotkey</p>
       ${keyboard.default_hotkey ? 
-        `<p class="hotkey-default">Default hotkey: ${keyboard.default_hotkey}</p>` : 
+        `<p class="hotkey-default">Default hotkey: ${formatHotkeyForDisplay(keyboard.default_hotkey)}</p>` : 
         '<p class="hotkey-default">No default hotkey available</p>'}
     `,
     `
@@ -653,12 +789,28 @@ function recordHotkey(e) {
   e.preventDefault();
   e.stopPropagation();
   
+  // Clear any validation error
+  const errorDiv = document.getElementById('hotkey-validation-error');
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
+  
   recordedKeys = [];
   
   // Record modifiers
   if (e.ctrlKey) recordedKeys.push('Ctrl');
   if (e.shiftKey) recordedKeys.push('Shift');
   if (e.altKey) recordedKeys.push('Alt');
+  if (e.metaKey) {
+    // Platform-specific meta key name
+    if (platformInfo && platformInfo.os === 'windows') {
+      recordedKeys.push('Win');
+    } else if (platformInfo && platformInfo.os === 'macos') {
+      recordedKeys.push('Cmd');
+    } else {
+      recordedKeys.push('Super');
+    }
+  }
   
   // Record the main key
   if (e.key && e.key.length === 1) {
@@ -699,13 +851,23 @@ function recordHotkey(e) {
 window.clearHotkey = function() {
   recordedKeys = [];
   document.getElementById('hotkey-input').value = '';
+  // Clear any validation error
+  const errorDiv = document.getElementById('hotkey-validation-error');
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
 }
 
 window.useDefaultHotkey = function() {
   if (currentHotkeyKeyboard && currentHotkeyKeyboard.default_hotkey) {
     // Set special marker to indicate we want to use default
     recordedKeys = ['USE_DEFAULT'];
-    document.getElementById('hotkey-input').value = currentHotkeyKeyboard.default_hotkey;
+    document.getElementById('hotkey-input').value = formatHotkeyForDisplay(currentHotkeyKeyboard.default_hotkey);
+    // Clear any validation error
+    const errorDiv = document.getElementById('hotkey-validation-error');
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
   }
 }
 
@@ -717,6 +879,28 @@ window.cancelHotkeyConfig = function() {
   currentHotkeyKeyboard = null;
   recordedKeys = [];
   hideModal();
+}
+
+// Validate hotkey using backend logic
+async function validateHotkey(hotkeyString, recordedKeys) {
+  if (!hotkeyString) {
+    return { valid: true }; // Empty hotkey is valid (removes hotkey)
+  }
+  
+  // Special case for "use default" - don't validate the displayed string
+  if (recordedKeys && recordedKeys.length === 1 && recordedKeys[0] === 'USE_DEFAULT') {
+    return { valid: true };
+  }
+  
+  try {
+    await invoke('validate_hotkey', { hotkey: hotkeyString });
+    return { valid: true };
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: error.toString().replace('Error: ', '')
+    };
+  }
 }
 
 window.saveHotkey = async function() {
@@ -741,6 +925,32 @@ window.saveHotkey = async function() {
       } else {
         // User set a custom hotkey
         hotkeyValue = recordedKeys.join('+');
+        
+        // Validate the hotkey before saving
+        const validation = await validateHotkey(hotkeyValue, recordedKeys);
+        
+        if (!validation.valid) {
+          // Show error in the modal
+          const errorDiv = document.getElementById('hotkey-validation-error');
+          if (errorDiv) {
+            errorDiv.textContent = validation.error;
+            errorDiv.style.display = 'block';
+            errorDiv.className = 'validation-error';
+          }
+          return; // Don't close the dialog
+        }
+        
+        // Check if hotkey has modifiers (warning only)
+        const hasModifier = /Ctrl|Alt|Shift|Win|Cmd|Meta|Super/i.test(hotkeyValue);
+        if (!hasModifier) {
+          const errorDiv = document.getElementById('hotkey-validation-error');
+          if (errorDiv) {
+            errorDiv.textContent = '⚠️ Warning: Hotkey without modifiers may interfere with normal typing. Consider adding Ctrl, Alt, or Shift.';
+            errorDiv.style.display = 'block';
+            errorDiv.className = 'validation-warning';
+          }
+        }
+        
         successMessage = 'Hotkey configured';
       }
       
@@ -755,15 +965,17 @@ window.saveHotkey = async function() {
       await updateTrayMenu();
       
       showSuccess(successMessage);
+      
+      // Only close modal on success
+      currentHotkeyKeyboard = null;
+      recordedKeys = [];
+      hideModal();
     } catch (error) {
       console.error('Failed to save hotkey:', error);
-      showError('Failed to save hotkey');
+      showError('Failed to save hotkey: ' + (error.message || error));
+      // Don't close the dialog on error
     }
   }
-  
-  currentHotkeyKeyboard = null;
-  recordedKeys = [];
-  hideModal();
 }
 
 // Function to open Windows input settings
@@ -816,8 +1028,8 @@ window.checkForUpdates = async function() {
       statusElement.textContent = `New version ${updateInfo.latest_version} is available!`;
       statusElement.className = 'update-status available';
       
-      // Open update window
-      await showUpdateWindow(updateInfo);
+      // Open update window (manual check - always show)
+      await showUpdateWindow(updateInfo, true);
     } else {
       statusElement.textContent = 'You are using the latest version.';
       statusElement.className = 'update-status up-to-date';
@@ -833,22 +1045,25 @@ window.checkForUpdates = async function() {
 }
 
 // Show update window
-window.showUpdateWindow = async function(updateInfo) {
+window.showUpdateWindow = async function(updateInfo, isManualCheck = false) {
   try {
-    // Check if we should show the update (remind me later logic)
-    try {
-      const remindAfterStr = await invoke('get_setting', { key: 'UpdateRemindAfter' });
-      if (remindAfterStr) {
-        const remindAfter = parseInt(remindAfterStr);
-        if (!isNaN(remindAfter) && Date.now() < remindAfter) {
-          // Still in "remind later" period, don't show window
-          console.log('Update window skipped due to remind later setting');
-          return;
+    // Only check remind later setting for automatic checks
+    if (!isManualCheck) {
+      // Check if we should show the update (remind me later logic)
+      try {
+        const remindAfterStr = await invoke('get_update_remind_after');
+        if (remindAfterStr) {
+          const remindAfter = parseInt(remindAfterStr);
+          if (!isNaN(remindAfter) && Date.now() < remindAfter) {
+            // Still in "remind later" period, don't show window
+            console.log('Update window skipped due to remind later setting');
+            return;
+          }
         }
+      } catch (e) {
+        // If get_update_remind_after fails, continue showing the update
+        console.log('Could not check remind later setting:', e);
       }
-    } catch (e) {
-      // If get_setting fails, continue showing the update
-      console.log('Could not check remind later setting:', e);
     }
     
     const { WebviewWindow } = window.__TAURI__.webviewWindow;
@@ -917,34 +1132,6 @@ async function loadAboutVersion() {
       aboutVersionElement.textContent = '-';
     }
   }
-}
-
-// Show update notification
-function showUpdateNotification(updateInfo) {
-  // Create a subtle notification banner
-  const banner = document.createElement('div');
-  banner.className = 'update-notification-banner';
-  banner.innerHTML = `
-    <div class="update-notification-content">
-      <span>New version ${updateInfo.latest_version} is available!</span>
-      <button class="btn-link" onclick="window.showUpdateWindow(${JSON.stringify(updateInfo).replace(/"/g, '&quot;')}); this.parentElement.parentElement.remove();">
-        View Details
-      </button>
-      <button class="btn-link" onclick="this.parentElement.parentElement.remove();">
-        Dismiss
-      </button>
-    </div>
-  `;
-  
-  // Add to the body
-  document.body.appendChild(banner);
-  
-  // Auto-dismiss after 10 seconds
-  setTimeout(() => {
-    if (banner.parentElement) {
-      banner.remove();
-    }
-  }, 10000);
 }
 
 // Language profile management
@@ -1271,10 +1458,24 @@ function updatePlatformSpecificUI() {
     }
   }
   
-  // Hide composition mode section if not supported
-  const compositionSection = document.querySelector('.settings-section:has(#composition-mode-process-list)');
-  if (compositionSection && !platformInfo.features.composition_mode) {
-    compositionSection.style.display = 'none';
+  // Handle composition/direct mode sections based on platform
+  const compositionSection = document.getElementById('composition-mode-section');
+  const directModeSection = document.getElementById('direct-mode-section');
+  
+  if (platformInfo.features.composition_mode) {
+    if (platformInfo.os === 'macos') {
+      // macOS: Show direct mode section, hide composition mode section
+      if (compositionSection) compositionSection.style.display = 'none';
+      if (directModeSection) directModeSection.style.display = 'block';
+    } else {
+      // Windows: Show composition mode section, hide direct mode section
+      if (compositionSection) compositionSection.style.display = 'block';
+      if (directModeSection) directModeSection.style.display = 'none';
+    }
+  } else {
+    // Platform doesn't support composition mode at all
+    if (compositionSection) compositionSection.style.display = 'none';
+    if (directModeSection) directModeSection.style.display = 'none';
   }
   
   // Hide Windows input settings button if not on Windows
@@ -1296,6 +1497,9 @@ async function init() {
   
   // Set up event listeners
   setupEventListeners();
+  
+  // Initialize converter
+  initializeConverter();
   
   // Listen for keyboard import events
   const { listen } = window.__TAURI__.event;
@@ -1461,6 +1665,254 @@ async function showImportWizard() {
     console.error('Failed to show import wizard:', error);
     showError('Failed to open import wizard: ' + error.message);
   }
+}
+
+// Converter Page Functions
+let selectedKmsFile = null;
+
+function initializeConverter() {
+  const fileInput = document.getElementById('kms-file-input');
+  const fileLabel = document.querySelector('.file-input-label');
+  const selectedFileInfo = document.getElementById('selected-file-info');
+  const validationResult = document.getElementById('validation-result');
+  const convertBtn = document.getElementById('convert-btn');
+  const convertAndImportBtn = document.getElementById('convert-and-import-btn');
+  const conversionResult = document.getElementById('conversion-result');
+  
+  if (!fileInput) return; // Converter page not loaded yet
+  
+  // Replace file input with button click to use dialog
+  fileLabel.addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    const { open } = window.__TAURI__.dialog;
+    
+    // Open file dialog
+    const selected = await open({
+      multiple: false,
+      filters: [{
+        name: 'KeyMagic Script',
+        extensions: ['kms']
+      }],
+      title: 'Select KMS File'
+    });
+    
+    if (!selected) {
+      resetConverterUI();
+      return;
+    }
+    
+    selectedKmsFile = selected;
+    const fileName = selected.split(/[\\/]/).pop(); // Get file name from path
+    
+    // Create a more refined file display
+    selectedFileInfo.innerHTML = `
+      <div class="selected-file-display">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" class="file-icon">
+          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V8h-3a1 1 0 01-1-1V4H6zm5 0v2h2.586L11 3.414V4z" clip-rule="evenodd"/>
+        </svg>
+        <span class="file-name">${fileName}</span>
+        <button class="clear-file-btn" onclick="window.clearSelectedFile()">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+      </div>
+    `;
+    selectedFileInfo.style.display = 'block';
+    
+    // Validate the KMS file
+    try {
+      const validationMsg = await invoke('validate_kms_file', { 
+        filePath: selected
+      });
+      
+      validationResult.innerHTML = `
+        <div class="validation-success">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+          ${validationMsg.replace(/\n/g, '<br>')}
+        </div>
+      `;
+      validationResult.style.display = 'block';
+      
+      // Enable convert buttons
+      convertBtn.disabled = false;
+      convertAndImportBtn.disabled = false;
+    } catch (error) {
+      showValidationError(error.toString());
+      convertBtn.disabled = true;
+      convertAndImportBtn.disabled = true;
+    }
+  });
+  
+  convertBtn.addEventListener('click', async () => {
+    await convertKmsFile(false);
+  });
+  
+  convertAndImportBtn.addEventListener('click', async () => {
+    await convertKmsFile(true);
+  });
+  
+  function resetConverterUI() {
+    selectedKmsFile = null;
+    selectedFileInfo.textContent = '';
+    selectedFileInfo.style.display = 'none';
+    validationResult.style.display = 'none';
+    conversionResult.style.display = 'none';
+    convertBtn.disabled = true;
+    convertAndImportBtn.disabled = true;
+  }
+  
+  // Clear selected file function
+  window.clearSelectedFile = function() {
+    resetConverterUI();
+  }
+  
+  function showValidationError(error) {
+    validationResult.innerHTML = `
+      <div class="validation-error">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>
+        ${error}
+      </div>
+    `;
+    validationResult.style.display = 'block';
+  }
+}
+
+async function convertKmsFile(shouldImport) {
+  if (!selectedKmsFile) return;
+  
+  const conversionResult = document.getElementById('conversion-result');
+  const convertBtn = document.getElementById('convert-btn');
+  const convertAndImportBtn = document.getElementById('convert-and-import-btn');
+  
+  // Disable buttons during conversion
+  convertBtn.disabled = true;
+  convertAndImportBtn.disabled = true;
+  
+  try {
+    // Get file name from path
+    const fileName = selectedKmsFile.split(/[\\/]/).pop();
+    const outputFileName = fileName.replace('.kms', '.km2');
+    let outputPath;
+    
+    if (shouldImport) {
+      // For import, we'll use a temporary path
+      const { tempDir, join } = window.__TAURI__.path;
+      const tempDirPath = await tempDir();
+      outputPath = await join(tempDirPath, outputFileName);
+    } else {
+      // For save, let user choose location
+      outputPath = await saveFileDialog(outputFileName);
+      if (!outputPath) {
+        // User cancelled save dialog
+        convertBtn.disabled = false;
+        convertAndImportBtn.disabled = false;
+        return;
+      }
+    }
+    
+    // Convert the file
+    await invoke('convert_kms_file', {
+      inputPath: selectedKmsFile,
+      outputPath: outputPath
+    });
+    
+    // Show success message
+    if (shouldImport) {
+      // Import the converted keyboard
+      try {
+        const keyboard = await invoke('import_keyboard', { filePath: outputPath });
+        
+        // Mark this keyboard as recently added
+        recentlyAddedKeyboardIds.add(keyboard.id);
+        
+        // Switch to keyboards page
+        switchPage('keyboards');
+        
+        // Load keyboards to show the new one
+        await loadKeyboards();
+        await updateTrayMenu();
+        
+        showSuccess(`Keyboard "${keyboard.name}" has been imported successfully`);
+        
+        // Remove "just added" label after 60 seconds (1 minute)
+        setTimeout(() => {
+          recentlyAddedKeyboardIds.delete(keyboard.id);
+          renderKeyboardList();
+        }, 60000);
+        
+        // Re-enable buttons before returning
+        convertBtn.disabled = false;
+        convertAndImportBtn.disabled = false;
+        
+        return; // Don't show conversion result since we switched pages
+      } catch (importError) {
+        conversionResult.innerHTML = `
+          <div class="conversion-warning">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+              <strong>Conversion successful but import failed:</strong><br>
+              ${importError}
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      conversionResult.innerHTML = `
+        <div class="conversion-success">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <strong>Conversion successful!</strong><br>
+            File saved as: ${outputFileName}
+          </div>
+        </div>
+      `;
+    }
+    
+    conversionResult.style.display = 'block';
+    
+  } catch (error) {
+    conversionResult.innerHTML = `
+      <div class="conversion-error">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+          <strong>Conversion failed:</strong><br>
+          ${error}
+        </div>
+      </div>
+    `;
+    conversionResult.style.display = 'block';
+  } finally {
+    // Re-enable buttons
+    convertBtn.disabled = false;
+    convertAndImportBtn.disabled = false;
+  }
+}
+
+// Helper function for save file dialog
+async function saveFileDialog(defaultFileName) {
+  const { save } = window.__TAURI__.dialog;
+  
+  const filePath = await save({
+    defaultPath: defaultFileName,
+    filters: [{
+      name: 'KeyMagic Binary File',
+      extensions: ['km2']
+    }]
+  });
+  
+  return filePath;
 }
 
 window.addEventListener('DOMContentLoaded', init);
