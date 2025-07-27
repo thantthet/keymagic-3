@@ -54,6 +54,7 @@ build-swift: build-core
 		-framework Foundation \
 		-framework AppKit \
 		src/swift/main.swift \
+		src/swift/MacHotkey.swift \
 		src/swift/KMInputController.swift \
 		src/swift/KeycodeMapping.swift \
 		src/swift/KMConfiguration.swift

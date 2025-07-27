@@ -52,6 +52,7 @@ class KMInputController: IMKInputController {
     private var useCompositionMode: Bool = true
     private var supportsTSMDocumentAccess: Bool = false
     private var deleteFailedLastTime: Bool = false
+    private var metadataCache: [String: KeyboardMetadata] = [:]  // Cache keyboard metadata by ID
     
     // MARK: - Initialization
     
@@ -792,6 +793,7 @@ class KMInputController: IMKInputController {
             queue: .main
         ) { [weak self] _ in
             LOG_DEBUG("Config file changed, reloading keyboard")
+            self?.clearMetadataCache()  // Clear cache when config changes
             self?.loadActiveKeyboard()
         }
         LOG_DEBUG("Config file monitoring enabled")
@@ -852,6 +854,61 @@ class KMInputController: IMKInputController {
     
     // MARK: - Menu Support
     
+    /// Keyboard metadata from KM2 file
+    private struct KeyboardMetadata {
+        let name: String?
+        let description: String?
+        let hotkey: String?
+    }
+    
+    /// Get metadata from a KM2 file with caching
+    private func getMetadataFromKM2(id: String, path: String) -> KeyboardMetadata? {
+        // Check cache first
+        if let cached = metadataCache[id] {
+            return cached
+        }
+        
+        // Load from file
+        guard let km2Handle = path.withCString({ keymagic_km2_load($0) }) else {
+            return nil
+        }
+        defer { keymagic_km2_free(km2Handle) }
+        
+        var name: String?
+        var description: String?
+        var hotkey: String?
+        
+        // Get name
+        if let namePtr = keymagic_km2_get_name(km2Handle) {
+            name = String(cString: namePtr)
+            keymagic_free_string(namePtr)
+        }
+        
+        // Get description
+        if let descPtr = keymagic_km2_get_description(km2Handle) {
+            description = String(cString: descPtr)
+            keymagic_free_string(descPtr)
+        }
+        
+        // Get hotkey
+        if let hotkeyPtr = keymagic_km2_get_hotkey(km2Handle) {
+            hotkey = String(cString: hotkeyPtr)
+            keymagic_free_string(hotkeyPtr)
+        }
+        
+        let metadata = KeyboardMetadata(name: name, description: description, hotkey: hotkey)
+        
+        // Cache the result
+        metadataCache[id] = metadata
+        
+        return metadata
+    }
+    
+    /// Clear metadata cache (e.g., when keyboards are installed/uninstalled)
+    private func clearMetadataCache() {
+        metadataCache.removeAll()
+    }
+    
     override func menu() -> NSMenu! {
         LOG_DEBUG("Creating menu")
         let menu = NSMenu(title: "KeyMagic")
@@ -868,16 +925,50 @@ class KMInputController: IMKInputController {
             menu.addItem(noKeyboardsItem)
         } else {
             for (index, keyboard) in keyboards.enumerated() {
-                guard let id = keyboard["id"],
-                      let name = keyboard["name"] else { continue }
+                guard let id = keyboard["id"] else { continue }
                 
-                LOG_DEBUG("Adding keyboard menu item: \(name) (id: \(id))")
+                var displayName = keyboard["name"] ?? id
+                var hotkeyString = keyboard["hotkey"]
+                var description: String?
                 
-                let menuItem = NSMenuItem(title: name, action: #selector(selectionChanged(_:)), keyEquivalent: "")
+                // Get metadata from KM2 file if available
+                if let keyboardPath = KMConfiguration.shared.getKeyboardPath(for: id),
+                   let metadata = getMetadataFromKM2(id: id, path: keyboardPath) {
+                    // Use name from KM2 if not in config
+                    if keyboard["name"] == nil, let km2Name = metadata.name {
+                        displayName = km2Name
+                    }
+                    
+                    // Use hotkey from KM2 if not in config
+                    if hotkeyString == nil, let km2Hotkey = metadata.hotkey {
+                        hotkeyString = km2Hotkey
+                        LOG_DEBUG("Got hotkey from KM2 file for \(displayName): \(km2Hotkey)")
+                    }
+                    
+                    // Get description for tooltip
+                    description = metadata.description
+                }
+                
+                LOG_DEBUG("Adding keyboard menu item: \(displayName) (id: \(id))")
+                
+                let menuItem = NSMenuItem(title: displayName, action: #selector(selectionChanged(_:)), keyEquivalent: "")
                 menuItem.target = self
                 menuItem.representedObject = id
                 menuItem.tag = index
                 menuItem.isEnabled = true
+                
+                // Set hotkey if available
+                if let hotkeyStr = hotkeyString,
+                   hotkeyStr != "",
+                   let hotkey = MacHotkey.parse(hotkeyStr) {
+                    LOG_DEBUG("Setting hotkey for \(displayName): \(hotkey.debugDescription)")
+                    hotkey.applyTo(menuItem)
+                }
+                
+                // Set tooltip with description if available
+                if let desc = description {
+                    menuItem.toolTip = desc
+                }
                 
                 // Check current keyboard
                 if id == currentKeyboardId {

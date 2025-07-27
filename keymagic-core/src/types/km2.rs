@@ -129,6 +129,12 @@ impl Metadata {
         self.get_string(INFO_HTKY)
     }
     
+    /// Parse the hotkey string into a HotkeyBinding
+    pub fn parse_hotkey(&self) -> Option<crate::hotkey::HotkeyBinding> {
+        self.hotkey()
+            .and_then(|s| crate::hotkey::HotkeyBinding::parse(&s).ok())
+    }
+    
     /// Get the icon data
     pub fn icon(&self) -> Option<&[u8]> {
         self.get(INFO_ICON)

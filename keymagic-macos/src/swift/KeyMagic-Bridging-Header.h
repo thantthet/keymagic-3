@@ -15,6 +15,9 @@
 // Opaque handle to the KeyMagic engine
 typedef void* EngineHandle;
 
+// Opaque handle to a loaded KM2 file
+typedef void* Km2FileHandle;
+
 // Result codes for FFI functions
 typedef enum {
     KeyMagicResult_Success = 0,
@@ -45,5 +48,23 @@ extern KeyMagicResult keymagic_engine_reset(EngineHandle* engine);
 extern char* keymagic_engine_get_composition(EngineHandle* engine);
 extern KeyMagicResult keymagic_engine_set_composition(EngineHandle* engine, const char* text);
 extern void keymagic_free_string(char* str);
+
+// Hotkey parsing
+typedef struct {
+    int key_code;       // VirtualKey as int
+    int ctrl;           // 0 or 1
+    int alt;            // 0 or 1
+    int shift;          // 0 or 1
+    int meta;           // 0 or 1
+} HotkeyInfo;
+
+extern int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info);
+
+// KM2 file functions
+extern Km2FileHandle* keymagic_km2_load(const char* path);
+extern void keymagic_km2_free(Km2FileHandle* handle);
+extern char* keymagic_km2_get_name(Km2FileHandle* handle);
+extern char* keymagic_km2_get_description(Km2FileHandle* handle);
+extern char* keymagic_km2_get_hotkey(Km2FileHandle* handle);
 
 #endif /* KeyMagic_Bridging_Header_h */

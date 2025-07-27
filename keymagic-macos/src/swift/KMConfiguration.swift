@@ -88,12 +88,16 @@ public class KMConfiguration {
     public var installedKeyboards: [[String: String]] {
         guard let keyboards = config?.keyboards.installed else { return [] }
         return keyboards.map { keyboard in
-            [
+            var dict = [
                 "id": keyboard.id,
                 "name": keyboard.name,
                 "filename": keyboard.filename,
                 "hash": keyboard.hash
             ]
+            if let hotkey = keyboard.hotkey {
+                dict["hotkey"] = hotkey
+            }
+            return dict
         }
     }
     
