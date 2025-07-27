@@ -982,7 +982,7 @@ class KMInputController: IMKInputController {
         menu.addItem(NSMenuItem.separator())
         
         // Add preferences item
-        let preferencesItem = NSMenuItem(title: "Preferences...", action: #selector(showKeyMagicPreferences), keyEquivalent: ",")
+        let preferencesItem = NSMenuItem(title: "Preferences...", action: #selector(showKeyMagicPreferences), keyEquivalent: "")
         preferencesItem.target = self
         menu.addItem(preferencesItem)
         
