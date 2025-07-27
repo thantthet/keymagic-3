@@ -113,7 +113,7 @@ install: $(PROJECT_NAME)
 	install -m 644 $(DATADIR)/keymagic3.xml $(COMPONENTDIR)/keymagic3.xml
 	
 	# Install icon
-	install -m 644 $(DATADIR)/keymagic3.png $(ICONDIR)/keymagic3.png
+	install -m 644 ../resources/icons/keymagic.png $(ICONDIR)/keymagic3.png
 
 # Uninstall from system
 uninstall:

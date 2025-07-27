@@ -28,7 +28,7 @@
             <longname>KeyMagic 3</longname>
             <description>Smart keyboard input method for Myanmar and other languages</description>
             <rank>50</rank>
-            <symbol>🪄</symbol>
+            <symbol>✨</symbol>
             <setup>/usr/bin/keymagic3-gui</setup>
             <version>0.0.1</version>
             <textdomain>keymagic3</textdomain>
