@@ -89,6 +89,17 @@ KeyMagicResult keymagic_engine_process_key_test_win(
     ProcessKeyOutput* output
 );
 
+// Hotkey parsing
+typedef struct {
+    int key_code;       // VirtualKey as int
+    int ctrl;           // 0 or 1
+    int alt;            // 0 or 1
+    int shift;          // 0 or 1
+    int meta;           // 0 or 1
+} HotkeyInfo;
+
+int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info);
+
 #ifdef __cplusplus
 }
 #endif

@@ -32,7 +32,14 @@ impl HotkeyManager {
             return Ok(());
         }
         
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows, TSF will handle hotkeys via preserved keys
+            log::info!("Skipping hotkey registration on Windows - TSF handles hotkeys via preserved keys");
+            return Ok(());
+        }
+        
+        #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
         {
             // Clear existing hotkeys first
             self.unregister_all_hotkeys(app)?;

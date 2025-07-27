@@ -24,4 +24,9 @@ DEFINE_GUID(GUID_KeyMagicLangBarButton,
 DEFINE_GUID(GUID_KeyMagicDisplayAttributeInput,
     0x2839b100, 0x4cb8, 0x4079, 0xb4, 0x4b, 0x80, 0x32, 0xd4, 0xc7, 0x03, 0x42);
 
+// Base GUID for preserved keys (will be modified per keyboard)
+// {F7D8B5A0-3E2C-4B89-9F6D-1234567890AB}
+DEFINE_GUID(GUID_KeyMagicPreservedKey,
+    0xf7d8b5a0, 0x3e2c, 0x4b89, 0x9f, 0x6d, 0x12, 0x34, 0x56, 0x78, 0x90, 0xab);
+
 #endif // KEYMAGIC_GUIDS_H

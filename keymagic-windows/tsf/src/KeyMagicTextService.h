@@ -5,6 +5,7 @@
 #include <msctf.h>
 #include <string>
 #include <memory>
+#include <vector>
 #include "../include/keymagic_ffi.h"
 #include "Composition.h"
 #include "DisplayAttribute.h"
@@ -143,6 +144,21 @@ private:
     static DWORD WINAPI EventMonitorThreadProc(LPVOID lpParam);
     HRESULT StartEventMonitoring();
     HRESULT StopEventMonitoring();
+    
+    // Preserved key support
+    struct PreservedKeyInfo {
+        std::wstring keyboardId;
+        TF_PRESERVEDKEY tfKey;
+        GUID guid;
+    };
+    std::vector<PreservedKeyInfo> m_preservedKeys;
+    ITfKeystrokeMgr *m_pKeystrokeMgr;
+    
+    HRESULT RegisterPreservedKeys();
+    HRESULT UnregisterPreservedKeys();
+    HRESULT UpdatePreservedKeys();
+    HRESULT ParseHotkeyString(const std::wstring& hotkeyStr, TF_PRESERVEDKEY& tfKey);
+    GUID GenerateGuidForKeyboard(const std::wstring& keyboardId);
     
     // Friend classes
     friend class CDirectEditSession;

@@ -8,12 +8,14 @@
 #include "ProcessDetector.h"
 #include "KeyProcessingUtils.h"
 #include "Registry.h"
+#include "HUD.h"
 #include <string>
 #include <codecvt>
 #include <locale>
 #include <vector>
 #include <algorithm>
 #include <tlhelp32.h>
+#include <functional>
 
 // Helper function to convert UTF-8 to UTF-16
 std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
@@ -77,6 +79,12 @@ CKeyMagicTextService::CKeyMagicTextService()
     m_bEventThreadRunning = false;
     m_bIsActiveInputProcessor = false;
     m_lastSendInputTime = 0;
+    
+    // Initialize preserved key support
+    m_pKeystrokeMgr = nullptr;
+    
+    // Initialize HUD
+    KeyMagicHUD::GetInstance().Initialize();
     
     
     InitializeCriticalSection(&m_cs);
@@ -204,12 +212,11 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
         pSource->Release();
     }
 
-    // Register key event sink
-    ITfKeystrokeMgr *pKeystrokeMgr;
-    if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr)))
+    // Register key event sink and get keystroke manager interface
+    if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&m_pKeystrokeMgr)))
     {
-        pKeystrokeMgr->AdviseKeyEventSink(m_tfClientId, static_cast<ITfKeyEventSink*>(this), TRUE);
-        pKeystrokeMgr->Release();
+        m_pKeystrokeMgr->AdviseKeyEventSink(m_tfClientId, static_cast<ITfKeyEventSink*>(this), TRUE);
+        // Keep the reference for preserved key registration
     }
 
     // Register display attribute GUID and create display attribute info
@@ -219,7 +226,9 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
     // Load initial keyboard and settings
     ReloadRegistrySettings();
     
-
+    // Register preserved keys for keyboard switching
+    RegisterPreservedKeys();
+    
     LeaveCriticalSection(&m_cs);
     return S_OK;
 }
@@ -227,13 +236,16 @@ STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
 STDAPI CKeyMagicTextService::Deactivate()
 {
     EnterCriticalSection(&m_cs);
+    
+    // Unregister preserved keys
+    UnregisterPreservedKeys();
 
     // Unregister key event sink
-    ITfKeystrokeMgr *pKeystrokeMgr;
-    if (m_pThreadMgr && SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr)))
+    if (m_pKeystrokeMgr)
     {
-        pKeystrokeMgr->UnadviseKeyEventSink(m_tfClientId);
-        pKeystrokeMgr->Release();
+        m_pKeystrokeMgr->UnadviseKeyEventSink(m_tfClientId);
+        m_pKeystrokeMgr->Release();
+        m_pKeystrokeMgr = nullptr;
     }
 
     // Unregister thread manager event sink
@@ -660,6 +672,63 @@ STDAPI CKeyMagicTextService::OnPreservedKey(ITfContext *pic, REFGUID rguid, BOOL
         return E_INVALIDARG;
 
     *pfEaten = FALSE;
+    
+    EnterCriticalSection(&m_cs);
+    
+    // Find which keyboard this preserved key maps to
+    for (const auto& preservedKey : m_preservedKeys)
+    {
+        if (IsEqualGUID(rguid, preservedKey.guid))
+        {
+            DEBUG_LOG(L"Preserved key triggered for keyboard: " + preservedKey.keyboardId);
+            
+            // Update the default keyboard in registry
+            HKEY hKey = OpenSettingsKey(KEY_WRITE);
+            if (hKey)
+            {
+                LONG result = RegSetValueExW(hKey, L"DefaultKeyboard", 0, REG_SZ, 
+                                           (const BYTE*)preservedKey.keyboardId.c_str(), 
+                                           (DWORD)(preservedKey.keyboardId.length() + 1) * sizeof(WCHAR));
+                RegCloseKey(hKey);
+                
+                if (result == ERROR_SUCCESS)
+                {
+                    // Signal the registry update event
+                    if (m_hRegistryUpdateEvent)
+                    {
+                        SetEvent(m_hRegistryUpdateEvent);
+                    }
+                    
+                    // Reload the keyboard
+                    LoadKeyboardByID(preservedKey.keyboardId);
+                    
+                    // Show HUD notification
+                    // Get keyboard display name from registry
+                    std::wstring displayName = preservedKey.keyboardId;
+                    std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + preservedKey.keyboardId;
+                    HKEY hKeyboardKey;
+                    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKeyboardKey) == ERROR_SUCCESS)
+                    {
+                        WCHAR szName[256];
+                        DWORD dwType = REG_SZ;
+                        DWORD dwSize = sizeof(szName);
+                        if (RegQueryValueExW(hKeyboardKey, L"Name", nullptr, &dwType, (LPBYTE)szName, &dwSize) == ERROR_SUCCESS)
+                        {
+                            displayName = szName;
+                        }
+                        RegCloseKey(hKeyboardKey);
+                    }
+                    
+                    KeyMagicHUD::GetInstance().ShowKeyboard(displayName);
+                    
+                    *pfEaten = TRUE;
+                }
+            }
+            break;
+        }
+    }
+    
+    LeaveCriticalSection(&m_cs);
     return S_OK;
 }
 
@@ -806,13 +875,230 @@ STDAPI CKeyMagicTextService::OnMouseEvent(ULONG uEdge, ULONG uQuadrant, DWORD dw
     return S_OK;
 }
 
+// Preserved key methods
+HRESULT CKeyMagicTextService::RegisterPreservedKeys()
+{
+    if (!m_pKeystrokeMgr)
+        return E_FAIL;
+        
+    // Clear any existing preserved keys
+    UnregisterPreservedKeys();
+    
+    // Open keyboards registry key
+    HKEY hKeyboardsKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Keyboards", 0, 
+                      KEY_READ, &hKeyboardsKey) != ERROR_SUCCESS)
+    {
+        DEBUG_LOG(L"Failed to open keyboards registry key");
+        return S_OK; // Not an error if no keyboards configured
+    }
+    
+    // Enumerate all keyboards
+    DWORD dwIndex = 0;
+    WCHAR szKeyboardId[256];
+    DWORD dwKeyboardIdSize = sizeof(szKeyboardId) / sizeof(WCHAR);
+    
+    while (RegEnumKeyExW(hKeyboardsKey, dwIndex++, szKeyboardId, &dwKeyboardIdSize, 
+                         nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS)
+    {
+        HKEY hKeyboardKey;
+        if (RegOpenKeyExW(hKeyboardsKey, szKeyboardId, 0, KEY_READ, 
+                          &hKeyboardKey) == ERROR_SUCCESS)
+        {
+            // Read hotkey value
+            WCHAR szHotkey[256];
+            DWORD dwType = REG_SZ;
+            DWORD dwSize = sizeof(szHotkey);
+            
+            if (RegQueryValueExW(hKeyboardKey, L"Hotkey", nullptr, &dwType, 
+                               (LPBYTE)szHotkey, &dwSize) == ERROR_SUCCESS)
+            {
+                TF_PRESERVEDKEY tfKey;
+                if (SUCCEEDED(ParseHotkeyString(szHotkey, tfKey)))
+                {
+                    // Generate unique GUID for this keyboard
+                    GUID guid = GenerateGuidForKeyboard(szKeyboardId);
+                    
+                    // Register the preserved key
+                    HRESULT hr = m_pKeystrokeMgr->PreserveKey(m_tfClientId, guid, &tfKey, nullptr, 0);
+                    if (SUCCEEDED(hr))
+                    {
+                        // Store the mapping
+                        PreservedKeyInfo info;
+                        info.keyboardId = szKeyboardId;
+                        info.tfKey = tfKey;
+                        info.guid = guid;
+                        m_preservedKeys.push_back(info);
+                        
+                        DEBUG_LOG(L"Registered preserved key for keyboard: " + std::wstring(szKeyboardId) + 
+                                 L" with hotkey: " + std::wstring(szHotkey));
+                    }
+                    else
+                    {
+                        DEBUG_LOG(L"Failed to register preserved key for keyboard: " + std::wstring(szKeyboardId));
+                    }
+                }
+            }
+            
+            RegCloseKey(hKeyboardKey);
+        }
+        
+        dwKeyboardIdSize = sizeof(szKeyboardId) / sizeof(WCHAR);
+    }
+    
+    RegCloseKey(hKeyboardsKey);
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::UnregisterPreservedKeys()
+{
+    if (!m_pKeystrokeMgr)
+        return E_FAIL;
+        
+    for (const auto& preservedKey : m_preservedKeys)
+    {
+        m_pKeystrokeMgr->UnpreserveKey(preservedKey.guid, &preservedKey.tfKey);
+    }
+    
+    m_preservedKeys.clear();
+    return S_OK;
+}
+
+HRESULT CKeyMagicTextService::UpdatePreservedKeys()
+{
+    // Re-register all preserved keys (called when registry changes)
+    return RegisterPreservedKeys();
+}
+
+HRESULT CKeyMagicTextService::ParseHotkeyString(const std::wstring& hotkeyStr, TF_PRESERVEDKEY& tfKey)
+{
+    // Convert wide string to narrow string for parsing
+    std::string narrowStr;
+    for (wchar_t wc : hotkeyStr)
+    {
+        narrowStr += static_cast<char>(wc);
+    }
+    
+    // Use keymagic-core's hotkey parsing
+    HotkeyInfo info;
+    if (keymagic_parse_hotkey(narrowStr.c_str(), &info) != 1)
+    {
+        return E_FAIL;
+    }
+    
+    // Convert VirtualKey enum to Windows VK code
+    // The info.key_code is a VirtualKey enum value that needs to be converted
+    // to the actual Windows Virtual Key code.
+    // For now, we'll use a simple mapping for the most common keys
+    UINT vkCode = 0;
+    switch (info.key_code)
+    {
+        // Letter keys (VirtualKey enum values 26-51 map to VK codes 0x41-0x5A)
+        case 26: vkCode = 0x41; break; // A
+        case 27: vkCode = 0x42; break; // B
+        case 28: vkCode = 0x43; break; // C
+        case 29: vkCode = 0x44; break; // D
+        case 30: vkCode = 0x45; break; // E
+        case 31: vkCode = 0x46; break; // F
+        case 32: vkCode = 0x47; break; // G
+        case 33: vkCode = 0x48; break; // H
+        case 34: vkCode = 0x49; break; // I
+        case 35: vkCode = 0x4A; break; // J
+        case 36: vkCode = 0x4B; break; // K
+        case 37: vkCode = 0x4C; break; // L
+        case 38: vkCode = 0x4D; break; // M
+        case 39: vkCode = 0x4E; break; // N
+        case 40: vkCode = 0x4F; break; // O
+        case 41: vkCode = 0x50; break; // P
+        case 42: vkCode = 0x51; break; // Q
+        case 43: vkCode = 0x52; break; // R
+        case 44: vkCode = 0x53; break; // S
+        case 45: vkCode = 0x54; break; // T
+        case 46: vkCode = 0x55; break; // U
+        case 47: vkCode = 0x56; break; // V
+        case 48: vkCode = 0x57; break; // W
+        case 49: vkCode = 0x58; break; // X
+        case 50: vkCode = 0x59; break; // Y
+        case 51: vkCode = 0x5A; break; // Z
+        
+        // Number keys (VirtualKey enum values 52-61 map to VK codes 0x30-0x39)
+        case 52: vkCode = 0x30; break; // 0
+        case 53: vkCode = 0x31; break; // 1
+        case 54: vkCode = 0x32; break; // 2
+        case 55: vkCode = 0x33; break; // 3
+        case 56: vkCode = 0x34; break; // 4
+        case 57: vkCode = 0x35; break; // 5
+        case 58: vkCode = 0x36; break; // 6
+        case 59: vkCode = 0x37; break; // 7
+        case 60: vkCode = 0x38; break; // 8
+        case 61: vkCode = 0x39; break; // 9
+        
+        // Function keys
+        case 71: vkCode = 0x70; break; // F1
+        case 72: vkCode = 0x71; break; // F2
+        case 73: vkCode = 0x72; break; // F3
+        case 74: vkCode = 0x73; break; // F4
+        case 75: vkCode = 0x74; break; // F5
+        case 76: vkCode = 0x75; break; // F6
+        case 77: vkCode = 0x76; break; // F7
+        case 78: vkCode = 0x77; break; // F8
+        case 79: vkCode = 0x78; break; // F9
+        case 80: vkCode = 0x79; break; // F10
+        case 81: vkCode = 0x7A; break; // F11
+        case 82: vkCode = 0x7B; break; // F12
+        
+        // Special keys
+        case 12: vkCode = 0x20; break; // Space
+        case 9: vkCode = 0x09; break;  // Tab
+        case 8: vkCode = 0x0D; break;  // Enter/Return
+        
+        default:
+            DEBUG_LOG(L"Unknown virtual key code: " + std::to_wstring(info.key_code));
+            return E_FAIL;
+    }
+    
+    tfKey.uVKey = vkCode;
+    
+    // TSF preserved keys don't support Windows/Meta key
+    if (info.meta)
+    {
+        DEBUG_LOG(L"Skipping hotkey with Windows/Meta key - not supported by TSF preserved keys");
+        return E_FAIL;
+    }
+    
+    tfKey.uModifiers = 0;
+    if (info.ctrl)
+        tfKey.uModifiers |= TF_MOD_CONTROL;
+    if (info.alt)
+        tfKey.uModifiers |= TF_MOD_ALT;
+    if (info.shift)
+        tfKey.uModifiers |= TF_MOD_SHIFT;
+        
+    return S_OK;
+}
+
+GUID CKeyMagicTextService::GenerateGuidForKeyboard(const std::wstring& keyboardId)
+{
+    // Create a deterministic GUID based on keyboard ID
+    // This ensures the same keyboard always gets the same GUID
+    GUID guid = GUID_KeyMagicPreservedKey; // Start with base GUID
+    
+    // Simple hash of keyboard ID to modify the GUID
+    size_t hash = std::hash<std::wstring>{}(keyboardId);
+    guid.Data1 = static_cast<unsigned long>(hash & 0xFFFFFFFF);
+    guid.Data2 = static_cast<unsigned short>((hash >> 32) & 0xFFFF);
+    guid.Data3 = static_cast<unsigned short>((hash >> 48) & 0xFFFF);
+    
+    return guid;
+}
+
 // Helper methods
 // Always open the 64-bit view of the registry, regardless of host process
 HKEY CKeyMagicTextService::OpenSettingsKey(REGSAM samDesired)
 {
     HKEY hKey;
     const wchar_t* KEYMAGIC_REG_SETTINGS = L"Software\\KeyMagic\\Settings";
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, samDesired | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REG_SETTINGS, 0, samDesired, &hKey) == ERROR_SUCCESS)
     {
         return hKey;
     }
@@ -868,7 +1154,7 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
     std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + keyboardId;
     HKEY hKey;
     
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS)
     {
         // Read keyboard path
         wchar_t km2Path[MAX_PATH] = {0};
@@ -1441,6 +1727,9 @@ DWORD WINAPI CKeyMagicTextService::EventMonitorThreadProc(LPVOID lpParam)
                 
                 // Reload registry settings
                 pThis->ReloadRegistrySettings();
+                
+                // Update preserved keys in case hotkeys changed
+                pThis->UpdatePreservedKeys();
             }
         }
         else

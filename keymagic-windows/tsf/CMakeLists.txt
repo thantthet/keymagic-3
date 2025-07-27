@@ -22,6 +22,7 @@ set(SOURCES
     src/ProcessDetector.cpp
     src/KeyProcessingUtils.cpp
     src/LanguageUtils.cpp
+    src/HUD.cpp
     src/KeyMagicTSF.rc
 )
 
@@ -51,6 +52,7 @@ target_link_libraries(KeyMagicTSF PRIVATE
     ws2_32      # Windows Sockets
     userenv     # User environment
     ntdll       # NT functions
+    gdi32       # Graphics Device Interface for HUD
 )
 
 # Determine Rust target directory based on architecture
