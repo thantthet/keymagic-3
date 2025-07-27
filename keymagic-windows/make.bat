@@ -106,11 +106,11 @@ if %errorlevel% neq 0 (
 )
 
 :: Set DLL path
-set "DLL_PATH=tsf\build-%ARCH%\%CONFIG%\KeyMagicTSF.dll"
+set "DLL_PATH=tsf\build-%ARCH%\%CONFIG%\KeyMagicTSF_%ARCH%.dll"
 
 if not exist "%DLL_PATH%" (
     echo [ERROR] TSF DLL not found at: %DLL_PATH%
-    echo Run: make-simple.bat build %ARCH% %CONFIG%
+    echo Run: make.bat build %ARCH% %CONFIG%
     exit /b 1
 )
 
