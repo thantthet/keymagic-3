@@ -55,8 +55,8 @@ function Update-FileContent {
     }
 }
 
-# Update gui-tauri/src-tauri/Cargo.toml - only the package version
-$CargoTomlPath = Join-Path $ProjectRoot "gui-tauri\src-tauri\Cargo.toml"
+# Update keymagic-shared/gui/src-tauri/Cargo.toml - only the package version
+$CargoTomlPath = Join-Path $ProjectRoot "..\keymagic-shared\gui\src-tauri\Cargo.toml"
 Update-FileContent -FilePath $CargoTomlPath -UpdateScript {
     param($Content)
     # Split content into lines
@@ -86,8 +86,8 @@ Update-FileContent -FilePath $CargoTomlPath -UpdateScript {
     return $lines -join "`n"
 }
 
-# Update gui-tauri/src-tauri/tauri.conf.json
-$TauriConfPath = Join-Path $ProjectRoot "gui-tauri\src-tauri\tauri.conf.json"
+# Update keymagic-shared/gui/src-tauri/tauri.conf.json
+$TauriConfPath = Join-Path $ProjectRoot "..\keymagic-shared\gui\src-tauri\tauri.conf.json"
 Update-FileContent -FilePath $TauriConfPath -UpdateScript {
     param($Content)
     $Content -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$NewVersion`""

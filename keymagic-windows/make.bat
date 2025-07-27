@@ -60,10 +60,10 @@ echo.
 echo Building Rust libraries...
 if /i "%CONFIG%"=="Release" (
     cargo build -p keymagic-core --release --target %RUST_TARGET% || exit /b 1
-    cargo build -p gui-tauri --release --target %RUST_TARGET% || exit /b 1
+    cargo build -p keymagic-gui --release --target %RUST_TARGET% || exit /b 1
 ) else (
     cargo build -p keymagic-core --target %RUST_TARGET% || exit /b 1
-    cargo build -p gui-tauri --target %RUST_TARGET% || exit /b 1
+    cargo build -p keymagic-gui --target %RUST_TARGET% || exit /b 1
 )
 
 :: Build TSF
@@ -106,11 +106,11 @@ if %errorlevel% neq 0 (
 )
 
 :: Set DLL path
-set "DLL_PATH=tsf\build-%ARCH%\%CONFIG%\KeyMagicTSF.dll"
+set "DLL_PATH=tsf\build-%ARCH%\%CONFIG%\KeyMagicTSF_%ARCH%.dll"
 
 if not exist "%DLL_PATH%" (
     echo [ERROR] TSF DLL not found at: %DLL_PATH%
-    echo Run: make-simple.bat build %ARCH% %CONFIG%
+    echo Run: make.bat build %ARCH% %CONFIG%
     exit /b 1
 )
 

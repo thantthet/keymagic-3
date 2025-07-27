@@ -31,7 +31,7 @@ if not exist "tsf\build-x64\Release\KeyMagicTSF_x64.dll" (
 echo [OK] x64 TSF DLL found
 
 :: Check GUI
-if not exist "target\x86_64-pc-windows-msvc\release\gui-tauri.exe" (
+if not exist "..\target\x86_64-pc-windows-msvc\release\keymagic-gui.exe" (
     echo [ERROR] GUI executable not found
     exit /b 1
 )

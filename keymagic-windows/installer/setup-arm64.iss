@@ -27,7 +27,7 @@ AllowNoIcons=yes
 LicenseFile=..\..\LICENSE.md
 OutputDir=.\output
 OutputBaseFilename=KeyMagic3-Setup-{#MyAppVersion}-arm64
-SetupIconFile=..\resources\icons\keymagic.ico
+SetupIconFile=..\..\resources\icons\keymagic.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2
 SolidCompression=yes
@@ -55,7 +55,7 @@ Type: filesandordirs; Name: "{app}\keyboards"
 
 [Files]
 ; GUI Application
-Source: "..\target\aarch64-pc-windows-msvc\release\gui-tauri.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
+Source: "..\..\target\aarch64-pc-windows-msvc\release\keymagic-gui.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
 
 ; TSF DLLs - ARM64X forwarder and implementation DLLs in versioned subdirectory
 Source: "..\tsf\build-arm64x\KeyMagicTSF.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
