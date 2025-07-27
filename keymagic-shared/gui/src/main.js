@@ -347,17 +347,6 @@ function setupEventListeners() {
   });
 
   
-  // Setting change handlers
-  document.getElementById('start-with-windows').addEventListener('change', async (e) => {
-    try {
-      await invoke('set_start_with_system', { enabled: e.target.checked });
-      showSuccess('Setting saved');
-    } catch (error) {
-      console.error('Failed to save setting:', error);
-      showError('Failed to save setting');
-      e.target.checked = !e.target.checked;
-    }
-  });
 
   
   // Modal event listeners
@@ -373,11 +362,6 @@ function setupEventListeners() {
 // Settings
 async function loadSettings() {
   try {
-    const startWithSystem = await invoke('get_start_with_system');
-    
-    document.getElementById('start-with-windows').checked = startWithSystem;
-    
-    
     // Load current version
     await loadCurrentVersion();
     
@@ -1428,17 +1412,6 @@ async function loadPlatformInfo() {
 }
 
 function updatePlatformSpecificUI() {
-  // Update "Start with Windows/System" text
-  const startWithSystemLabel = document.querySelector('#start-with-windows').nextElementSibling;
-  if (startWithSystemLabel) {
-    if (platformInfo.os === 'windows') {
-      startWithSystemLabel.textContent = 'Start with Windows';
-    } else if (platformInfo.os === 'macos') {
-      startWithSystemLabel.textContent = 'Start with macOS';
-    } else {
-      startWithSystemLabel.textContent = 'Start with system';
-    }
-  }
   
   // Hide language profiles section if not supported
   const languageSection = document.querySelector('.settings-section:has(#language-search)');

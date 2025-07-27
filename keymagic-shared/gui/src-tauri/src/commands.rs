@@ -310,64 +310,6 @@ pub fn set_composition_mode_hosts(
     state.save_config(&config).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn set_start_with_system(
-    app_handle: tauri::AppHandle,
-    state: State<AppState>,
-    enabled: bool,
-) -> Result<(), String> {
-    // Update platform config
-    let mut config = state.get_config();
-    config.general.start_with_system = enabled;
-    
-    state.save_config(&config)
-        .map_err(|e| e.to_string())?;
-    
-    // Update system autostart using Tauri plugin
-    use tauri_plugin_autostart::ManagerExt;
-    let manager = app_handle.autolaunch();
-    
-    if enabled {
-        manager.enable()
-            .map_err(|e| format!("Failed to enable autostart: {}", e))?;
-    } else {
-        manager.disable()
-            .map_err(|e| format!("Failed to disable autostart: {}", e))?;
-    }
-    
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_start_with_system(
-    app_handle: tauri::AppHandle,
-    state: State<AppState>,
-) -> Result<bool, String> {
-    // First check the actual autostart state from the system
-    use tauri_plugin_autostart::ManagerExt;
-    let manager = app_handle.autolaunch();
-    
-    match manager.is_enabled() {
-        Ok(enabled) => {
-            // Update config to match system state if different
-            let config = state.get_config();
-            
-            if config.general.start_with_system != enabled {
-                let mut updated_config = config;
-                updated_config.general.start_with_system = enabled;
-                let _ = state.save_config(&updated_config);
-            }
-            
-            Ok(enabled)
-        }
-        Err(e) => {
-            // If we can't check system state, fall back to config
-            log::warn!("Failed to check autostart state: {}", e);
-            let config = state.get_config();
-            Ok(config.general.start_with_system)
-        }
-    }
-}
 
 
 // Version info

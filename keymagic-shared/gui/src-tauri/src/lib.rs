@@ -60,6 +60,40 @@ pub fn run() {
                 tauri_plugin_autostart::MacosLauncher::LaunchAgent,
                 None,
             ))?;
+            
+            // Check and disable autostart if it was previously enabled
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                let autolaunch_manager = app.handle().autolaunch();
+                
+                // Check if autostart is currently enabled
+                match autolaunch_manager.is_enabled() {
+                    Ok(true) => {
+                        // Autostart is enabled, disable it
+                        log::info!("Autostart was previously enabled, disabling it now");
+                        if let Err(e) = autolaunch_manager.disable() {
+                            log::error!("Failed to disable autostart: {}", e);
+                        } else {
+                            log::info!("Successfully disabled autostart");
+                        }
+                    }
+                    Ok(false) => {
+                        log::info!("Autostart is already disabled");
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to check autostart status: {}", e);
+                    }
+                }
+                
+                // Also update the config to reflect this change
+                if let Ok(mut config) = keyboard_manager.get_platform().load_config() {
+                    if config.general.start_with_system {
+                        config.general.start_with_system = false;
+                        let _ = keyboard_manager.get_platform().save_config(&config);
+                    }
+                }
+            }
+            
             app.handle().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
                 // If another instance tries to start, focus our window
                 if let Some(window) = app.get_webview_window("main") {
@@ -110,8 +144,6 @@ pub fn run() {
             commands::open_keyboards_folder,
             commands::get_composition_mode_hosts,
             commands::set_composition_mode_hosts,
-            commands::set_start_with_system,
-            commands::get_start_with_system,
             commands::get_app_version,
             commands::should_scan_bundled_keyboards,
             commands::get_bundled_keyboards,
