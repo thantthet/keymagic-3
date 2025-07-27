@@ -421,7 +421,6 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
                         aux_text_timeout_cb, engine);
                     
                     /* Update configuration file */
-                    KeyMagicConfig* config = keymagic_config_load(engine->config_path);
                     if (config) {
                         g_free(config->active_keyboard);
                         config->active_keyboard = g_strdup(keyboard_id);
@@ -1047,11 +1046,39 @@ keymagic_engine_update_properties(KeyMagicEngine* engine)
     g_free(keyboards_dir);
     keymagic_config_free(config);
     
-    /* Register properties with IBus */
+    /* Add separator if we have keyboards */
     if (keyboard_count > 0) {
-        ibus_engine_register_properties((IBusEngine*)engine, engine->prop_list);
-        g_debug("%s: Registered %d keyboard properties", LOG_TAG, keyboard_count);
+        IBusProperty* separator = ibus_property_new("separator",
+                                                   PROP_TYPE_SEPARATOR,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL,
+                                                   TRUE,
+                                                   TRUE,
+                                                   PROP_STATE_UNCHECKED,
+                                                   NULL);
+        ibus_prop_list_append(engine->prop_list, separator);
     }
+    
+    /* Add "Open Configurator" menu item */
+    IBusText* configurator_label = ibus_text_new_from_string("Open KeyMagic...");
+    IBusText* configurator_tooltip = ibus_text_new_from_string("Open KeyMagic window");
+    
+    IBusProperty* configurator_prop = ibus_property_new("open-configurator",
+                                                       PROP_TYPE_NORMAL,
+                                                       configurator_label,
+                                                       NULL,  /* icon */
+                                                       configurator_tooltip,
+                                                       TRUE,  /* sensitive */
+                                                       TRUE,  /* visible */
+                                                       PROP_STATE_UNCHECKED,
+                                                       NULL); /* sub_props */
+    
+    ibus_prop_list_append(engine->prop_list, configurator_prop);
+    
+    /* Register properties with IBus */
+    ibus_engine_register_properties((IBusEngine*)engine, engine->prop_list);
+    g_debug("%s: Registered %d keyboard properties plus configurator menu", LOG_TAG, keyboard_count);
 }
 
 /**
@@ -1149,8 +1176,36 @@ keymagic_engine_property_activate(IBusEngine* ibus_engine,
 {
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(ibus_engine);
     
-    /* Handle property activation */
-    if (prop_state == PROP_STATE_CHECKED) {
+    g_debug("%s: property_activate called - prop_name: %s, prop_state: %u", 
+            LOG_TAG, prop_name, prop_state);
+    
+    /* Handle special menu items */
+    if (g_strcmp0(prop_name, "open-configurator") == 0) {
+        g_debug("%s: Opening KeyMagic configurator", LOG_TAG);
+        
+        /* Launch the KeyMagic configurator */
+        GError* error = NULL;
+        gchar* argv[] = { (gchar*)"keymagic3-gui", NULL };
+        
+        g_debug("%s: Attempting to spawn: %s", LOG_TAG, "keymagic3-gui");
+        
+        if (!g_spawn_async(NULL,           /* working directory */
+                          argv,            /* argv */
+                          NULL,            /* envp */
+                          G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL,
+                          NULL,            /* child_setup */
+                          NULL,            /* user_data */
+                          NULL,            /* child_pid */
+                          &error)) {
+            g_warning("%s: Failed to launch KeyMagic configurator: %s", 
+                     LOG_TAG, error ? error->message : "Unknown error");
+            if (error) g_error_free(error);
+        } else {
+            g_debug("%s: Successfully spawned KeyMagic configurator", LOG_TAG);
+        }
+    }
+    /* Handle radio button properties (keyboard selection) */
+    else if (prop_state == PROP_STATE_CHECKED) {
         keymagic_engine_activate_property(engine, prop_name);
     }
     
