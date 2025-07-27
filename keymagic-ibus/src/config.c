@@ -396,15 +396,15 @@ keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* ke
     /* Update active keyboard to the new value */
     g_string_append_printf(toml_str, "active = \"%s\"\n", keyboard_id);
     
-    /* Add last_used array if present */
+    /* Add last_used array (write empty array if not present) */
+    g_string_append(toml_str, "last_used = [");
     if (config->last_used && config->last_used[0]) {
-        g_string_append(toml_str, "last_used = [");
         for (gint i = 0; config->last_used[i] != NULL; i++) {
             if (i > 0) g_string_append(toml_str, ", ");
             g_string_append_printf(toml_str, "\"%s\"", config->last_used[i]);
         }
-        g_string_append(toml_str, "]\n");
     }
+    g_string_append(toml_str, "]\n");
     
     /* Add installed keyboards array */
     if (config->installed_keyboards) {
