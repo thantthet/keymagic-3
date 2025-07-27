@@ -640,6 +640,86 @@ config_file_changed_cb(GFileMonitor* monitor G_GNUC_UNUSED, GFile* file,
 }
 
 /**
+ * Create an IBus property for a keyboard
+ * 
+ * @param kb Keyboard information
+ * @param prop_key Property key string
+ * @param keyboards_dir Path to keyboards directory (for loading KM2 metadata)
+ * @param is_active Whether this keyboard is currently active
+ * @return New IBusProperty or NULL on error
+ */
+static IBusProperty*
+create_keyboard_property(InstalledKeyboard* kb, const gchar* prop_key, 
+                        const gchar* keyboards_dir, gboolean is_active)
+{
+    g_return_val_if_fail(kb != NULL, NULL);
+    g_return_val_if_fail(prop_key != NULL, NULL);
+    
+    /* Use name from config or fallback to ID */
+    const gchar* display_name = kb->name ? kb->name : kb->id;
+    
+    /* Determine hotkey to use */
+    gchar* hotkey_to_use = NULL;
+    gboolean hotkey_from_km2 = FALSE;
+    
+    if (kb->hotkey == NULL) {
+        /* Hotkey not set in config - try to get from KM2 file */
+        gchar* km2_path = NULL;
+        if (kb->filename && keyboards_dir) {
+            km2_path = g_build_filename(keyboards_dir, kb->filename, NULL);
+        }
+        
+        if (km2_path && g_file_test(km2_path, G_FILE_TEST_EXISTS)) {
+            void* km2_handle = keymagic_ffi_km2_load(km2_path);
+            if (km2_handle) {
+                hotkey_to_use = keymagic_ffi_km2_get_hotkey(km2_handle);
+                hotkey_from_km2 = TRUE;
+                keymagic_ffi_km2_free(km2_handle);
+            }
+        }
+        g_free(km2_path);
+    } else if (strlen(kb->hotkey) > 0) {
+        /* Hotkey explicitly set in config */
+        hotkey_to_use = g_strdup(kb->hotkey);
+    }
+    /* else: kb->hotkey is empty string - user disabled hotkey */
+    
+    /* Create IBus property */
+    IBusText* label = ibus_text_new_from_string(display_name);
+    IBusText* tooltip = NULL;
+    
+    if (hotkey_to_use && strlen(hotkey_to_use) > 0) {
+        gchar* tooltip_str = g_strdup_printf("%s (%s)", display_name, hotkey_to_use);
+        tooltip = ibus_text_new_from_string(tooltip_str);
+        g_free(tooltip_str);
+    } else {
+        tooltip = ibus_text_new_from_string(display_name);
+    }
+    
+    /* Determine property state (checked if active) */
+    IBusPropState state = is_active ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED;
+    
+    /* Create property with radio button type for exclusive selection */
+    IBusProperty* property = ibus_property_new(prop_key,
+                                              PROP_TYPE_RADIO,
+                                              label,
+                                              NULL,  /* icon */
+                                              tooltip,
+                                              TRUE,  /* sensitive */
+                                              TRUE,  /* visible */
+                                              state,
+                                              NULL); /* sub_props */
+    
+    g_debug("%s: Created keyboard property: %s (hotkey: %s%s)", LOG_TAG, display_name,
+            hotkey_to_use ? hotkey_to_use : "none",
+            hotkey_from_km2 ? " [from KM2]" : "");
+    
+    g_free(hotkey_to_use);
+    
+    return property;
+}
+
+/**
  * Update IBus properties for all available keyboards
  */
 void
@@ -681,80 +761,25 @@ keymagic_engine_update_properties(KeyMagicEngine* engine)
             /* Create property key */
             gchar* prop_key = g_strdup_printf("keyboard.%s", kb->id);
             
-            /* Use name from config or fallback to ID */
-            const gchar* display_name = kb->name ? kb->name : kb->id;
+            /* Check if this is the active keyboard */
+            gboolean is_active = (engine->active_keyboard_id && 
+                                 g_strcmp0(kb->id, engine->active_keyboard_id) == 0);
             
-            /* Determine hotkey to use */
-            gchar* hotkey_to_use = NULL;
-            gboolean hotkey_from_km2 = FALSE;
-            
-            if (kb->hotkey == NULL) {
-                /* Hotkey not set in config - try to get from KM2 file */
-                gchar* km2_path = NULL;
-                if (kb->filename && keyboards_dir) {
-                    km2_path = g_build_filename(keyboards_dir, kb->filename, NULL);
-                }
+            /* Create property using shared function */
+            IBusProperty* property = create_keyboard_property(kb, prop_key, keyboards_dir, is_active);
+            if (property) {
+                /* Add to property list */
+                ibus_prop_list_append(engine->prop_list, property);
                 
-                if (km2_path && g_file_test(km2_path, G_FILE_TEST_EXISTS)) {
-                    void* km2_handle = keymagic_ffi_km2_load(km2_path);
-                    if (km2_handle) {
-                        hotkey_to_use = keymagic_ffi_km2_get_hotkey(km2_handle);
-                        hotkey_from_km2 = TRUE;
-                        keymagic_ffi_km2_free(km2_handle);
-                    }
-                }
-                g_free(km2_path);
-            } else if (strlen(kb->hotkey) > 0) {
-                /* Hotkey explicitly set in config */
-                hotkey_to_use = g_strdup(kb->hotkey);
-            }
-            /* else: kb->hotkey is empty string - user disabled hotkey */
-            
-            /* Create IBus property */
-            IBusText* label = ibus_text_new_from_string(display_name);
-            IBusText* tooltip = NULL;
-            
-            if (hotkey_to_use && strlen(hotkey_to_use) > 0) {
-                gchar* tooltip_str = g_strdup_printf("%s (%s)", display_name, hotkey_to_use);
-                tooltip = ibus_text_new_from_string(tooltip_str);
-                g_free(tooltip_str);
-            } else {
-                tooltip = ibus_text_new_from_string(display_name);
+                /* Map property key to keyboard ID */
+                g_hash_table_insert(engine->keyboard_properties, 
+                                   g_strdup(prop_key), 
+                                   g_strdup(kb->id));
+                
+                keyboard_count++;
             }
             
-            /* Determine property state (checked if active) */
-            IBusPropState state = PROP_STATE_UNCHECKED;
-            if (engine->active_keyboard_id && 
-                g_strcmp0(kb->id, engine->active_keyboard_id) == 0) {
-                state = PROP_STATE_CHECKED;
-            }
-            
-            /* Create property with radio button type for exclusive selection */
-            IBusProperty* property = ibus_property_new(prop_key,
-                                                      PROP_TYPE_RADIO,
-                                                      label,
-                                                      NULL,  /* icon */
-                                                      tooltip,
-                                                      TRUE,  /* sensitive */
-                                                      TRUE,  /* visible */
-                                                      state,
-                                                      NULL); /* sub_props */
-            
-            /* Add to property list */
-            ibus_prop_list_append(engine->prop_list, property);
-            
-            /* Map property key to keyboard ID */
-            g_hash_table_insert(engine->keyboard_properties, 
-                               g_strdup(prop_key), 
-                               g_strdup(kb->id));
-            
-            g_debug("%s: Added keyboard property from config: %s (hotkey: %s%s)", LOG_TAG, display_name,
-                    hotkey_to_use ? hotkey_to_use : "none",
-                    hotkey_from_km2 ? " [from KM2]" : "");
-            
-            keyboard_count++;
             g_free(prop_key);
-            g_free(hotkey_to_use);
         }
     }
     
@@ -800,45 +825,41 @@ keymagic_engine_activate_property(KeyMagicEngine* engine, const gchar* prop_name
     if (keymagic_ibus_engine_load_keyboard(engine, keyboard_id)) {
         /* Update property states to reflect new selection */
         if (engine->prop_list) {
-            /* IBusPropList is opaque, so we iterate through our hash table instead */
-            GHashTableIter iter;
-            gpointer key, value;
-            g_hash_table_iter_init(&iter, engine->keyboard_properties);
-            
-            while (g_hash_table_iter_next(&iter, &key, &value)) {
-                const gchar* prop_key = (const gchar*)key;
-                const gchar* kb_id = (const gchar*)value;
+            /* Need to reload config to get proper display names and hotkeys */
+            KeyMagicConfig* config = keymagic_config_load(engine->config_path);
+            if (config) {
+                gchar* keyboards_dir = keymagic_config_get_keyboards_dir();
                 
-                /* Determine new state */
-                IBusPropState new_state = (g_strcmp0(prop_key, prop_name) == 0) ? 
-                                         PROP_STATE_CHECKED : PROP_STATE_UNCHECKED;
+                /* IBusPropList is opaque, so we iterate through our hash table instead */
+                GHashTableIter iter;
+                gpointer key, value;
+                g_hash_table_iter_init(&iter, engine->keyboard_properties);
                 
-                /* Create a property update with the new state */
-                IBusText* label = ibus_text_new_from_string(kb_id);
-                IBusProperty* prop = ibus_property_new(prop_key,
-                                                      PROP_TYPE_RADIO,
-                                                      label,
-                                                      NULL,  /* icon */
-                                                      NULL,  /* tooltip */
-                                                      TRUE,  /* sensitive */
-                                                      TRUE,  /* visible */
-                                                      new_state,
-                                                      NULL); /* sub_props */
+                while (g_hash_table_iter_next(&iter, &key, &value)) {
+                    const gchar* prop_key = (const gchar*)key;
+                    const gchar* kb_id = (const gchar*)value;
+                    
+                    /* Find keyboard info from config */
+                    InstalledKeyboard* kb_info = keymagic_config_get_keyboard_info(config, kb_id);
+                    if (kb_info) {
+                        /* Check if this keyboard is now active */
+                        gboolean is_active = (g_strcmp0(prop_key, prop_name) == 0);
+                        
+                        /* Create property using shared function */
+                        IBusProperty* prop = create_keyboard_property(kb_info, prop_key, 
+                                                                     keyboards_dir, is_active);
+                        if (prop) {
+                            /* Update this property */
+                            ibus_engine_update_property((IBusEngine*)engine, prop);
+                            g_object_unref(prop);
+                        }
+                    }
+                }
                 
-                /* Update this property */
-                ibus_engine_update_property((IBusEngine*)engine, prop);
-                g_object_unref(prop);
+                g_free(keyboards_dir);
+                keymagic_config_free(config);
             }
         }
-        
-        /* Show notification using auxiliary text */
-        gchar* message = g_strdup_printf("Switched to: %s", keyboard_id);
-        IBusText* text = ibus_text_new_from_string(message);
-        ibus_engine_update_auxiliary_text((IBusEngine*)engine, text, TRUE);
-        g_free(message);
-        
-        /* Hide notification after 2 seconds */
-        g_timeout_add_seconds(2, (GSourceFunc)((void (*)(void*))ibus_engine_hide_auxiliary_text), engine);
         
         /* Update configuration file to persist the selection */
         if (!keymagic_config_update_active_keyboard(engine->config_path, keyboard_id)) {
