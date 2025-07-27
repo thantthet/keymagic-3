@@ -7,6 +7,26 @@ let activeKeyboardId = null;
 let selectedKeyboardId = null;
 let recentlyAddedKeyboardIds = new Set(); // Track recently added keyboards
 let platformInfo = null; // Platform capabilities
+
+// Helper function to format hotkey for display based on platform
+function formatHotkeyForDisplay(hotkey) {
+  if (!hotkey || !platformInfo) return hotkey;
+  
+  // Replace generic meta key names with platform-specific ones
+  let formatted = hotkey;
+  
+  // Handle different meta key variations
+  if (platformInfo.os === 'windows') {
+    formatted = formatted.replace(/\b(Meta|Cmd|Command|Super)\b/gi, 'Win');
+  } else if (platformInfo.os === 'macos') {
+    formatted = formatted.replace(/\b(Meta|Win|Windows|Super)\b/gi, 'Cmd');
+  } else {
+    // Linux/other
+    formatted = formatted.replace(/\b(Meta|Win|Windows|Cmd|Command)\b/gi, 'Super');
+  }
+  
+  return formatted;
+}
 // DOM Elements
 let keyboardList;
 let addKeyboardBtn;
@@ -127,11 +147,11 @@ function createKeyboardCard(keyboard) {
             displayHotkey = 'No hotkey';
             displayClass += ' add-hotkey';
           } else {
-            displayHotkey = keyboard.hotkey;
+            displayHotkey = formatHotkeyForDisplay(keyboard.hotkey);
           }
         } else if (keyboard.default_hotkey) {
           // No custom hotkey, use default
-          displayHotkey = keyboard.default_hotkey;
+          displayHotkey = formatHotkeyForDisplay(keyboard.default_hotkey);
           displayTitle = 'Default hotkey - Click to configure';
         } else {
           // No custom hotkey and no default
@@ -711,13 +731,13 @@ window.configureHotkey = function(keyboardId) {
       statusText = '<span style="color: var(--warning-color)">Currently: No hotkey (explicitly disabled)</span>';
     } else {
       // Custom hotkey
-      initialValue = keyboard.hotkey;
+      initialValue = formatHotkeyForDisplay(keyboard.hotkey);
       recordedKeys = keyboard.hotkey.split('+');
       statusText = '<span style="color: var(--success-color)">Currently: Custom hotkey</span>';
     }
   } else if (keyboard.default_hotkey) {
     // Using default hotkey
-    initialValue = keyboard.default_hotkey;
+    initialValue = formatHotkeyForDisplay(keyboard.default_hotkey);
     recordedKeys = keyboard.default_hotkey.split('+');
     statusText = '<span style="color: var(--primary-color)">Currently: Using default hotkey</span>';
   } else {
@@ -748,7 +768,7 @@ window.configureHotkey = function(keyboardId) {
       <div id="hotkey-validation-error" class="validation-error" style="display: none; margin-top: 10px;"></div>
       <p class="hotkey-hint">Press the desired key combination (e.g., Ctrl+Shift+M) or click Clear to remove hotkey</p>
       ${keyboard.default_hotkey ? 
-        `<p class="hotkey-default">Default hotkey: ${keyboard.default_hotkey}</p>` : 
+        `<p class="hotkey-default">Default hotkey: ${formatHotkeyForDisplay(keyboard.default_hotkey)}</p>` : 
         '<p class="hotkey-default">No default hotkey available</p>'}
     `,
     `
@@ -781,6 +801,16 @@ function recordHotkey(e) {
   if (e.ctrlKey) recordedKeys.push('Ctrl');
   if (e.shiftKey) recordedKeys.push('Shift');
   if (e.altKey) recordedKeys.push('Alt');
+  if (e.metaKey) {
+    // Platform-specific meta key name
+    if (platformInfo && platformInfo.os === 'windows') {
+      recordedKeys.push('Win');
+    } else if (platformInfo && platformInfo.os === 'macos') {
+      recordedKeys.push('Cmd');
+    } else {
+      recordedKeys.push('Super');
+    }
+  }
   
   // Record the main key
   if (e.key && e.key.length === 1) {
@@ -832,7 +862,7 @@ window.useDefaultHotkey = function() {
   if (currentHotkeyKeyboard && currentHotkeyKeyboard.default_hotkey) {
     // Set special marker to indicate we want to use default
     recordedKeys = ['USE_DEFAULT'];
-    document.getElementById('hotkey-input').value = currentHotkeyKeyboard.default_hotkey;
+    document.getElementById('hotkey-input').value = formatHotkeyForDisplay(currentHotkeyKeyboard.default_hotkey);
     // Clear any validation error
     const errorDiv = document.getElementById('hotkey-validation-error');
     if (errorDiv) {
@@ -911,7 +941,7 @@ window.saveHotkey = async function() {
         }
         
         // Check if hotkey has modifiers (warning only)
-        const hasModifier = /Ctrl|Alt|Shift|Win|Cmd|Meta/i.test(hotkeyValue);
+        const hasModifier = /Ctrl|Alt|Shift|Win|Cmd|Meta|Super/i.test(hotkeyValue);
         if (!hasModifier) {
           const errorDiv = document.getElementById('hotkey-validation-error');
           if (errorDiv) {
