@@ -42,10 +42,13 @@ keymagic_config_load(const gchar* config_path)
     config->start_with_system = FALSE;
     config->check_for_updates = TRUE;
     config->last_update_check = NULL;
+    config->last_scanned_version = NULL;
+    config->update_remind_after = NULL;
     config->active_keyboard = NULL;
     config->last_used = NULL;
     config->installed_keyboards = NULL;
-    config->enabled_processes = NULL;
+    config->composition_mode_hosts = NULL;
+    config->direct_mode_hosts = NULL;
     
     /* Parse [general] section */
     toml_table_t* general = toml_table_in(conf, "general");
@@ -65,6 +68,18 @@ keymagic_config_load(const gchar* config_path)
         datum = toml_string_in(general, "last_update_check");
         if (datum.ok) {
             config->last_update_check = g_strdup(datum.u.s);
+            free(datum.u.s);
+        }
+        
+        datum = toml_string_in(general, "last_scanned_version");
+        if (datum.ok) {
+            config->last_scanned_version = g_strdup(datum.u.s);
+            free(datum.u.s);
+        }
+        
+        datum = toml_string_in(general, "update_remind_after");
+        if (datum.ok) {
+            config->update_remind_after = g_strdup(datum.u.s);
             free(datum.u.s);
         }
     }
@@ -157,15 +172,33 @@ keymagic_config_load(const gchar* config_path)
     /* Parse [composition_mode] section */
     toml_table_t* comp_mode = toml_table_in(conf, "composition_mode");
     if (comp_mode) {
-        toml_array_t* enabled_procs = toml_array_in(comp_mode, "enabled_processes");
-        if (enabled_procs) {
-            int n = toml_array_nelem(enabled_procs);
-            config->enabled_processes = g_new0(gchar*, n + 1);
+        toml_array_t* enabled_hosts = toml_array_in(comp_mode, "enabled_hosts");
+        if (enabled_hosts) {
+            int n = toml_array_nelem(enabled_hosts);
+            config->composition_mode_hosts = g_new0(gchar*, n + 1);
             
             for (int i = 0; i < n; i++) {
-                toml_datum_t datum = toml_string_at(enabled_procs, i);
+                toml_datum_t datum = toml_string_at(enabled_hosts, i);
                 if (datum.ok) {
-                    config->enabled_processes[i] = g_strdup(datum.u.s);
+                    config->composition_mode_hosts[i] = g_strdup(datum.u.s);
+                    free(datum.u.s);
+                }
+            }
+        }
+    }
+    
+    /* Parse [direct_mode] section */
+    toml_table_t* direct_mode = toml_table_in(conf, "direct_mode");
+    if (direct_mode) {
+        toml_array_t* enabled_hosts = toml_array_in(direct_mode, "enabled_hosts");
+        if (enabled_hosts) {
+            int n = toml_array_nelem(enabled_hosts);
+            config->direct_mode_hosts = g_new0(gchar*, n + 1);
+            
+            for (int i = 0; i < n; i++) {
+                toml_datum_t datum = toml_string_at(enabled_hosts, i);
+                if (datum.ok) {
+                    config->direct_mode_hosts[i] = g_strdup(datum.u.s);
                     free(datum.u.s);
                 }
             }
@@ -210,9 +243,12 @@ keymagic_config_free(KeyMagicConfig* config)
     }
     
     g_free(config->last_update_check);
+    g_free(config->last_scanned_version);
+    g_free(config->update_remind_after);
     g_free(config->active_keyboard);
     g_strfreev(config->last_used);
-    g_strfreev(config->enabled_processes);
+    g_strfreev(config->composition_mode_hosts);
+    g_strfreev(config->direct_mode_hosts);
     
     /* Free installed keyboards list */
     if (config->installed_keyboards) {
@@ -360,20 +396,13 @@ keymagic_config_get_keyboard_info(KeyMagicConfig* config, const gchar* keyboard_
 }
 
 /**
- * Update active keyboard in configuration file
+ * Save configuration to TOML file
  */
 gboolean
-keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* keyboard_id)
+keymagic_config_save(const gchar* config_path, const KeyMagicConfig* config)
 {
     g_return_val_if_fail(config_path != NULL, FALSE);
-    g_return_val_if_fail(keyboard_id != NULL, FALSE);
-    
-    /* Load current configuration */
-    KeyMagicConfig* config = keymagic_config_load(config_path);
-    if (!config) {
-        g_warning("%s: Failed to load config for update: %s", LOG_TAG, config_path);
-        return FALSE;
-    }
+    g_return_val_if_fail(config != NULL, FALSE);
     
     /* Build TOML string */
     GString* toml_str = g_string_new("");
@@ -388,13 +417,23 @@ keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* ke
         g_string_append_printf(toml_str, "last_update_check = \"%s\"\n", 
                               config->last_update_check);
     }
+    if (config->last_scanned_version) {
+        g_string_append_printf(toml_str, "last_scanned_version = \"%s\"\n", 
+                              config->last_scanned_version);
+    }
+    if (config->update_remind_after) {
+        g_string_append_printf(toml_str, "update_remind_after = \"%s\"\n", 
+                              config->update_remind_after);
+    }
     g_string_append(toml_str, "\n");
     
     /* Keyboards section */
     g_string_append(toml_str, "[keyboards]\n");
     
-    /* Update active keyboard to the new value */
-    g_string_append_printf(toml_str, "active = \"%s\"\n", keyboard_id);
+    /* Write active keyboard */
+    if (config->active_keyboard) {
+        g_string_append_printf(toml_str, "active = \"%s\"\n", config->active_keyboard);
+    }
     
     /* Add last_used array (write empty array if not present) */
     g_string_append(toml_str, "last_used = [");
@@ -428,16 +467,27 @@ keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* ke
         }
     }
     
-    /* Add composition_mode section if enabled_processes exists */
-    if (config->enabled_processes && config->enabled_processes[0]) {
-        g_string_append(toml_str, "[composition_mode]\n");
-        g_string_append(toml_str, "enabled_processes = [");
-        for (gint i = 0; config->enabled_processes[i] != NULL; i++) {
+    /* Add composition_mode section */
+    g_string_append(toml_str, "[composition_mode]\n");
+    g_string_append(toml_str, "enabled_hosts = [");
+    if (config->composition_mode_hosts && config->composition_mode_hosts[0]) {
+        for (gint i = 0; config->composition_mode_hosts[i] != NULL; i++) {
             if (i > 0) g_string_append(toml_str, ", ");
-            g_string_append_printf(toml_str, "\"%s\"", config->enabled_processes[i]);
+            g_string_append_printf(toml_str, "\"%s\"", config->composition_mode_hosts[i]);
         }
-        g_string_append(toml_str, "]\n");
     }
+    g_string_append(toml_str, "]\n\n");
+    
+    /* Add direct_mode section */
+    g_string_append(toml_str, "[direct_mode]\n");
+    g_string_append(toml_str, "enabled_hosts = [");
+    if (config->direct_mode_hosts && config->direct_mode_hosts[0]) {
+        for (gint i = 0; config->direct_mode_hosts[i] != NULL; i++) {
+            if (i > 0) g_string_append(toml_str, ", ");
+            g_string_append_printf(toml_str, "\"%s\"", config->direct_mode_hosts[i]);
+        }
+    }
+    g_string_append(toml_str, "]\n");
     
     /* Write to file */
     GError* error = NULL;
@@ -448,11 +498,11 @@ keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* ke
                   error ? error->message : "Unknown error");
         if (error) g_error_free(error);
     } else {
-        g_debug("%s: Successfully updated active keyboard to: %s", LOG_TAG, keyboard_id);
+        g_debug("%s: Successfully saved config to: %s", LOG_TAG, config_path);
     }
     
     g_string_free(toml_str, TRUE);
-    keymagic_config_free(config);
     
     return success;
 }
+

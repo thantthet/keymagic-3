@@ -421,7 +421,13 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
                         aux_text_timeout_cb, engine);
                     
                     /* Update configuration file */
-                    keymagic_config_update_active_keyboard(engine->config_path, keyboard_id);
+                    KeyMagicConfig* config = keymagic_config_load(engine->config_path);
+                    if (config) {
+                        g_free(config->active_keyboard);
+                        config->active_keyboard = g_strdup(keyboard_id);
+                        keymagic_config_save(engine->config_path, config);
+                        keymagic_config_free(config);
+                    }
                 }
             }
             
@@ -1083,11 +1089,11 @@ keymagic_engine_activate_property(KeyMagicEngine* engine, const gchar* prop_name
     
     /* Load the keyboard immediately */
     if (keymagic_ibus_engine_load_keyboard(engine, keyboard_id)) {
-        /* Update property states to reflect new selection */
-        if (engine->prop_list) {
-            /* Need to reload config to get proper display names and hotkeys */
-            KeyMagicConfig* config = keymagic_config_load(engine->config_path);
-            if (config) {
+        /* Load config to update properties and save active keyboard */
+        KeyMagicConfig* config = keymagic_config_load(engine->config_path);
+        if (config) {
+            /* Update property states to reflect new selection */
+            if (engine->prop_list) {
                 gchar* keyboards_dir = keymagic_config_get_keyboards_dir();
                 
                 /* IBusPropList is opaque, so we iterate through our hash table instead */
@@ -1117,13 +1123,18 @@ keymagic_engine_activate_property(KeyMagicEngine* engine, const gchar* prop_name
                 }
                 
                 g_free(keyboards_dir);
-                keymagic_config_free(config);
             }
-        }
-        
-        /* Update configuration file to persist the selection */
-        if (!keymagic_config_update_active_keyboard(engine->config_path, keyboard_id)) {
-            g_warning("%s: Failed to persist keyboard selection to config", LOG_TAG);
+            
+            /* Update active keyboard and save configuration */
+            g_free(config->active_keyboard);
+            config->active_keyboard = g_strdup(keyboard_id);
+            if (!keymagic_config_save(engine->config_path, config)) {
+                g_warning("%s: Failed to persist keyboard selection to config", LOG_TAG);
+            }
+            
+            keymagic_config_free(config);
+        } else {
+            g_warning("%s: Failed to load config for keyboard update", LOG_TAG);
         }
     }
 }

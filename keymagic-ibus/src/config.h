@@ -29,6 +29,8 @@ typedef struct {
     gboolean start_with_system;
     gboolean check_for_updates;
     gchar* last_update_check;           /* ISO 8601 timestamp or NULL */
+    gchar* last_scanned_version;        /* Last scanned app version or NULL */
+    gchar* update_remind_after;         /* ISO 8601 timestamp or NULL */
     
     /* Keyboard settings */
     gchar* active_keyboard;             /* keyboards.active - ID of current keyboard */
@@ -36,7 +38,10 @@ typedef struct {
     GList* installed_keyboards;         /* keyboards.installed - List of InstalledKeyboard* */
     
     /* Composition mode settings */
-    gchar** enabled_processes;          /* NULL-terminated array of process names */
+    gchar** composition_mode_hosts;     /* NULL-terminated array of host names/processes */
+    
+    /* Direct mode settings */
+    gchar** direct_mode_hosts;          /* NULL-terminated array of host names */
 } KeyMagicConfig;
 
 /**
@@ -93,13 +98,13 @@ InstalledKeyboard* keymagic_config_get_keyboard_info(KeyMagicConfig* config, con
 void keymagic_config_free_keyboard(InstalledKeyboard* keyboard);
 
 /**
- * Update active keyboard in configuration file
+ * Save configuration to TOML file
  * 
  * @param config_path Path to config.toml file
- * @param keyboard_id New active keyboard ID
+ * @param config Configuration to save
  * @return TRUE on success, FALSE on error
  */
-gboolean keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* keyboard_id);
+gboolean keymagic_config_save(const gchar* config_path, const KeyMagicConfig* config);
 
 G_END_DECLS
 
