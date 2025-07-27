@@ -41,8 +41,8 @@ if (Test-Path $VersionFile) {
 
 Write-Host "`nComponent Versions:" -ForegroundColor Yellow
 
-# Check gui-tauri/src-tauri/Cargo.toml - only package version
-$CargoTomlPath = Join-Path $ProjectRoot "gui-tauri\src-tauri\Cargo.toml"
+# Check keymagic-shared/gui/src-tauri/Cargo.toml - only package version
+$CargoTomlPath = Join-Path $ProjectRoot "..\keymagic-shared\gui\src-tauri\Cargo.toml"
 $CargoVersion = "Not found"
 if (Test-Path $CargoTomlPath) {
     $Content = Get-Content $CargoTomlPath -Raw
@@ -58,8 +58,8 @@ if ($CargoVersion -eq $MasterVersion) {
     Write-Host $CargoVersion -ForegroundColor Red
 }
 
-# Check gui-tauri/src-tauri/tauri.conf.json
-$TauriConfPath = Join-Path $ProjectRoot "gui-tauri\src-tauri\tauri.conf.json"
+# Check keymagic-shared/gui/src-tauri/tauri.conf.json
+$TauriConfPath = Join-Path $ProjectRoot "..\keymagic-shared\gui\src-tauri\tauri.conf.json"
 $TauriVersion = Get-VersionFromFile -FilePath $TauriConfPath -Pattern '"version"\s*:\s*"([^"]*)"'
 Write-Host "  Tauri Config:          " -NoNewline
 if ($TauriVersion -eq $MasterVersion) {

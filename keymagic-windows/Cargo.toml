@@ -1,7 +1,0 @@
-[workspace]
-members = ["gui-tauri/src-tauri"]
-resolver = "2"
-
-[workspace.dependencies]
-keymagic-core = { path = "../keymagic-core" }
-anyhow = "1.0"

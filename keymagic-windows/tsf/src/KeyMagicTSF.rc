@@ -32,4 +32,4 @@ BEGIN
 END
 
 // Icon Resources
-IDI_KEYMAGIC       ICON    "..\\..\\resources\\icons\\keymagic.ico"
+IDI_KEYMAGIC       ICON    "..\\..\\..\\resources\\icons\\keymagic.ico"
