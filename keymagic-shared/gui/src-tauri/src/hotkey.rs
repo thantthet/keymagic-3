@@ -26,31 +26,40 @@ impl HotkeyManager {
 
     /// Register hotkeys for all keyboards
     pub fn register_all_hotkeys<R: Runtime>(&self, app: &AppHandle<R>, keyboard_manager: Arc<KeyboardManager>) -> Result<()> {
-        // Clear existing hotkeys first
-        self.unregister_all_hotkeys(app)?;
+        #[cfg(target_os = "macos")]
+        {
+            log::info!("Skipping hotkey registration on macOS - handled by IME");
+            return Ok(());
+        }
         
-        let keyboards = keyboard_manager.get_keyboards();
-        
-        for keyboard in keyboards {
-            // Check if hotkey is explicitly disabled (empty string)
-            if keyboard.hotkey.as_ref() == Some(&String::new()) {
-                // User explicitly disabled hotkey, skip registration
-                continue;
-            }
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Clear existing hotkeys first
+            self.unregister_all_hotkeys(app)?;
             
-            // Use custom hotkey if set, otherwise use default hotkey
-            let effective_hotkey = keyboard.hotkey.as_ref().or(keyboard.default_hotkey.as_ref());
+            let keyboards = keyboard_manager.get_keyboards();
             
-            if let Some(hotkey_str) = effective_hotkey {
-                if !hotkey_str.is_empty() {
-                    if let Err(e) = self.register_hotkey(app, &keyboard.id, hotkey_str, keyboard_manager.clone()) {
-                        log::warn!("Failed to register hotkey '{}' for keyboard '{}': {}", hotkey_str, keyboard.id, e);
+            for keyboard in keyboards {
+                // Check if hotkey is explicitly disabled (empty string)
+                if keyboard.hotkey.as_ref() == Some(&String::new()) {
+                    // User explicitly disabled hotkey, skip registration
+                    continue;
+                }
+                
+                // Use custom hotkey if set, otherwise use default hotkey
+                let effective_hotkey = keyboard.hotkey.as_ref().or(keyboard.default_hotkey.as_ref());
+                
+                if let Some(hotkey_str) = effective_hotkey {
+                    if !hotkey_str.is_empty() {
+                        if let Err(e) = self.register_hotkey(app, &keyboard.id, hotkey_str, keyboard_manager.clone()) {
+                            log::warn!("Failed to register hotkey '{}' for keyboard '{}': {}", hotkey_str, keyboard.id, e);
+                        }
                     }
                 }
             }
+            
+            Ok(())
         }
-        
-        Ok(())
     }
 
     /// Register a single hotkey for a keyboard
@@ -61,26 +70,35 @@ impl HotkeyManager {
         hotkey_str: &str,
         keyboard_manager: Arc<KeyboardManager>
     ) -> Result<()> {
-        let shortcut = self.parse_hotkey(hotkey_str)
-            .context(format!("Failed to parse hotkey: {}", hotkey_str))?;
+        #[cfg(target_os = "macos")]
+        {
+            log::info!("Skipping hotkey registration on macOS - handled by IME");
+            return Ok(());
+        }
         
-        // For now, just register the shortcut - the handling will be done via events
-        app.global_shortcut().register(shortcut.clone())
-            .context(format!("Failed to register global shortcut: {}", hotkey_str))?;
-        
-        // Get normalized string representation of the shortcut
-        let normalized_shortcut = self.shortcut_to_string(&shortcut);
-        
-        // Store the registered shortcut
-        let mut registered = self.registered_shortcuts.lock().unwrap();
-        registered.insert(keyboard_id.to_string(), hotkey_str.to_string());
-        
-        let mut shortcut_map = self.shortcut_to_keyboard.lock().unwrap();
-        shortcut_map.insert(normalized_shortcut.clone(), keyboard_id.to_string());
-        
-        log::info!("Registered hotkey '{}' (normalized: '{}') for keyboard '{}'", hotkey_str, normalized_shortcut, keyboard_id);
-        
-        Ok(())
+        #[cfg(not(target_os = "macos"))]
+        {
+            let shortcut = self.parse_hotkey(hotkey_str)
+                .context(format!("Failed to parse hotkey: {}", hotkey_str))?;
+            
+            // For now, just register the shortcut - the handling will be done via events
+            app.global_shortcut().register(shortcut.clone())
+                .context(format!("Failed to register global shortcut: {}", hotkey_str))?;
+            
+            // Get normalized string representation of the shortcut
+            let normalized_shortcut = self.shortcut_to_string(&shortcut);
+            
+            // Store the registered shortcut
+            let mut registered = self.registered_shortcuts.lock().unwrap();
+            registered.insert(keyboard_id.to_string(), hotkey_str.to_string());
+            
+            let mut shortcut_map = self.shortcut_to_keyboard.lock().unwrap();
+            shortcut_map.insert(normalized_shortcut.clone(), keyboard_id.to_string());
+            
+            log::info!("Registered hotkey '{}' (normalized: '{}') for keyboard '{}'", hotkey_str, normalized_shortcut, keyboard_id);
+            
+            Ok(())
+        }
     }
 
     /// Unregister a specific hotkey
@@ -115,7 +133,16 @@ impl HotkeyManager {
 
     /// Refresh all hotkeys (useful when keyboards are updated)
     pub fn refresh_hotkeys<R: Runtime>(&self, app: &AppHandle<R>, keyboard_manager: Arc<KeyboardManager>) -> Result<()> {
-        self.register_all_hotkeys(app, keyboard_manager)
+        #[cfg(target_os = "macos")]
+        {
+            log::info!("Skipping hotkey refresh on macOS - handled by IME");
+            return Ok(());
+        }
+        
+        #[cfg(not(target_os = "macos"))]
+        {
+            self.register_all_hotkeys(app, keyboard_manager)
+        }
     }
 
     /// Validate a hotkey string without registering it

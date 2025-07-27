@@ -141,9 +141,16 @@ pub fn run() {
                 )?;
             }
             
-            // Initialize hotkeys after all plugins are loaded
-            hotkey_manager.initialize(app.handle(), keyboard_manager.clone())
-                .expect("Failed to initialize hotkey manager");
+            // Initialize hotkeys after all plugins are loaded (except on macOS where IME handles hotkeys)
+            #[cfg(not(target_os = "macos"))]
+            {
+                hotkey_manager.initialize(app.handle(), keyboard_manager.clone())
+                    .expect("Failed to initialize hotkey manager");
+            }
+            #[cfg(target_os = "macos")]
+            {
+                log::info!("Skipping hotkey registration on macOS - handled by IME");
+            }
             
             // Check for updates on startup (async)
             let app_handle = app.handle().clone();
