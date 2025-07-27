@@ -40,6 +40,10 @@ struct _KeyMagicEngine {
     IBusText* preedit_text;             /* Current preedit text being composed */
     gboolean preedit_visible;           /* Whether preedit is currently shown */
     guint preedit_cursor_pos;           /* Cursor position in preedit text */
+    
+    /* Property management for keyboard switching */
+    IBusPropList* prop_list;            /* List of properties (keyboards with hotkeys) */
+    GHashTable* keyboard_properties;    /* Maps property key to keyboard ID */
 };
 
 struct _KeyMagicEngineClass {
@@ -65,6 +69,10 @@ void keymagic_engine_clear_preedit(KeyMagicEngine* engine);
 /* Utility functions */
 gboolean keymagic_engine_is_printable_ascii(guint keyval);
 gboolean keymagic_engine_should_commit(guint keyval, gboolean is_processed, const gchar* composing_text);
+
+/* Property/hotkey management */
+void keymagic_engine_update_properties(KeyMagicEngine* engine);
+void keymagic_engine_activate_property(KeyMagicEngine* engine, const gchar* prop_name);
 
 G_END_DECLS
 

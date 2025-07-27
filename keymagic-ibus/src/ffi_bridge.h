@@ -107,6 +107,45 @@ void keymagic_ffi_free_string(gchar* str);
  */
 void keymagic_ffi_free_result(KeyProcessingResult* result);
 
+/**
+ * Load KM2 file for metadata access
+ * 
+ * @param km2_path Path to .km2 file
+ * @return Handle to KM2 file or NULL on error
+ */
+void* keymagic_ffi_km2_load(const gchar* km2_path);
+
+/**
+ * Free KM2 file handle
+ * 
+ * @param handle KM2 file handle
+ */
+void keymagic_ffi_km2_free(void* handle);
+
+/**
+ * Get keyboard name from KM2 file
+ * 
+ * @param handle KM2 file handle  
+ * @return Keyboard name (caller must free) or NULL
+ */
+gchar* keymagic_ffi_km2_get_name(void* handle);
+
+/**
+ * Get keyboard description from KM2 file
+ * 
+ * @param handle KM2 file handle
+ * @return Description (caller must free) or NULL  
+ */
+gchar* keymagic_ffi_km2_get_description(void* handle);
+
+/**
+ * Get keyboard hotkey from KM2 file
+ * 
+ * @param handle KM2 file handle
+ * @return Hotkey string (caller must free) or NULL
+ */
+gchar* keymagic_ffi_km2_get_hotkey(void* handle);
+
 G_END_DECLS
 
 #endif /* KEYMAGIC_FFI_BRIDGE_H */

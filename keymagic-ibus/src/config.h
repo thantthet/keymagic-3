@@ -6,6 +6,19 @@
 G_BEGIN_DECLS
 
 /**
+ * Installed Keyboard Information
+ * 
+ * Represents a keyboard entry in the keyboards.installed array
+ */
+typedef struct {
+    gchar* id;                          /* Keyboard ID */
+    gchar* name;                        /* Display name */
+    gchar* filename;                    /* Filename (not full path) */
+    gchar* hotkey;                      /* Hotkey string or NULL */
+    gchar* hash;                        /* File hash */
+} InstalledKeyboard;
+
+/**
  * KeyMagic Configuration Structure
  * 
  * Represents the parsed TOML configuration from ~/.config/keymagic/config.toml
@@ -20,6 +33,7 @@ typedef struct {
     /* Keyboard settings */
     gchar* active_keyboard;             /* keyboards.active - ID of current keyboard */
     gchar** last_used;                  /* keyboards.last_used - NULL-terminated array */
+    GList* installed_keyboards;         /* keyboards.installed - List of InstalledKeyboard* */
     
     /* Composition mode settings */
     gchar** enabled_processes;          /* NULL-terminated array of process names */
@@ -61,6 +75,31 @@ gchar* keymagic_config_get_keyboards_dir(void);
  * @return Full path to .km2 file or NULL if not found (caller must free)
  */
 gchar* keymagic_config_find_keyboard_file(const gchar* keyboard_id);
+
+/**
+ * Get installed keyboard info by ID
+ * 
+ * @param config Configuration structure
+ * @param keyboard_id Keyboard ID to search for
+ * @return InstalledKeyboard info or NULL if not found (do not free - owned by config)
+ */
+InstalledKeyboard* keymagic_config_get_keyboard_info(KeyMagicConfig* config, const gchar* keyboard_id);
+
+/**
+ * Free an InstalledKeyboard structure
+ * 
+ * @param keyboard InstalledKeyboard to free
+ */
+void keymagic_config_free_keyboard(InstalledKeyboard* keyboard);
+
+/**
+ * Update active keyboard in configuration file
+ * 
+ * @param config_path Path to config.toml file
+ * @param keyboard_id New active keyboard ID
+ * @return TRUE on success, FALSE on error
+ */
+gboolean keymagic_config_update_active_keyboard(const gchar* config_path, const gchar* keyboard_id);
 
 G_END_DECLS
 

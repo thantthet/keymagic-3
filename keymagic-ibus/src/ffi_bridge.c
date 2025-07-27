@@ -57,6 +57,14 @@ extern char* keymagic_engine_get_composition(void* engine);
 extern int keymagic_engine_set_composition(void* engine, const char* text);
 extern void keymagic_engine_free_string(char* str);
 
+/* External KM2 metadata FFI functions */
+extern void* keymagic_km2_load(const char* path);
+extern void keymagic_km2_free(void* handle);
+extern char* keymagic_km2_get_name(void* handle);
+extern char* keymagic_km2_get_description(void* handle);
+extern char* keymagic_km2_get_hotkey(void* handle);
+extern void keymagic_free_string(char* str);
+
 /* ProcessKeyOutput structure from Rust FFI */
 typedef struct {
     int action_type;
@@ -303,4 +311,91 @@ keymagic_ffi_free_result(KeyProcessingResult* result)
     
     /* Clear structure */
     memset(result, 0, sizeof(KeyProcessingResult));
+}
+
+/**
+ * Load KM2 file for metadata access
+ */
+void*
+keymagic_ffi_km2_load(const gchar* km2_path)
+{
+    g_return_val_if_fail(km2_path != NULL, NULL);
+    
+    if (!g_file_test(km2_path, G_FILE_TEST_EXISTS)) {
+        g_debug("%s: KM2 file not found: %s", LOG_TAG, km2_path);
+        return NULL;
+    }
+    
+    return keymagic_km2_load(km2_path);
+}
+
+/**
+ * Free KM2 file handle
+ */
+void
+keymagic_ffi_km2_free(void* handle)
+{
+    if (handle) {
+        keymagic_km2_free(handle);
+    }
+}
+
+/**
+ * Get keyboard name from KM2 file
+ */
+gchar*
+keymagic_ffi_km2_get_name(void* handle)
+{
+    g_return_val_if_fail(handle != NULL, NULL);
+    
+    char* name = keymagic_km2_get_name(handle);
+    if (!name) {
+        return NULL;
+    }
+    
+    /* Convert from Rust-allocated string to GLib string */
+    gchar* result = g_strdup(name);
+    keymagic_free_string(name);
+    
+    return result;
+}
+
+/**
+ * Get keyboard description from KM2 file
+ */
+gchar*
+keymagic_ffi_km2_get_description(void* handle)
+{
+    g_return_val_if_fail(handle != NULL, NULL);
+    
+    char* desc = keymagic_km2_get_description(handle);
+    if (!desc) {
+        return NULL;
+    }
+    
+    /* Convert from Rust-allocated string to GLib string */
+    gchar* result = g_strdup(desc);
+    keymagic_free_string(desc);
+    
+    return result;
+}
+
+/**
+ * Get keyboard hotkey from KM2 file
+ */
+gchar*
+keymagic_ffi_km2_get_hotkey(void* handle)
+{
+    g_return_val_if_fail(handle != NULL, NULL);
+    
+    char* hotkey = keymagic_km2_get_hotkey(handle);
+    if (!hotkey) {
+        return NULL;
+    }
+    
+    /* Convert from Rust-allocated string to GLib string */
+    gchar* result = g_strdup(hotkey);
+    keymagic_free_string(hotkey);
+    
+    return result;
 }

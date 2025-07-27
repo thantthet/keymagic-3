@@ -40,6 +40,8 @@ static void keymagic_engine_focus_out(IBusEngine* engine);
 static void keymagic_engine_reset(IBusEngine* engine);
 static void keymagic_engine_enable(IBusEngine* engine);
 static void keymagic_engine_disable(IBusEngine* engine);
+static void keymagic_engine_property_activate(IBusEngine* engine, const gchar* prop_name,
+                                              guint prop_state);
 
 /* Type registration */
 G_DEFINE_TYPE(KeyMagicEngine, keymagic_engine, IBUS_TYPE_ENGINE)
@@ -63,6 +65,7 @@ keymagic_engine_class_init(KeyMagicEngineClass* klass)
     engine_class->reset = keymagic_engine_reset;
     engine_class->enable = keymagic_engine_enable;
     engine_class->disable = keymagic_engine_disable;
+    engine_class->property_activate = keymagic_engine_property_activate;
 }
 
 /**
@@ -84,6 +87,11 @@ keymagic_engine_init(KeyMagicEngine* engine)
     engine->preedit_text = NULL;
     engine->preedit_visible = FALSE;
     engine->preedit_cursor_pos = 0;
+    
+    /* Initialize property management */
+    engine->prop_list = NULL;
+    engine->keyboard_properties = g_hash_table_new_full(g_str_hash, g_str_equal,
+                                                        g_free, g_free);
     
     /* Set up configuration path and monitoring */
     engine->config_path = keymagic_config_get_default_path();
@@ -138,6 +146,15 @@ keymagic_engine_finalize(GObject* object)
     /* Clear preedit */
     keymagic_engine_clear_preedit(engine);
     
+    /* Cleanup property management */
+    if (engine->prop_list) {
+        engine->prop_list = NULL;
+    }
+    if (engine->keyboard_properties) {
+        g_hash_table_destroy(engine->keyboard_properties);
+        engine->keyboard_properties = NULL;
+    }
+    
     /* Call parent finalize */
     G_OBJECT_CLASS(keymagic_engine_parent_class)->finalize(object);
 }
@@ -172,9 +189,7 @@ keymagic_engine_load_config(KeyMagicEngine* engine)
     }
     
     /* Check if active keyboard changed */
-    gboolean keyboard_changed = FALSE;
     if (g_strcmp0(engine->active_keyboard_id, config->active_keyboard) != 0) {
-        keyboard_changed = TRUE;
         g_free(engine->active_keyboard_id);
         engine->active_keyboard_id = g_strdup(config->active_keyboard);
         engine->keyboard_changed = TRUE;
@@ -434,6 +449,9 @@ keymagic_engine_enable(IBusEngine* ibus_engine)
     /* Load config and keyboard if needed */
     keymagic_engine_load_config(engine);
     
+    /* Update keyboard properties for menu/hotkeys */
+    keymagic_engine_update_properties(engine);
+    
     /* Call parent method */
     IBUS_ENGINE_CLASS(keymagic_engine_parent_class)->enable(ibus_engine);
 }
@@ -602,7 +620,8 @@ keymagic_engine_should_commit(guint keyval, gboolean is_processed, const gchar* 
  * Config file change callback
  */
 static void
-config_file_changed_cb(GFileMonitor* monitor, GFile* file, GFile* other_file,
+config_file_changed_cb(GFileMonitor* monitor G_GNUC_UNUSED, GFile* file, 
+                       GFile* other_file G_GNUC_UNUSED,
                        GFileMonitorEvent event_type, gpointer user_data)
 {
     KeyMagicEngine* engine = KEYMAGIC_ENGINE(user_data);
@@ -618,4 +637,233 @@ config_file_changed_cb(GFileMonitor* monitor, GFile* file, GFile* other_file,
         /* Reload configuration */
         keymagic_engine_load_config(engine);
     }
+}
+
+/**
+ * Update IBus properties for all available keyboards
+ */
+void
+keymagic_engine_update_properties(KeyMagicEngine* engine)
+{
+    g_return_if_fail(KEYMAGIC_IS_ENGINE(engine));
+    
+    g_debug("%s: Updating keyboard properties with hotkeys", LOG_TAG);
+    
+    /* Clean up existing properties */
+    if (engine->prop_list) {
+        g_object_unref(engine->prop_list);
+        engine->prop_list = NULL;
+    }
+    
+    /* Create new property list */
+    engine->prop_list = ibus_prop_list_new();
+    
+    /* Clear keyboard properties mapping */
+    g_hash_table_remove_all(engine->keyboard_properties);
+    
+    /* Load configuration to get installed keyboards */
+    KeyMagicConfig* config = keymagic_config_load(engine->config_path);
+    if (!config) {
+        g_warning("%s: Failed to load config for keyboard properties", LOG_TAG);
+        return;
+    }
+    
+    gint keyboard_count = 0;
+    gchar* keyboards_dir = keymagic_config_get_keyboards_dir();
+    
+    /* First, try to use installed keyboards from config */
+    if (config->installed_keyboards) {
+        GList* iter;
+        for (iter = config->installed_keyboards; iter != NULL; iter = iter->next) {
+            InstalledKeyboard* kb = (InstalledKeyboard*)iter->data;
+            if (!kb || !kb->id) continue;
+            
+            /* Create property key */
+            gchar* prop_key = g_strdup_printf("keyboard.%s", kb->id);
+            
+            /* Use name from config or fallback to ID */
+            const gchar* display_name = kb->name ? kb->name : kb->id;
+            
+            /* Determine hotkey to use */
+            gchar* hotkey_to_use = NULL;
+            gboolean hotkey_from_km2 = FALSE;
+            
+            if (kb->hotkey == NULL) {
+                /* Hotkey not set in config - try to get from KM2 file */
+                gchar* km2_path = NULL;
+                if (kb->filename && keyboards_dir) {
+                    km2_path = g_build_filename(keyboards_dir, kb->filename, NULL);
+                }
+                
+                if (km2_path && g_file_test(km2_path, G_FILE_TEST_EXISTS)) {
+                    void* km2_handle = keymagic_ffi_km2_load(km2_path);
+                    if (km2_handle) {
+                        hotkey_to_use = keymagic_ffi_km2_get_hotkey(km2_handle);
+                        hotkey_from_km2 = TRUE;
+                        keymagic_ffi_km2_free(km2_handle);
+                    }
+                }
+                g_free(km2_path);
+            } else if (strlen(kb->hotkey) > 0) {
+                /* Hotkey explicitly set in config */
+                hotkey_to_use = g_strdup(kb->hotkey);
+            }
+            /* else: kb->hotkey is empty string - user disabled hotkey */
+            
+            /* Create IBus property */
+            IBusText* label = ibus_text_new_from_string(display_name);
+            IBusText* tooltip = NULL;
+            
+            if (hotkey_to_use && strlen(hotkey_to_use) > 0) {
+                gchar* tooltip_str = g_strdup_printf("%s (%s)", display_name, hotkey_to_use);
+                tooltip = ibus_text_new_from_string(tooltip_str);
+                g_free(tooltip_str);
+            } else {
+                tooltip = ibus_text_new_from_string(display_name);
+            }
+            
+            /* Determine property state (checked if active) */
+            IBusPropState state = PROP_STATE_UNCHECKED;
+            if (engine->active_keyboard_id && 
+                g_strcmp0(kb->id, engine->active_keyboard_id) == 0) {
+                state = PROP_STATE_CHECKED;
+            }
+            
+            /* Create property with radio button type for exclusive selection */
+            IBusProperty* property = ibus_property_new(prop_key,
+                                                      PROP_TYPE_RADIO,
+                                                      label,
+                                                      NULL,  /* icon */
+                                                      tooltip,
+                                                      TRUE,  /* sensitive */
+                                                      TRUE,  /* visible */
+                                                      state,
+                                                      NULL); /* sub_props */
+            
+            /* Add to property list */
+            ibus_prop_list_append(engine->prop_list, property);
+            
+            /* Map property key to keyboard ID */
+            g_hash_table_insert(engine->keyboard_properties, 
+                               g_strdup(prop_key), 
+                               g_strdup(kb->id));
+            
+            g_debug("%s: Added keyboard property from config: %s (hotkey: %s%s)", LOG_TAG, display_name,
+                    hotkey_to_use ? hotkey_to_use : "none",
+                    hotkey_from_km2 ? " [from KM2]" : "");
+            
+            keyboard_count++;
+            g_free(prop_key);
+            g_free(hotkey_to_use);
+        }
+    }
+    
+    g_free(keyboards_dir);
+    keymagic_config_free(config);
+    
+    /* Register properties with IBus */
+    if (keyboard_count > 0) {
+        ibus_engine_register_properties((IBusEngine*)engine, engine->prop_list);
+        g_debug("%s: Registered %d keyboard properties", LOG_TAG, keyboard_count);
+    }
+}
+
+/**
+ * Handle property activation (keyboard switching)
+ */
+void
+keymagic_engine_activate_property(KeyMagicEngine* engine, const gchar* prop_name)
+{
+    g_return_if_fail(KEYMAGIC_IS_ENGINE(engine));
+    g_return_if_fail(prop_name != NULL);
+    
+    g_debug("%s: Property activated: %s", LOG_TAG, prop_name);
+    
+    if (!engine->keyboard_properties)
+        return;
+        
+    /* Look up keyboard ID from property name */
+    const gchar* keyboard_id = g_hash_table_lookup(engine->keyboard_properties, prop_name);
+    if (!keyboard_id) {
+        g_debug("%s: Unknown property: %s", LOG_TAG, prop_name);
+        return;
+    }
+    
+    g_debug("%s: Switching to keyboard: %s", LOG_TAG, keyboard_id);
+    
+    /* Update active keyboard in configuration */
+    g_free(engine->active_keyboard_id);
+    engine->active_keyboard_id = g_strdup(keyboard_id);
+    engine->keyboard_changed = TRUE;
+    
+    /* Load the keyboard immediately */
+    if (keymagic_ibus_engine_load_keyboard(engine, keyboard_id)) {
+        /* Update property states to reflect new selection */
+        if (engine->prop_list) {
+            /* IBusPropList is opaque, so we iterate through our hash table instead */
+            GHashTableIter iter;
+            gpointer key, value;
+            g_hash_table_iter_init(&iter, engine->keyboard_properties);
+            
+            while (g_hash_table_iter_next(&iter, &key, &value)) {
+                const gchar* prop_key = (const gchar*)key;
+                const gchar* kb_id = (const gchar*)value;
+                
+                /* Determine new state */
+                IBusPropState new_state = (g_strcmp0(prop_key, prop_name) == 0) ? 
+                                         PROP_STATE_CHECKED : PROP_STATE_UNCHECKED;
+                
+                /* Create a property update with the new state */
+                IBusText* label = ibus_text_new_from_string(kb_id);
+                IBusProperty* prop = ibus_property_new(prop_key,
+                                                      PROP_TYPE_RADIO,
+                                                      label,
+                                                      NULL,  /* icon */
+                                                      NULL,  /* tooltip */
+                                                      TRUE,  /* sensitive */
+                                                      TRUE,  /* visible */
+                                                      new_state,
+                                                      NULL); /* sub_props */
+                
+                /* Update this property */
+                ibus_engine_update_property((IBusEngine*)engine, prop);
+                g_object_unref(prop);
+            }
+        }
+        
+        /* Show notification using auxiliary text */
+        gchar* message = g_strdup_printf("Switched to: %s", keyboard_id);
+        IBusText* text = ibus_text_new_from_string(message);
+        ibus_engine_update_auxiliary_text((IBusEngine*)engine, text, TRUE);
+        g_free(message);
+        
+        /* Hide notification after 2 seconds */
+        g_timeout_add_seconds(2, (GSourceFunc)((void (*)(void*))ibus_engine_hide_auxiliary_text), engine);
+        
+        /* Update configuration file to persist the selection */
+        if (!keymagic_config_update_active_keyboard(engine->config_path, keyboard_id)) {
+            g_warning("%s: Failed to persist keyboard selection to config", LOG_TAG);
+        }
+    }
+}
+
+/**
+ * Handle property activation callback
+ */
+static void
+keymagic_engine_property_activate(IBusEngine* ibus_engine,
+                                 const gchar* prop_name,
+                                 guint prop_state)
+{
+    KeyMagicEngine* engine = KEYMAGIC_ENGINE(ibus_engine);
+    
+    /* Handle property activation */
+    if (prop_state == PROP_STATE_CHECKED) {
+        keymagic_engine_activate_property(engine, prop_name);
+    }
+    
+    /* Call parent class method */
+    IBUS_ENGINE_CLASS(keymagic_engine_parent_class)->property_activate(ibus_engine,
+                                                                       prop_name,
+                                                                       prop_state);
 }
