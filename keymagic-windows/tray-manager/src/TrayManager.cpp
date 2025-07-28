@@ -341,7 +341,7 @@ void TrayManager::OnMenuCommand(UINT cmdId) {
         PostMessage(m_hWnd, WM_CLOSE, 0, 0);
     } else if (cmdId == IDM_SETTINGS) {
         // Launch KeyMagic GUI application
-        LaunchKeyMagicApp()
+        LaunchKeyMagicApp();
     } else if (cmdId >= IDM_KEYBOARD_BASE) {
         // Keyboard selection
         UINT index = cmdId - IDM_KEYBOARD_BASE;
