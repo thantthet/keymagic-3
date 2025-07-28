@@ -67,6 +67,7 @@ target_link_libraries(keymagic-tray PRIVATE
     ws2_32
     userenv
     ntdll
+    comctl32
 )
 
 # Determine Rust target based on architecture
