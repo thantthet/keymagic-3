@@ -43,6 +43,9 @@ private:
     
     // Check if any TIP is active
     bool IsAnyTipActive() const;
+    
+    // Launch KeyMagic GUI application
+    void LaunchKeyMagicApp();
 
 private:
     // Core components
@@ -56,6 +59,8 @@ private:
     std::set<DWORD> m_activeTipProcesses;
     std::wstring m_currentKeyboardId;
     bool m_hasFocus;
+    bool m_contextMenuActive;
+    UINT_PTR m_hideTimerId;
     std::mutex m_stateMutex;
     
     // Window handle

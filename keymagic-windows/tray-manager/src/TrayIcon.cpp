@@ -118,7 +118,6 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<KeyboardInfo>& keybo
     
     // Add standard items
     AppendMenuW(hMenu, MF_STRING, IDM_SETTINGS, L"Settings...");
-    AppendMenuW(hMenu, MF_STRING, IDM_ABOUT, L"About KeyMagic...");
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, IDM_EXIT, L"Exit");
     

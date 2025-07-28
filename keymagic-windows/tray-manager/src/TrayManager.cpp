@@ -1,5 +1,6 @@
 #include "TrayManager.h"
 #include <shlobj.h>
+#include <shellapi.h>
 
 TrayManager* TrayManager::s_instance = nullptr;
 
@@ -264,13 +265,9 @@ void TrayManager::OnMenuCommand(UINT cmdId) {
     
     if (cmdId == IDM_EXIT) {
         PostMessage(m_hWnd, WM_CLOSE, 0, 0);
-    } else if (cmdId == IDM_ABOUT) {
-        MessageBoxW(m_hWnd, 
-                   L"KeyMagic Input Method\nVersion 3.0\n\nCopyright © 2024 KeyMagic Project",
-                   L"About KeyMagic",
-                   MB_OK | MB_ICONINFORMATION);
     } else if (cmdId == IDM_SETTINGS) {
-        // TODO: Launch settings UI
+        // Launch KeyMagic GUI application
+        LaunchKeyMagicApp()
     } else if (cmdId >= IDM_KEYBOARD_BASE) {
         // Keyboard selection
         UINT index = cmdId - IDM_KEYBOARD_BASE;
@@ -312,4 +309,69 @@ void TrayManager::UpdateTrayIcon() {
 
 bool TrayManager::IsAnyTipActive() const {
     return !m_activeTipProcesses.empty();
+}
+
+void TrayManager::LaunchKeyMagicApp() {
+    // Get the directory where this executable is located
+    wchar_t exePath[MAX_PATH];
+    if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0) {
+        OutputDebugStringW(L"TrayManager: Failed to get module file name\n");
+        MessageBoxW(m_hWnd, L"Failed to determine application directory.", L"KeyMagic", MB_OK | MB_ICONERROR);
+        return;
+    }
+    
+    // Remove the filename to get the directory
+    wchar_t* lastSlash = wcsrchr(exePath, L'\\');
+    if (lastSlash) {
+        *lastSlash = L'\0';
+    }
+    
+    // Build path to keymagic.exe (GUI application)
+    std::wstring keymagicPath = std::wstring(exePath) + L"\\keymagic.exe";
+    
+    // Check if keymagic.exe exists
+    DWORD fileAttrib = GetFileAttributesW(keymagicPath.c_str());
+    if (fileAttrib == INVALID_FILE_ATTRIBUTES || (fileAttrib & FILE_ATTRIBUTE_DIRECTORY)) {
+        OutputDebugStringW((L"TrayManager: keymagic.exe not found at " + keymagicPath + L"\n").c_str());
+        
+        std::wstring errorMsg = L"KeyMagic Settings application not found.\n\n";
+        errorMsg += L"Expected location:\n" + keymagicPath + L"\n\n";
+        errorMsg += L"Please reinstall KeyMagic to fix this issue.";
+        MessageBoxW(m_hWnd, errorMsg.c_str(), L"KeyMagic", MB_OK | MB_ICONERROR);
+        return;
+    }
+    
+    OutputDebugStringW((L"TrayManager: Launching " + keymagicPath + L"\n").c_str());
+    
+    // Launch the application
+    SHELLEXECUTEINFOW sei = {};
+    sei.cbSize = sizeof(SHELLEXECUTEINFOW);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpFile = keymagicPath.c_str();
+    sei.lpParameters = nullptr;
+    sei.lpDirectory = exePath;
+    sei.nShow = SW_SHOWNORMAL;
+    
+    if (!ShellExecuteExW(&sei)) {
+        DWORD error = GetLastError();
+        OutputDebugStringW((L"TrayManager: Failed to launch KeyMagic app, error: " + std::to_wstring(error) + L"\n").c_str());
+        
+        // Show error message to user
+        std::wstring errorMsg = L"Failed to launch KeyMagic Settings.\n\n";
+        errorMsg += L"Error code: " + std::to_wstring(error);
+        
+        // Add common error explanations
+        if (error == ERROR_ACCESS_DENIED) {
+            errorMsg += L"\n\nAccess denied. Please check file permissions.";
+        } else if (error == ERROR_FILE_NOT_FOUND) {
+            errorMsg += L"\n\nFile not found. Please reinstall KeyMagic.";
+        }
+        
+        MessageBoxW(m_hWnd, errorMsg.c_str(), L"KeyMagic", MB_OK | MB_ICONERROR);
+    } else {
+        // Close the handle as we don't need to wait for the process
+        if (sei.hProcess) {
+            CloseHandle(sei.hProcess);
+        }
+    }
 }
