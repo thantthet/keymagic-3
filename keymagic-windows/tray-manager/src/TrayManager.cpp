@@ -6,7 +6,9 @@ TrayManager* TrayManager::s_instance = nullptr;
 
 TrayManager::TrayManager()
     : m_hWnd(nullptr)
-    , m_hasFocus(false) {
+    , m_hasFocus(false)
+    , m_contextMenuActive(false)
+    , m_hideTimerId(0) {
     s_instance = this;
 }
 
@@ -71,6 +73,16 @@ LRESULT TrayManager::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARA
             
         case WM_TRAYICON:
             if (m_trayIcon) {
+                // Detect right-click early (only on button down to avoid duplicates)
+                if (LOWORD(lParam) == WM_RBUTTONDOWN) {
+                    OutputDebugStringW(L"TrayManager: Right-click detected on tray icon\n");
+                    // Cancel any pending hide timer immediately
+                    if (m_hideTimerId) {
+                        KillTimer(hWnd, m_hideTimerId);
+                        m_hideTimerId = 0;
+                    }
+                    m_contextMenuActive = true;
+                }
                 m_trayIcon->HandleMessage(hWnd, message, wParam, lParam);
             }
             return 0;
@@ -80,7 +92,9 @@ LRESULT TrayManager::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARA
                 // Show context menu
                 auto keyboards = m_registryMonitor->GetKeyboards();
                 m_trayIcon->ShowContextMenu(hWnd, keyboards, m_currentKeyboardId,
-                    [this](UINT cmdId) { OnMenuCommand(cmdId); });
+                    [this](UINT cmdId) { 
+                        OnMenuCommand(cmdId); 
+                    });
             }
             return 0;
             
@@ -91,6 +105,37 @@ LRESULT TrayManager::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARA
                 if (pMsg) {
                     OnPipeMessage(*pMsg);
                     delete pMsg;
+                }
+            }
+            return 0;
+            
+        case WM_MENU_SHOWN:
+            OutputDebugStringW(L"TrayManager: Context menu shown\n");
+            // Cancel hide timer if it's running
+            if (m_hideTimerId) {
+                KillTimer(hWnd, m_hideTimerId);
+                m_hideTimerId = 0;
+            }
+            m_contextMenuActive = true;
+            return 0;
+            
+        case WM_MENU_DISMISSED:
+            OutputDebugStringW(L"TrayManager: Context menu dismissed\n");
+            m_contextMenuActive = false;
+            // Update icon visibility after menu closes
+            UpdateTrayIcon();
+            return 0;
+            
+        case WM_TIMER:
+            if (wParam == TIMER_HIDE_DELAY) {
+                OutputDebugStringW(L"TrayManager: Hide timer triggered\n");
+                KillTimer(hWnd, TIMER_HIDE_DELAY);
+                m_hideTimerId = 0;
+                
+                // Only hide if context menu is not active
+                if (!m_contextMenuActive) {
+                    OutputDebugStringW(L"TrayManager: Hiding icon (delayed)\n");
+                    UpdateTrayIcon();
                 }
             }
             return 0;
@@ -150,6 +195,12 @@ bool TrayManager::Initialize() {
 }
 
 void TrayManager::Cleanup() {
+    // Kill any pending timer
+    if (m_hideTimerId && m_hWnd) {
+        KillTimer(m_hWnd, m_hideTimerId);
+        m_hideTimerId = 0;
+    }
+    
     // Stop components in reverse order
     if (m_pipeServer) {
         m_pipeServer->Stop();
@@ -208,13 +259,23 @@ bool TrayManager::CreateMessageWindow() {
 void TrayManager::OnPipeMessage(const TrayMessage& msg) {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     
+    // Debug output
+    OutputDebugStringW(L"TrayManager: Received pipe message\n");
+    OutputDebugStringW((L"  Message type: " + std::to_wstring(msg.messageType) + L"\n").c_str());
+    OutputDebugStringW((L"  Process ID: " + std::to_wstring(msg.processId) + L"\n").c_str());
+    OutputDebugStringW((L"  Keyboard ID: " + std::wstring(msg.keyboardId) + L"\n").c_str());
+    
     switch (msg.messageType) {
         case MSG_TIP_STARTED:
+            OutputDebugStringW(L"  -> MSG_TIP_STARTED\n");
             m_activeTipProcesses.insert(msg.processId);
+            OutputDebugStringW((L"  Active TIP count: " + std::to_wstring(m_activeTipProcesses.size()) + L"\n").c_str());
             break;
             
         case MSG_TIP_STOPPED:
+            OutputDebugStringW(L"  -> MSG_TIP_STOPPED\n");
             m_activeTipProcesses.erase(msg.processId);
+            OutputDebugStringW((L"  Active TIP count: " + std::to_wstring(m_activeTipProcesses.size()) + L"\n").c_str());
             if (m_activeTipProcesses.empty()) {
                 m_hasFocus = false;
                 UpdateTrayIcon();
@@ -222,23 +283,36 @@ void TrayManager::OnPipeMessage(const TrayMessage& msg) {
             break;
             
         case MSG_FOCUS_GAINED:
+            OutputDebugStringW(L"  -> MSG_FOCUS_GAINED\n");
             m_hasFocus = true;
             if (msg.keyboardId[0]) {
+                OutputDebugStringW((L"  Setting keyboard: " + std::wstring(msg.keyboardId) + L"\n").c_str());
                 m_currentKeyboardId = msg.keyboardId;
             }
             UpdateTrayIcon();
             break;
             
         case MSG_FOCUS_LOST:
+            OutputDebugStringW(L"  -> MSG_FOCUS_LOST\n");
             m_hasFocus = false;
-            UpdateTrayIcon();
+            OutputDebugStringW(L"  Starting hide timer\n");
+            // Set timer to hide icon after delay
+            if (m_hWnd && !m_contextMenuActive) {
+                m_hideTimerId = SetTimer(m_hWnd, TIMER_HIDE_DELAY, HIDE_DELAY_MS, nullptr);
+            }
             break;
             
         case MSG_KEYBOARD_CHANGED:
+            OutputDebugStringW(L"  -> MSG_KEYBOARD_CHANGED\n");
             if (msg.keyboardId[0]) {
+                OutputDebugStringW((L"  Changing keyboard to: " + std::wstring(msg.keyboardId) + L"\n").c_str());
                 m_currentKeyboardId = msg.keyboardId;
                 UpdateTrayIcon();
             }
+            break;
+            
+        default:
+            OutputDebugStringW((L"  -> Unknown message type: " + std::to_wstring(msg.messageType) + L"\n").c_str());
             break;
     }
 }

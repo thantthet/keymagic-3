@@ -89,9 +89,13 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<KeyboardInfo>& keybo
                                const std::wstring& currentKeyboardId, MenuCallback callback) {
     m_menuCallback = callback;
     
+    // Notify that menu is about to be shown (use SendMessage for immediate handling)
+    SendMessage(hWnd, WM_MENU_SHOWN, 0, 0);
+    
     // Create popup menu
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) {
+        SendMessage(hWnd, WM_MENU_DISMISSED, 0, 0);
         return;
     }
     
@@ -140,6 +144,9 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<KeyboardInfo>& keybo
     if (cmd != 0 && m_menuCallback) {
         m_menuCallback(cmd);
     }
+    
+    // Notify that menu has been dismissed (use SendMessage for immediate handling)
+    SendMessage(hWnd, WM_MENU_DISMISSED, 0, 0);
 }
 
 void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -153,9 +160,12 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
             break;
             
         case WM_RBUTTONUP:
-        case WM_CONTEXTMENU:
             // Context menu will be shown by TrayManager
             PostMessage(hWnd, WM_COMMAND, MAKEWPARAM(0, 0), 0);
+            break;
+            
+        case WM_CONTEXTMENU:
+            // Already handled by WM_RBUTTONUP
             break;
     }
 }
