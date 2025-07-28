@@ -9,6 +9,7 @@
 #include "KeyProcessingUtils.h"
 #include "Registry.h"
 #include "HUD.h"
+#include "TrayClient.h"
 #include <string>
 #include <codecvt>
 #include <locale>
@@ -86,6 +87,8 @@ CKeyMagicTextService::CKeyMagicTextService()
     // Initialize HUD
     KeyMagicHUD::GetInstance().Initialize();
     
+    // Initialize TrayClient
+    InitializeTrayClient();
     
     InitializeCriticalSection(&m_cs);
     DllAddRef();
@@ -116,6 +119,11 @@ CKeyMagicTextService::~CKeyMagicTextService()
     
     // Stop event monitoring
     StopEventMonitoring();
+    
+    // Notify tray manager we're stopping
+    if (m_pTrayClient) {
+        m_pTrayClient->NotifyTipStopped();
+    }
     
     UninitializeEngine();
     DeleteCriticalSection(&m_cs);
@@ -309,6 +317,9 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
     // Get new context and set up sinks
     if (m_pDocMgrFocus)
     {
+        // Notify tray manager that we have focus
+        NotifyTrayManagerFocusChange(TRUE);
+
         ITfContext *pContext;
         if (SUCCEEDED(m_pDocMgrFocus->GetTop(&pContext)) && pContext)
         {
@@ -401,6 +412,9 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
     {
         // Lost focus entirely, reset engine
         ResetEngine();
+
+        // Notify tray manager that we lost focus
+        NotifyTrayManagerFocusChange(FALSE);
     }
 
     LeaveCriticalSection(&m_cs);
@@ -427,11 +441,15 @@ STDAPI CKeyMagicTextService::OnSetFocus(BOOL fForeground)
     if (fForeground)
     {
         DEBUG_LOG(L"Text service became active input processor");
+        // Notify tray manager that we gained focus
+        NotifyTrayManagerFocusChange(TRUE);
     }
     else
     {
         DEBUG_LOG(L"Text service no longer active input processor");
         // We keep the monitoring thread running but it won't actively wait when document focus is lost
+        // Notify tray manager that we lost focus
+        NotifyTrayManagerFocusChange(FALSE);
     }
     
     return S_OK;
@@ -1193,6 +1211,9 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
                     {
                         DEBUG_LOG(L"Loaded keyboard: " + std::wstring(name) + L" (" + keyboardId + L")");
                     }
+                    
+                    // Notify tray manager of keyboard change
+                    NotifyTrayManagerKeyboardChange();
                 }
                 
                 RegCloseKey(hKey);
@@ -1741,4 +1762,37 @@ DWORD WINAPI CKeyMagicTextService::EventMonitorThreadProc(LPVOID lpParam)
     
     DEBUG_LOG(L"Event monitor thread exiting");
     return 0;
+}
+
+// TrayClient integration methods
+void CKeyMagicTextService::InitializeTrayClient()
+{
+    m_pTrayClient = std::make_unique<TrayClient>();
+    if (m_pTrayClient) {
+        m_pTrayClient->Connect();
+        // Notify tray manager that we've started
+        m_pTrayClient->NotifyTipStarted();
+    }
+}
+
+void CKeyMagicTextService::NotifyTrayManagerFocusChange(BOOL hasFocus)
+{
+    if (!m_pTrayClient) {
+        return;
+    }
+    
+    if (hasFocus) {
+        m_pTrayClient->NotifyFocusGained(m_currentKeyboardId);
+    } else {
+        m_pTrayClient->NotifyFocusLost();
+    }
+}
+
+void CKeyMagicTextService::NotifyTrayManagerKeyboardChange()
+{
+    if (!m_pTrayClient) {
+        return;
+    }
+    
+    m_pTrayClient->NotifyKeyboardChanged(m_currentKeyboardId);
 }

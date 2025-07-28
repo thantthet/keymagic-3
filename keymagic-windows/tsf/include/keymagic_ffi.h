@@ -100,6 +100,30 @@ typedef struct {
 
 int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info);
 
+// KM2 file loading and metadata access
+typedef struct Km2FileHandle Km2FileHandle;
+
+// Load a KM2 file
+Km2FileHandle* keymagic_km2_load(const char* path);
+
+// Free a loaded KM2 file
+void keymagic_km2_free(Km2FileHandle* handle);
+
+// Get keyboard name (returns NULL if not defined)
+char* keymagic_km2_get_name(Km2FileHandle* handle);
+
+// Get keyboard description (returns NULL if not defined)
+char* keymagic_km2_get_description(Km2FileHandle* handle);
+
+// Get hotkey string (returns NULL if not defined)
+char* keymagic_km2_get_hotkey(Km2FileHandle* handle);
+
+// Get icon data from KM2 file
+// If buffer is NULL, returns the required buffer size
+// If buffer is not NULL, copies icon data to buffer and returns actual size copied
+// Returns 0 if no icon is defined or on error
+size_t keymagic_km2_get_icon_data(Km2FileHandle* handle, uint8_t* buffer, size_t buffer_size);
+
 #ifdef __cplusplus
 }
 #endif

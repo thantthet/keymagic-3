@@ -619,3 +619,44 @@ pub extern "C" fn keymagic_parse_hotkey(hotkey_str: *const c_char, info: *mut Ho
     }
 }
 
+/// Get icon data from KM2 file
+/// If buffer is NULL, returns the required buffer size
+/// If buffer is not NULL, copies icon data to buffer and returns actual size copied
+/// Returns 0 if no icon is defined or on error
+#[no_mangle]
+pub extern "C" fn keymagic_km2_get_icon_data(
+    handle: *mut Km2FileHandle, 
+    buffer: *mut u8,
+    buffer_size: usize
+) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+
+    unsafe {
+        let km2 = &(*handle).0;
+        let metadata = km2.metadata();
+        
+        match metadata.icon() {
+            Some(icon_data) => {
+                let data_len = icon_data.len();
+                
+                // If buffer is NULL, just return the required size
+                if buffer.is_null() {
+                    return data_len;
+                }
+                
+                // If buffer is provided, copy data up to buffer_size
+                if buffer_size >= data_len {
+                    std::ptr::copy_nonoverlapping(icon_data.as_ptr(), buffer, data_len);
+                    data_len
+                } else {
+                    // Buffer too small, return 0 to indicate error
+                    0
+                }
+            }
+            None => 0,
+        }
+    }
+}
+
