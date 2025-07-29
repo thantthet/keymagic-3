@@ -128,6 +128,8 @@ create_package_structure() {
     mkdir -p "$pkg_dir/usr/lib/ibus-keymagic3"
     mkdir -p "$pkg_dir/usr/share/ibus/component"
     mkdir -p "$pkg_dir/usr/share/applications"
+    mkdir -p "$pkg_dir/usr/share/icons/hicolor/32x32/apps"
+    mkdir -p "$pkg_dir/usr/share/icons/hicolor/128x128/apps"
     mkdir -p "$pkg_dir/usr/share/icons/hicolor/256x256/apps"
     mkdir -p "$pkg_dir/usr/share/doc/keymagic3"
     mkdir -p "$pkg_dir/usr/share/keymagic3"
@@ -146,8 +148,10 @@ create_package_structure() {
     cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.xml" "$pkg_dir/usr/share/ibus/component/"
     cp "$PROJECT_ROOT/keymagic-ibus/data/keymagic3.desktop" "$pkg_dir/usr/share/applications/" 2>/dev/null || true
     
-    # Copy icon
-    cp "$PROJECT_ROOT/resources/icons/keymagic.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
+    # Copy icons
+    cp "$PROJECT_ROOT/keymagic-ibus/data/icon-32.png" "$pkg_dir/usr/share/icons/hicolor/32x32/apps/keymagic3.png"
+    cp "$PROJECT_ROOT/keymagic-ibus/data/icon-128.png" "$pkg_dir/usr/share/icons/hicolor/128x128/apps/keymagic3.png"
+    cp "$PROJECT_ROOT/keymagic-ibus/data/icon-256.png" "$pkg_dir/usr/share/icons/hicolor/256x256/apps/keymagic3.png"
     
     # Copy documentation
     cp "$PROJECT_ROOT/README.md" "$pkg_dir/usr/share/doc/keymagic3/" 2>/dev/null || true

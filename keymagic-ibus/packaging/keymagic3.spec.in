@@ -26,6 +26,8 @@ mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/lib/ibus-keymagic3
 mkdir -p %{buildroot}/usr/share/ibus/component
 mkdir -p %{buildroot}/usr/share/applications
+mkdir -p %{buildroot}/usr/share/icons/hicolor/32x32/apps
+mkdir -p %{buildroot}/usr/share/icons/hicolor/128x128/apps
 mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 mkdir -p %{buildroot}/usr/share/doc/keymagic3
 mkdir -p %{buildroot}/usr/share/keymagic3
@@ -43,8 +45,10 @@ if [ -f "@PROJECT_ROOT@/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" ]
     cp "@PROJECT_ROOT@/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" %{buildroot}/usr/share/keymagic3/
 fi
 
-# Copy icon
-cp "@PROJECT_ROOT@/resources/icons/keymagic.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/keymagic3.png
+# Copy icons
+cp "@PROJECT_ROOT@/keymagic-ibus/data/icon-32.png" %{buildroot}/usr/share/icons/hicolor/32x32/apps/keymagic3.png
+cp "@PROJECT_ROOT@/keymagic-ibus/data/icon-128.png" %{buildroot}/usr/share/icons/hicolor/128x128/apps/keymagic3.png
+cp "@PROJECT_ROOT@/keymagic-ibus/data/icon-256.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/keymagic3.png
 
 # Copy bundled keyboard files
 if [ -d "@PROJECT_ROOT@/keymagic-ibus/data/keyboards" ]; then
@@ -63,6 +67,8 @@ fi
 /usr/share/applications/keymagic3.desktop
 %doc /usr/share/doc/keymagic3/
 /usr/share/keymagic3/
+/usr/share/icons/hicolor/32x32/apps/keymagic3.png
+/usr/share/icons/hicolor/128x128/apps/keymagic3.png
 /usr/share/icons/hicolor/256x256/apps/keymagic3.png
 
 %post
