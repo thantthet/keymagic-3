@@ -41,7 +41,7 @@ case "$1" in
                 su -c "nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 &" "$SUDO_USER" || true
             elif [ "$USER" != "root" ]; then
                 # Launch directly if not root
-                nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 & || true
+                nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 & 
             fi
         fi
         ;;
