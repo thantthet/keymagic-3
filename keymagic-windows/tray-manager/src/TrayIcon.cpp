@@ -1,5 +1,6 @@
 #include "TrayIcon.h"
 #include "RegistryMonitor.h"
+#include "IconVisibilityManager.h"
 #include <strsafe.h>
 
 TrayIcon::TrayIcon()
@@ -236,31 +237,7 @@ bool TrayIcon::UpdateNotificationIcon(DWORD dwMessage) {
 }
 
 void TrayIcon::EnsureIconVisibility() {
-    // This function attempts to make the icon always visible
-    // Note: This requires user consent in Windows 10/11
-    
-    // Get the path to the current executable
-    WCHAR exePath[MAX_PATH];
-    if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0) {
-        return;
-    }
-    
-    // Build the registry path for notification area icons
-    // The exact path varies by Windows version, but this is the general location
-    HKEY hKey;
-    LPCWSTR keyPath = L"Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\TrayNotify";
-    
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath, 0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
-        // Set IconStreams and PastIconsStream to force Windows to re-evaluate icon visibility
-        // This is a workaround that sometimes helps
-        RegDeleteValueW(hKey, L"IconStreams");
-        RegDeleteValueW(hKey, L"PastIconsStream");
-        RegCloseKey(hKey);
-        
-        // Send a message to explorer to refresh the notification area
-        HWND hShellTrayWnd = FindWindowW(L"Shell_TrayWnd", nullptr);
-        if (hShellTrayWnd) {
-            SendMessage(hShellTrayWnd, WM_SETTINGCHANGE, 0, 0);
-        }
-    }
+    // Use IconVisibilityManager to ensure the icon is visible
+    IconVisibilityManager visibilityManager;
+    visibilityManager.EnsureIconVisible();
 }

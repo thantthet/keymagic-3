@@ -19,6 +19,7 @@ set(SOURCES
     src/ProfileMonitor.cpp
     src/TrayIcon.cpp
     src/SecurityUtils.cpp
+    src/IconVisibilityManager.cpp
 )
 
 set(HEADERS
@@ -31,6 +32,7 @@ set(HEADERS
     include/TrayProtocol.h
     include/SecurityUtils.h
     include/Common.h
+    include/IconVisibilityManager.h
 )
 
 # Create executable
