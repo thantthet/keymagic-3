@@ -123,7 +123,7 @@ void TrayClient::NotifyFocusLost() {
 
 void TrayClient::NotifyKeyboardChanged(const std::wstring& keyboardId) {
     TrayMessage msg = {};
-    msg.messageType = MSG_KEYBOARD_CHANGED;
+    msg.messageType = MSG_KEYBOARD_CHANGE;
     msg.processId = GetCurrentProcessId();
     StringCchCopyW(msg.keyboardId, ARRAYSIZE(msg.keyboardId), keyboardId.c_str());
     

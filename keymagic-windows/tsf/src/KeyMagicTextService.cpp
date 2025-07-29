@@ -700,48 +700,36 @@ STDAPI CKeyMagicTextService::OnPreservedKey(ITfContext *pic, REFGUID rguid, BOOL
         {
             DEBUG_LOG(L"Preserved key triggered for keyboard: " + preservedKey.keyboardId);
             
-            // Update the default keyboard in registry
-            HKEY hKey = OpenSettingsKey(KEY_WRITE);
-            if (hKey)
+            // NOTE: We don't update registry here because TIP might run in containerized hosts
+            // The tray manager will update the registry and signal the global event
+            
+            // Reload the keyboard
+            LoadKeyboardByID(preservedKey.keyboardId);
+            
+            // Show HUD notification
+            // Get keyboard display name from registry
+            std::wstring displayName = preservedKey.keyboardId;
+            std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + preservedKey.keyboardId;
+            HKEY hKeyboardKey;
+            if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKeyboardKey) == ERROR_SUCCESS)
             {
-                LONG result = RegSetValueExW(hKey, L"DefaultKeyboard", 0, REG_SZ, 
-                                           (const BYTE*)preservedKey.keyboardId.c_str(), 
-                                           (DWORD)(preservedKey.keyboardId.length() + 1) * sizeof(WCHAR));
-                RegCloseKey(hKey);
-                
-                if (result == ERROR_SUCCESS)
+                WCHAR szName[256];
+                DWORD dwType = REG_SZ;
+                DWORD dwSize = sizeof(szName);
+                if (RegQueryValueExW(hKeyboardKey, L"Name", nullptr, &dwType, (LPBYTE)szName, &dwSize) == ERROR_SUCCESS)
                 {
-                    // Signal the registry update event
-                    if (m_hRegistryUpdateEvent)
-                    {
-                        SetEvent(m_hRegistryUpdateEvent);
-                    }
-                    
-                    // Reload the keyboard
-                    LoadKeyboardByID(preservedKey.keyboardId);
-                    
-                    // Show HUD notification
-                    // Get keyboard display name from registry
-                    std::wstring displayName = preservedKey.keyboardId;
-                    std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + preservedKey.keyboardId;
-                    HKEY hKeyboardKey;
-                    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKeyboardKey) == ERROR_SUCCESS)
-                    {
-                        WCHAR szName[256];
-                        DWORD dwType = REG_SZ;
-                        DWORD dwSize = sizeof(szName);
-                        if (RegQueryValueExW(hKeyboardKey, L"Name", nullptr, &dwType, (LPBYTE)szName, &dwSize) == ERROR_SUCCESS)
-                        {
-                            displayName = szName;
-                        }
-                        RegCloseKey(hKeyboardKey);
-                    }
-                    
-                    KeyMagicHUD::GetInstance().ShowKeyboard(displayName);
-                    
-                    *pfEaten = TRUE;
+                    displayName = szName;
                 }
+                RegCloseKey(hKeyboardKey);
             }
+            
+            KeyMagicHUD::GetInstance().ShowKeyboard(displayName);
+            
+            // Notify tray manager about the keyboard change
+            // The tray manager will update the registry and signal the global event
+            NotifyTrayManagerKeyboardChange();
+            
+            *pfEaten = TRUE;
             break;
         }
     }

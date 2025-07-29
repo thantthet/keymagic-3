@@ -302,12 +302,37 @@ void TrayManager::OnPipeMessage(const TrayMessage& msg) {
             }
             break;
             
-        case MSG_KEYBOARD_CHANGED:
-            OutputDebugStringW(L"  -> MSG_KEYBOARD_CHANGED\n");
+        case MSG_KEYBOARD_CHANGE:
+            OutputDebugStringW(L"  -> MSG_KEYBOARD_CHANGE\n");
             if (msg.keyboardId[0]) {
                 OutputDebugStringW((L"  Changing keyboard to: " + std::wstring(msg.keyboardId) + L"\n").c_str());
                 m_currentKeyboardId = msg.keyboardId;
                 UpdateTrayIcon();
+                
+                // Update registry with new default keyboard
+                HKEY hKey;
+                if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+                    RegSetValueExW(hKey, L"DefaultKeyboard", 0, REG_SZ, 
+                                  (const BYTE*)msg.keyboardId, 
+                                  (DWORD)((wcslen(msg.keyboardId) + 1) * sizeof(WCHAR)));
+                    RegCloseKey(hKey);
+                    
+                    // Signal the global registry update event
+                    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, L"Global\\KeyMagicRegistryUpdate");
+                    if (hEvent) {
+                        SetEvent(hEvent);
+                        CloseHandle(hEvent);
+                        OutputDebugStringW(L"  -> Signaled registry update event\n");
+                    } else {
+                        // Try to create it if it doesn't exist
+                        hEvent = CreateEventW(nullptr, TRUE, FALSE, L"Global\\KeyMagicRegistryUpdate");
+                        if (hEvent) {
+                            SetEvent(hEvent);
+                            CloseHandle(hEvent);
+                            OutputDebugStringW(L"  -> Created and signaled registry update event\n");
+                        }
+                    }
+                }
             }
             break;
             

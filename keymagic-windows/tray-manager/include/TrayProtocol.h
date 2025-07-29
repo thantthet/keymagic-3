@@ -6,7 +6,7 @@
 enum TrayMessageType {
     MSG_FOCUS_GAINED = 1,
     MSG_FOCUS_LOST = 2,
-    MSG_KEYBOARD_CHANGED = 3,
+    MSG_KEYBOARD_CHANGE = 3,
     MSG_TIP_STARTED = 4,
     MSG_TIP_STOPPED = 5
 };
