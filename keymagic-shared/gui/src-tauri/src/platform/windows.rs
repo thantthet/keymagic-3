@@ -7,6 +7,13 @@ use std::path::PathBuf;
 use winreg::enums::*;
 use winreg::RegKey;
 
+use windows::Win32::System::Registry::{
+    RegQueryValueExW, RegSetValueExW, REG_MULTI_SZ, REG_VALUE_TYPE,
+};
+use windows::core::PCWSTR;
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
+
 // Registry paths - matching original implementation
 const KEYMAGIC_ROOT: &str = r"Software\KeyMagic";
 const KEYBOARDS_KEY: &str = r"Software\KeyMagic\Keyboards";
@@ -23,6 +30,131 @@ const KEYBOARD_DESCRIPTION_VALUE: &str = "Description";
 const KEYBOARD_HOTKEY_VALUE: &str = "Hotkey";
 const KEYBOARD_ENABLED_VALUE: &str = "Enabled";
 const KEYBOARD_HASH_VALUE: &str = "Hash";
+
+/// Helper function to read REG_MULTI_SZ values from registry
+fn read_multi_string_value(key: &RegKey, value_name: &str) -> Result<Vec<String>> {
+    use windows::Win32::Foundation::ERROR_MORE_DATA;
+    
+    // Get the raw handle from winreg
+    let hkey = unsafe { std::mem::transmute::<isize, windows::Win32::System::Registry::HKEY>(key.raw_handle()) };
+    
+    // Convert value name to wide string
+    let value_name_wide: Vec<u16> = OsStr::new(value_name)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    
+    // First, get the required buffer size
+    let mut data_type: REG_VALUE_TYPE = REG_VALUE_TYPE(0);
+    let mut data_size: u32 = 0;
+    
+    unsafe {
+        let result = RegQueryValueExW(
+            hkey,
+            PCWSTR::from_raw(value_name_wide.as_ptr()),
+            None,
+            Some(&mut data_type),
+            None,
+            Some(&mut data_size),
+        );
+        
+        if result != ERROR_MORE_DATA && result.is_err() {
+            return Err(anyhow::anyhow!("Failed to query registry value size"));
+        }
+        
+        if data_type != REG_MULTI_SZ {
+            return Err(anyhow::anyhow!("Registry value is not REG_MULTI_SZ"));
+        }
+    }
+    
+    // Allocate buffer and read the data
+    let mut buffer: Vec<u16> = vec![0; (data_size / 2) as usize];
+    
+    unsafe {
+        let result = RegQueryValueExW(
+            hkey,
+            PCWSTR::from_raw(value_name_wide.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(buffer.as_mut_ptr() as *mut u8),
+            Some(&mut data_size),
+        );
+        
+        if result.is_err() {
+            return Err(anyhow::anyhow!("Failed to read registry value"));
+        }
+    }
+    
+    // Parse the multi-string (double-null terminated)
+    let mut strings = Vec::new();
+    let mut start = 0;
+    
+    for i in 0..buffer.len() {
+        if buffer[i] == 0 {
+            if start < i {
+                let s = String::from_utf16(&buffer[start..i])
+                    .map_err(|_| anyhow::anyhow!("Invalid UTF-16 string"))?;
+                if !s.is_empty() {
+                    strings.push(s);
+                }
+            }
+            start = i + 1;
+            
+            // Check for double null terminator
+            if i + 1 < buffer.len() && buffer[i + 1] == 0 {
+                break;
+            }
+        }
+    }
+    
+    Ok(strings)
+}
+
+/// Helper function to write REG_MULTI_SZ values to registry
+fn write_multi_string_value(key: &RegKey, value_name: &str, values: &[String]) -> Result<()> {
+    // Get the raw handle from winreg
+    let hkey = unsafe { std::mem::transmute::<isize, windows::Win32::System::Registry::HKEY>(key.raw_handle()) };
+    
+    // Convert value name to wide string
+    let value_name_wide: Vec<u16> = OsStr::new(value_name)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    
+    // Build the multi-string buffer
+    let mut buffer: Vec<u16> = Vec::new();
+    
+    for value in values {
+        let wide: Vec<u16> = OsStr::new(value).encode_wide().collect();
+        buffer.extend(wide);
+        buffer.push(0); // Null terminator for each string
+    }
+    buffer.push(0); // Double null terminator
+    
+    // Write to registry
+    unsafe {
+        // Convert u16 buffer to u8 slice
+        let byte_slice = std::slice::from_raw_parts(
+            buffer.as_ptr() as *const u8,
+            buffer.len() * 2
+        );
+        
+        let result = RegSetValueExW(
+            hkey,
+            PCWSTR::from_raw(value_name_wide.as_ptr()),
+            0,
+            REG_MULTI_SZ,
+            Some(byte_slice),
+        );
+        
+        if result.is_err() {
+            return Err(anyhow::anyhow!("Failed to write registry value"));
+        }
+    }
+    
+    Ok(())
+}
+
 
 pub struct WindowsBackend {
     registry_key: RegKey,
@@ -75,7 +207,6 @@ impl WindowsBackend {
 }
 
 /// Notify Windows TSF (Text Services Framework) about registry changes using events
-#[cfg(target_os = "windows")]
 fn notify_registry_change() -> Result<()> {
     use log::{debug, error};
     
@@ -149,8 +280,11 @@ impl Platform for WindowsBackend {
         
         // Load composition mode hosts from Settings registry
         if let Ok(settings_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(SETTINGS_KEY) {
-            if let Ok(hosts) = settings_key.get_value::<String, _>("CompositionModeHosts") {
-                // Split by semicolon or newline
+            // Try to read as REG_MULTI_SZ first using Windows API
+            if let Ok(hosts) = read_multi_string_value(&settings_key, "CompositionModeHosts") {
+                config.composition_mode.enabled_hosts = hosts;
+            } else if let Ok(hosts) = settings_key.get_value::<String, _>("CompositionModeHosts") {
+                // Fallback to semicolon-delimited string for backward compatibility
                 config.composition_mode.enabled_hosts = hosts
                     .split(|c| c == ';' || c == '\n')
                     .filter(|s| !s.trim().is_empty())
@@ -214,11 +348,9 @@ impl Platform for WindowsBackend {
             }
         }
         
-        // Save composition mode hosts as multi-string
+        // Save composition mode hosts as REG_MULTI_SZ
         if !config.composition_mode.enabled_hosts.is_empty() {
-            // Note: winreg doesn't support REG_MULTI_SZ directly, so we'll save as semicolon-delimited
-            let hosts_str = config.composition_mode.enabled_hosts.join(";");
-            settings_key.set_value("CompositionModeHosts", &hosts_str)?;
+            write_multi_string_value(&settings_key, "CompositionModeHosts", &config.composition_mode.enabled_hosts)?;
         }
         
         Ok(())
