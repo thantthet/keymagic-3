@@ -1514,15 +1514,15 @@ bool CKeyMagicTextService::ShouldUseCompositionEditSession()
     HKEY hKey = OpenSettingsKey(KEY_READ);
     if (hKey)
     {
-        // Try to read the CompositionModeProcesses value
+        // Try to read the CompositionModeHosts value
         DWORD dataSize = 0;
-        LONG result = RegGetValueW(hKey, NULL, L"CompositionModeProcesses", RRF_RT_REG_MULTI_SZ, NULL, NULL, &dataSize);
+        LONG result = RegGetValueW(hKey, NULL, L"CompositionModeHosts", RRF_RT_REG_MULTI_SZ, NULL, NULL, &dataSize);
         
         if (result == ERROR_SUCCESS && dataSize > 0)
         {
             // Allocate buffer for the multi-string data
             std::vector<wchar_t> buffer(dataSize / sizeof(wchar_t));
-            result = RegGetValueW(hKey, NULL, L"CompositionModeProcesses", RRF_RT_REG_MULTI_SZ, NULL, buffer.data(), &dataSize);
+            result = RegGetValueW(hKey, NULL, L"CompositionModeHosts", RRF_RT_REG_MULTI_SZ, NULL, buffer.data(), &dataSize);
             
             if (result == ERROR_SUCCESS)
             {
@@ -1552,29 +1552,17 @@ bool CKeyMagicTextService::ShouldUseCompositionEditSession()
             }
             else
             {
-                DEBUG_LOG(L"Failed to read CompositionModeProcesses value, using default");
+                DEBUG_LOG(L"Failed to read CompositionModeHosts value, using default");
             }
         }
         else
         {
-            DEBUG_LOG(L"CompositionModeProcesses value not found, creating default list");
+            DEBUG_LOG(L"CompositionModeHosts value not found, using default list");
             
-            // Create default list of processes that should use composition mode
+            // Use default list of processes that should use composition mode
             std::vector<std::wstring> defaultProcesses = {
                 L"ms-teams.exe"
             };
-            
-            // Write the default list to registry
-            std::wstring multiString;
-            for (const auto& process : defaultProcesses)
-            {
-                multiString += process + L'\0';
-            }
-            multiString += L'\0';  // Double null terminator
-            
-            RegSetValueExW(hKey, L"CompositionModeProcesses", 0, REG_MULTI_SZ, 
-                          reinterpret_cast<const BYTE*>(multiString.c_str()), 
-                          static_cast<DWORD>(multiString.length() * sizeof(wchar_t)));
             
             // Check if current process is in the default list
             for (const auto& process : defaultProcesses)
