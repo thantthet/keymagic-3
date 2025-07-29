@@ -192,11 +192,27 @@ IconVisibilityManager::PromotionResult IconVisibilityManager::UpdateIconStreamsV
             recordPath += ch;
         }
         
+        // Decode the ROT-13 path first to get the actual path
+        std::wstring decodedPath = Rot13Encode(recordPath); // ROT-13 is self-inverse
+        
+        // Resolve any known folder paths
+        std::wstring resolvedPath = ResolveKnownFolderPath(decodedPath);
+        
+        // Re-encode the resolved path for comparison
+        std::wstring encodedResolvedPath = Rot13Encode(resolvedPath);
+        
         // Convert to lowercase for case-insensitive comparison
-        std::transform(recordPath.begin(), recordPath.end(), recordPath.begin(), ::towlower);
+        std::transform(encodedResolvedPath.begin(), encodedResolvedPath.end(), encodedResolvedPath.begin(), ::towlower);
+        
+        // Debug output
+        if (decodedPath != resolvedPath) {
+            OutputDebugStringW(L"IconVisibilityManager: IconStreams path resolution:\n");
+            OutputDebugStringW((L"  Original: " + decodedPath + L"\n").c_str());
+            OutputDebugStringW((L"  Resolved: " + resolvedPath + L"\n").c_str());
+        }
         
         // Check if this is our application
-        if (recordPath.find(encodedExePath) != std::wstring::npos) {
+        if (encodedResolvedPath.find(encodedExePath) != std::wstring::npos) {
             OutputDebugStringW(L"IconVisibilityManager: Found our icon in IconStreams\n");
             
             // Get current visibility value
@@ -247,6 +263,7 @@ IconVisibilityManager::PromotionResult IconVisibilityManager::UpdateIconStreamsV
     RegCloseKey(hKey);
     return PromotionResult::NotFound;
 }
+
 
 
 std::wstring IconVisibilityManager::Rot13Encode(const std::wstring& input) {
