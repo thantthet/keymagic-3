@@ -399,7 +399,6 @@ keymagic_engine_process_key_event(IBusEngine* ibus_engine, guint keyval,
                         if (kb_info && kb_info->name) {
                             message = g_strdup_printf("Switched to: %s", kb_info->name);
                         }
-                        keymagic_config_free(config);
                     }
                     
                     /* Fallback to keyboard ID if no display name found */
