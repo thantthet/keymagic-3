@@ -668,9 +668,6 @@ keymagic_engine_commit_preedit(KeyMagicEngine* engine)
         if (text && strlen(text) > 0) {
             g_debug("%s: Attempting to commit preedit text: %s", LOG_TAG, text);
             
-            /* Hide preedit first to ensure it's not shown as underlined */
-            ibus_engine_hide_preedit_text(ibus_engine);
-            
             /* Create a new text object for commit - IBus takes ownership */
             IBusText* commit_text = ibus_text_new_from_string(text);
             ibus_engine_commit_text(ibus_engine, commit_text);
@@ -692,6 +689,9 @@ keymagic_engine_clear_preedit(KeyMagicEngine* engine)
     
     if (engine->preedit_visible) {
         IBusEngine* ibus_engine = IBUS_ENGINE(engine);
+        
+        /* update preedit to empty string because on x11, ibus won't hide preedit if it's not empty */
+        ibus_engine_update_preedit_text(ibus_engine, ibus_text_new_from_string(""), 0, FALSE);
         
         /* Hide preedit */
         ibus_engine_hide_preedit_text(ibus_engine);
