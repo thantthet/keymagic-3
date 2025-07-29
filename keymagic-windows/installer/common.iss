@@ -209,6 +209,24 @@ begin
   end;
 end;
 
+// Check if KeyMagic Tray Manager is running
+function IsTrayManagerRunning(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  // Use tasklist with filter - returns 0 if found, 1 if not found
+  if not Exec('cmd.exe', '/C "tasklist /FI "IMAGENAME eq keymagic-tray.exe" 2>nul | find /I "keymagic-tray.exe" >nul"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    // If exec fails, assume it's not running
+    Result := False;
+  end
+  else
+  begin
+    // ResultCode = 0 means the process was found
+    Result := (ResultCode = 0);
+  end;
+end;
+
 // Custom initialization
 function InitializeSetup(): Boolean;
 var
@@ -248,8 +266,8 @@ begin
     end;
   end;
   
-  // Check if KeyMagic is running (for upgrades)
-  while IsKeyMagicRunning() do
+  // Check if KeyMagic or Tray Manager is running (for upgrades)
+  while IsKeyMagicRunning() or IsTrayManagerRunning() do
   begin
     case MsgBox('KeyMagic is currently running. Please close it before continuing with the installation.' + #13#10 + #13#10 + 
                 'Click "Yes" to close KeyMagic automatically.' + #13#10 +
@@ -257,8 +275,9 @@ begin
                 'Click "Cancel" to abort installation.', mbError, MB_YESNOCANCEL) of
       IDYES:
         begin
-          // Try to terminate KeyMagic
+          // Try to terminate both KeyMagic and Tray Manager
           Exec('taskkill.exe', '/F /IM keymagic.exe', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
+          Exec('taskkill.exe', '/F /IM keymagic-tray.exe', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
           Sleep(1000); // Give it a moment to close
         end;
       IDNO:
@@ -281,8 +300,8 @@ var
 begin
   Result := True;
   
-  // Check if KeyMagic is running
-  while IsKeyMagicRunning() do
+  // Check if KeyMagic or Tray Manager is running
+  while IsKeyMagicRunning() or IsTrayManagerRunning() do
   begin
     case MsgBox('KeyMagic is currently running. Please close it before continuing with the uninstallation.' + #13#10 + #13#10 + 
                 'Click "Yes" to close KeyMagic automatically.' + #13#10 +
@@ -290,8 +309,9 @@ begin
                 'Click "Cancel" to abort uninstallation.', mbError, MB_YESNOCANCEL) of
       IDYES:
         begin
-          // Try to terminate KeyMagic
+          // Try to terminate both KeyMagic and Tray Manager
           Exec('taskkill.exe', '/F /IM keymagic.exe', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
+          Exec('taskkill.exe', '/F /IM keymagic-tray.exe', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
           Sleep(1000); // Give it a moment to close
         end;
       IDNO:

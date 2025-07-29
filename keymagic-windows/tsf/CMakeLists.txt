@@ -23,6 +23,7 @@ set(SOURCES
     src/KeyProcessingUtils.cpp
     src/LanguageUtils.cpp
     src/HUD.cpp
+    src/TrayClient.cpp
     src/KeyMagicTSF.rc
 )
 
@@ -53,6 +54,8 @@ target_link_libraries(KeyMagicTSF PRIVATE
     userenv     # User environment
     ntdll       # NT functions
     gdi32       # Graphics Device Interface for HUD
+    shlwapi     # Path functions
+    psapi       # Process information
 )
 
 # Determine Rust target directory based on architecture

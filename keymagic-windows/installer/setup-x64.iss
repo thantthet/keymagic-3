@@ -55,6 +55,9 @@ Type: filesandordirs; Name: "{app}\keyboards"
 ; GUI Application (x64)
 Source: "..\..\target\x86_64-pc-windows-msvc\release\keymagic-gui.exe"; DestDir: "{app}"; DestName: "keymagic.exe"; Flags: ignoreversion
 
+; Tray Manager Application
+Source: "..\tray-manager\build-x64\bin\Release\keymagic-tray.exe"; DestDir: "{app}"; Flags: ignoreversion
+
 ; TSF DLL - x64 only in versioned subdirectory
 Source: "..\tsf\build-x64\Release\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Flags: ignoreversion
 
@@ -82,14 +85,14 @@ Root: HKCU; Subkey: "Software\KeyMagic"; Flags: uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\KeyMagic\Settings"; Flags: uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\KeyMagic\Keyboards"; Flags: uninsdeletekeyifempty
 
-; Set StartWithWindows to 1 on install
-Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: string; ValueName: "StartWithWindows"; ValueData: "1"; Flags: uninsdeletevalue
+; Set StartWithWindows to 0 on install (tray manager will handle startup)
+Root: HKCU; Subkey: "Software\KeyMagic\Settings"; ValueType: string; ValueName: "StartWithWindows"; ValueData: "0"; Flags: uninsdeletevalue
 
 ; Version-based first-run detection is now used instead of FirstRunScanKeyboards flag
 ; The app will automatically detect first run based on version comparison
 
-; Add to Windows Run registry for auto-start
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagic"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletevalue
+; Add Tray Manager to Windows Run registry for auto-start (not the GUI app)
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KeyMagicTray"; ValueData: "{app}\keymagic-tray.exe"; Flags: uninsdeletevalue
 
 ; File association for .km2 files
 Root: HKCR; Subkey: ".km2"; ValueType: string; ValueName: ""; ValueData: "KeyMagicKeyboard"; Flags: uninsdeletevalue
@@ -104,11 +107,14 @@ Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"
 ; Register TSF DLL (cleanup of old versions is handled automatically)
 Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF_x64.dll"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden; BeforeInstall: CleanupOldTSF
 
-; Launch application after installation
+; Always launch tray manager after installation
+Filename: "{app}\keymagic-tray.exe"; StatusMsg: "Starting KeyMagic Tray Manager..."; Flags: nowait runhidden
+
+; Optionally launch GUI application after installation
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Unregister TSF DLL before uninstall
-Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
+Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF_x64.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
 #include "common.iss"

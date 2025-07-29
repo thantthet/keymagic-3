@@ -13,7 +13,7 @@ echo.
 cd /d "%~dp0\.."
 
 :: Build dll and gui
-echo [1/3] Building ARM64 components...
+echo [1/4] Building ARM64 components...
 
 :: Build GUI and keymagic-core
 echo Building GUI and libraries...
@@ -32,7 +32,17 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/3] Verifying build artifacts...
+echo [2/4] Building ARM64 Tray Manager...
+cd tray-manager
+call make.bat build arm64 Release
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to build ARM64 Tray Manager
+    exit /b 1
+)
+cd ..
+
+echo.
+echo [3/4] Verifying build artifacts...
 
 :: Check ARM64X forwarder and its dependencies
 if not exist "tsf\build-arm64x\KeyMagicTSF.dll" (
@@ -60,13 +70,20 @@ if not exist "..\target\aarch64-pc-windows-msvc\release\keymagic-gui.exe" (
 )
 echo [OK] GUI executable found
 
+:: Check Tray Manager
+if not exist "tray-manager\build-arm64\bin\Release\keymagic-tray.exe" (
+    echo [ERROR] Tray Manager executable not found
+    exit /b 1
+)
+echo [OK] Tray Manager executable found
+
 :: Check resources
 if not exist "resources\icons\keymagic.ico" (
     echo [WARNING] Icon file not found, installer will use default icon
 )
 
 echo.
-echo [3/3] Building ARM64 installer...
+echo [4/4] Building ARM64 installer...
 
 cd installer
 

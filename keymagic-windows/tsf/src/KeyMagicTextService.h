@@ -13,6 +13,7 @@
 // Forward declaration
 class CKeyMagicTextService;
 class CCompositionManager;
+class TrayClient;
 
 class CKeyMagicTextService : public ITfTextInputProcessor,
                             public ITfThreadMgrEventSink,
@@ -159,6 +160,12 @@ private:
     HRESULT UpdatePreservedKeys();
     HRESULT ParseHotkeyString(const std::wstring& hotkeyStr, TF_PRESERVEDKEY& tfKey);
     GUID GenerateGuidForKeyboard(const std::wstring& keyboardId);
+    
+    // Tray client for communicating with tray manager
+    std::unique_ptr<TrayClient> m_pTrayClient;
+    void InitializeTrayClient();
+    void NotifyTrayManagerFocusChange(BOOL hasFocus);
+    void NotifyTrayManagerKeyboardChange();
     
     // Friend classes
     friend class CDirectEditSession;

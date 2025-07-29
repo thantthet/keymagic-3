@@ -13,7 +13,7 @@ echo.
 cd /d "%~dp0\.."
 
 :: Build dll and gui
-echo [1/3] Building x64 TSF DLL...
+echo [1/4] Building x64 TSF DLL...
 call make.bat build x64 Release
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build x64 TSF DLL
@@ -21,7 +21,17 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/3] Verifying build artifacts...
+echo [2/4] Building x64 Tray Manager...
+cd tray-manager
+call make.bat build x64 Release
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to build x64 Tray Manager
+    exit /b 1
+)
+cd ..
+
+echo.
+echo [3/4] Verifying build artifacts...
 
 :: Check x64 TSF
 if not exist "tsf\build-x64\Release\KeyMagicTSF_x64.dll" (
@@ -37,13 +47,20 @@ if not exist "..\target\x86_64-pc-windows-msvc\release\keymagic-gui.exe" (
 )
 echo [OK] GUI executable found
 
+:: Check Tray Manager
+if not exist "tray-manager\build-x64\bin\Release\keymagic-tray.exe" (
+    echo [ERROR] Tray Manager executable not found
+    exit /b 1
+)
+echo [OK] Tray Manager executable found
+
 :: Check resources
 if not exist "resources\icons\keymagic.ico" (
     echo [WARNING] Icon file not found, installer will use default icon
 )
 
 echo.
-echo [3/3] Building x64 installer...
+echo [4/4] Building x64 installer...
 
 cd installer
 
