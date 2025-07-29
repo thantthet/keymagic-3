@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <tlhelp32.h>
 #include <functional>
+#include <shlobj.h>
 
 // Helper function to convert UTF-8 to UTF-16
 std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
@@ -1162,51 +1163,112 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
     
     if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS)
     {
-        // Read keyboard path
+        // Try to read the new FileName value first, fall back to Path for backward compatibility
+        wchar_t filename[MAX_PATH] = {0};
         wchar_t km2Path[MAX_PATH] = {0};
-        DWORD dataSize = sizeof(km2Path);
+        DWORD dataSize = sizeof(filename);
+        bool hasValidPath = false;
         
-        if (RegGetValueW(hKey, NULL, L"Path", RRF_RT_REG_SZ, NULL, km2Path, &dataSize) == ERROR_SUCCESS)
+        // Try the new FileName value first
+        if (RegGetValueW(hKey, NULL, L"FileName", RRF_RT_REG_SZ, NULL, filename, &dataSize) == ERROR_SUCCESS && filename[0] != L'\0')
         {
-            if (km2Path[0] != L'\0')
+            // Construct full path from filename
+            // Get keyboards directory from settings or use default
+            std::wstring keyboardsDir;
+            HKEY hSettingsKey;
+            if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_READ, &hSettingsKey) == ERROR_SUCCESS)
             {
-                // Check if keyboard is enabled
-                DWORD enabled = 0;
-                dataSize = sizeof(enabled);
-                
-                if (RegGetValueW(hKey, NULL, L"Enabled", RRF_RT_REG_DWORD, NULL, &enabled, &dataSize) == ERROR_SUCCESS)
+                wchar_t dirPath[MAX_PATH] = {0};
+                DWORD dirSize = sizeof(dirPath);
+                if (RegGetValueW(hSettingsKey, NULL, L"KeyboardsPath", RRF_RT_REG_SZ, NULL, dirPath, &dirSize) == ERROR_SUCCESS && dirPath[0] != L'\0')
                 {
-                    if (!enabled)
+                    keyboardsDir = dirPath;
+                }
+                RegCloseKey(hSettingsKey);
+            }
+            
+            // Use default if not found in registry
+            if (keyboardsDir.empty())
+            {
+                wchar_t localAppData[MAX_PATH];
+                if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData)))
+                {
+                    keyboardsDir = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
+                }
+                else
+                {
+                    // Fallback to environment variable
+                    wchar_t* appData = nullptr;
+                    size_t len = 0;
+                    if (_wdupenv_s(&appData, &len, L"LOCALAPPDATA") == 0 && appData)
                     {
-                        DEBUG_LOG(L"Keyboard is disabled: " + keyboardId);
+                        keyboardsDir = std::wstring(appData) + L"\\KeyMagic\\Keyboards";
+                        free(appData);
+                    }
+                    else
+                    {
+                        // Failed to determine keyboards directory
+                        DEBUG_LOG(L"Failed to determine keyboards directory - cannot load keyboard");
                         RegCloseKey(hKey);
                         return FALSE;
                     }
                 }
-                
-                // Load the keyboard
-                BOOL result = LoadKeyboard(km2Path);
-                
-                if (result)
+            }
+            
+            // Construct full path
+            wcscpy_s(km2Path, (keyboardsDir + L"\\" + filename).c_str());
+            hasValidPath = true;
+            DEBUG_LOG(L"Using keyboard filename: " + std::wstring(filename) + L" with full path: " + std::wstring(km2Path));
+        }
+        else
+        {
+            // Fall back to old Path value for backward compatibility
+            dataSize = sizeof(km2Path);
+            if (RegGetValueW(hKey, NULL, L"Path", RRF_RT_REG_SZ, NULL, km2Path, &dataSize) == ERROR_SUCCESS && km2Path[0] != L'\0')
+            {
+                hasValidPath = true;
+                DEBUG_LOG(L"Using legacy Path value: " + std::wstring(km2Path));
+            }
+        }
+        
+        if (hasValidPath)
+        {
+            // Check if keyboard is enabled
+            DWORD enabled = 0;
+            dataSize = sizeof(enabled);
+            
+            if (RegGetValueW(hKey, NULL, L"Enabled", RRF_RT_REG_DWORD, NULL, &enabled, &dataSize) == ERROR_SUCCESS)
+            {
+                if (!enabled)
                 {
-                    // Store keyboard info
-                    m_currentKeyboardId = keyboardId;
-                    
-                    // Read keyboard name
-                    wchar_t name[256] = {0};
-                    dataSize = sizeof(name);
-                    if (RegGetValueW(hKey, NULL, L"Name", RRF_RT_REG_SZ, NULL, name, &dataSize) == ERROR_SUCCESS)
-                    {
-                        DEBUG_LOG(L"Loaded keyboard: " + std::wstring(name) + L" (" + keyboardId + L")");
-                    }
-                    
-                    // Notify tray manager of keyboard change
-                    NotifyTrayManagerKeyboardChange();
+                    DEBUG_LOG(L"Keyboard is disabled: " + keyboardId);
+                    RegCloseKey(hKey);
+                    return FALSE;
+                }
+            }
+            
+            // Load the keyboard
+            BOOL result = LoadKeyboard(km2Path);
+            
+            if (result)
+            {
+                // Store keyboard info
+                m_currentKeyboardId = keyboardId;
+                
+                // Read keyboard name
+                wchar_t name[256] = {0};
+                dataSize = sizeof(name);
+                if (RegGetValueW(hKey, NULL, L"Name", RRF_RT_REG_SZ, NULL, name, &dataSize) == ERROR_SUCCESS)
+                {
+                    DEBUG_LOG(L"Loaded keyboard: " + std::wstring(name) + L" (" + keyboardId + L")");
                 }
                 
-                RegCloseKey(hKey);
-                return result;
+                // Notify tray manager of keyboard change
+                NotifyTrayManagerKeyboardChange();
             }
+            
+            RegCloseKey(hKey);
+            return result;
         }
         
         RegCloseKey(hKey);

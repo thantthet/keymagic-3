@@ -236,7 +236,41 @@ bool RegistryMonitor::ReadKeyboardInfo(HKEY hKey, const std::wstring& keyboardId
     };
     
     readString(L"Name", info.name);
-    readString(L"Path", info.path);
+    
+    // Try to read the new FileName value first, fall back to Path for backward compatibility
+    std::wstring filename;
+    if (readString(L"FileName", filename) && !filename.empty()) {
+        // Construct full path from filename
+        // Get keyboards directory from settings or use default
+        std::wstring keyboardsDir;
+        HKEY hSettingsKey;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, KEY_READ, &hSettingsKey) == ERROR_SUCCESS) {
+            wchar_t dirPath[MAX_PATH] = {0};
+            DWORD dirSize = sizeof(dirPath);
+            if (RegQueryValueExW(hSettingsKey, L"KeyboardsPath", nullptr, nullptr, 
+                               reinterpret_cast<LPBYTE>(dirPath), &dirSize) == ERROR_SUCCESS && dirPath[0] != L'\0') {
+                keyboardsDir = dirPath;
+            }
+            RegCloseKey(hSettingsKey);
+        }
+        
+        // Use default if not found in registry
+        if (keyboardsDir.empty()) {
+            keyboardsDir = GetLocalAppDataPath() + L"\\Keyboards";
+        }
+        
+        // Construct full path
+        info.path = keyboardsDir + L"\\" + filename;
+        OutputDebugStringW((L"RegistryMonitor: Using keyboard filename: " + filename + L" with full path: " + info.path + L"\n").c_str());
+    } else {
+        // Fall back to old Path value for backward compatibility
+        if (!readString(L"Path", info.path)) {
+            info.path.clear();
+        } else {
+            OutputDebugStringW((L"RegistryMonitor: Using legacy Path value: " + info.path + L"\n").c_str());
+        }
+    }
+    
     readString(L"Hotkey", info.hotkey);
     readString(L"Description", info.description);
     readString(L"FontFamily", info.fontFamily);

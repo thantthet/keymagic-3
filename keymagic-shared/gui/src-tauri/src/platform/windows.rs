@@ -24,7 +24,8 @@ const DEFAULT_KEYBOARD_VALUE: &str = "DefaultKeyboard";
 const KEY_PROCESSING_ENABLED_VALUE: &str = "KeyProcessingEnabled";
 
 // Keyboard entry value names
-const KEYBOARD_PATH_VALUE: &str = "Path";
+const KEYBOARD_PATH_VALUE: &str = "Path";  // Legacy name for backward compatibility
+const KEYBOARD_FILENAME_VALUE: &str = "FileName";  // New name for filename storage
 const KEYBOARD_NAME_VALUE: &str = "Name";
 const KEYBOARD_DESCRIPTION_VALUE: &str = "Description";
 const KEYBOARD_HOTKEY_VALUE: &str = "Hotkey";
@@ -266,10 +267,33 @@ impl Platform for WindowsBackend {
         if let Ok(keyboards_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(KEYBOARDS_KEY) {
             for name in keyboards_key.enum_keys().filter_map(Result::ok) {
                 if let Ok(kb_key) = keyboards_key.open_subkey(&name) {
+                    // Try to read from new FileName value first, fall back to Path for compatibility
+                    let filename = if let Ok(filename) = kb_key.get_value::<String, _>(KEYBOARD_FILENAME_VALUE) {
+                        // Found the new FileName value
+                        filename
+                    } else if let Ok(path_value) = kb_key.get_value::<String, _>(KEYBOARD_PATH_VALUE) {
+                        // Fall back to old Path value for backward compatibility
+                        // Extract filename from path if it's a full path
+                        if path_value.contains('\\') || path_value.contains('/') {
+                            // It's a full path, extract filename
+                            PathBuf::from(&path_value)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or(&path_value)
+                                .to_string()
+                        } else {
+                            // It's already a filename
+                            path_value
+                        }
+                    } else {
+                        // No filename or path found, skip this keyboard
+                        continue;
+                    };
+                    
                     let keyboard = InstalledKeyboard {
                         id: name.clone(),
                         name: kb_key.get_value(KEYBOARD_NAME_VALUE).unwrap_or(name),
-                        filename: kb_key.get_value(KEYBOARD_PATH_VALUE).unwrap_or_default(),
+                        filename,
                         hotkey: kb_key.get_value(KEYBOARD_HOTKEY_VALUE).ok(),
                         hash: kb_key.get_value(KEYBOARD_HASH_VALUE).unwrap_or_default(),
                     };
@@ -339,7 +363,25 @@ impl Platform for WindowsBackend {
         for keyboard in &config.keyboards.installed {
             let (kb_key, _) = keyboards_key.create_subkey(&keyboard.id)?;
             kb_key.set_value(KEYBOARD_NAME_VALUE, &keyboard.name)?;
-            kb_key.set_value(KEYBOARD_PATH_VALUE, &keyboard.filename)?;
+            
+            // Always save filename only (not full path)
+            // Extract filename if it happens to be a full path
+            let filename_only = if keyboard.filename.contains('\\') || keyboard.filename.contains('/') {
+                PathBuf::from(&keyboard.filename)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&keyboard.filename)
+                    .to_string()
+            } else {
+                keyboard.filename.clone()
+            };
+            
+            // Write to new FileName value
+            kb_key.set_value(KEYBOARD_FILENAME_VALUE, &filename_only)?;
+            
+            // Delete old Path value if it exists (cleanup migration)
+            let _ = kb_key.delete_value(KEYBOARD_PATH_VALUE);
+            
             kb_key.set_value(KEYBOARD_HASH_VALUE, &keyboard.hash)?;
             kb_key.set_value(KEYBOARD_ENABLED_VALUE, &1u32)?; // Always enabled for now
             
