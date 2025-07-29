@@ -82,6 +82,17 @@ if command -v ibus write-cache >/dev/null 2>&1; then
     ibus write-cache
 fi
 
+# Restart IBus if we're in a graphical session and not root
+if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+    if [ "$SUDO_USER" ]; then
+        # Restart IBus as the sudo user, not root
+        su -c "ibus restart >/dev/null 2>&1 || true" "$SUDO_USER"
+    elif [ "$USER" != "root" ]; then
+        # Restart IBus directly if not root
+        ibus restart >/dev/null 2>&1 || true
+    fi
+fi
+
 # Launch KeyMagic3 GUI if we're in a graphical session
 if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
     # Check if we're running as root (during package installation)
