@@ -930,6 +930,7 @@ class KMInputController: IMKInputController {
                 var displayName = keyboard["name"] ?? id
                 var hotkeyString = keyboard["hotkey"]
                 var description: String?
+                var hotkeyFromKM2 = false
                 
                 // Get metadata from KM2 file if available
                 if let keyboardPath = KMConfiguration.shared.getKeyboardPath(for: id),
@@ -939,11 +940,21 @@ class KMInputController: IMKInputController {
                         displayName = km2Name
                     }
                     
-                    // Use hotkey from KM2 if not in config
-                    if hotkeyString == nil, let km2Hotkey = metadata.hotkey {
+                    // Consistent with IBus logic:
+                    // - nil hotkey in config: try KM2
+                    // - empty string in config: user disabled hotkey
+                    // - non-empty string in config: use it
+                    if hotkeyString == nil, let km2Hotkey = metadata.hotkey, !km2Hotkey.isEmpty {
+                        // Hotkey not set in config - use KM2 if available
                         hotkeyString = km2Hotkey
+                        hotkeyFromKM2 = true
                         LOG_DEBUG("Got hotkey from KM2 file for \(displayName): \(km2Hotkey)")
+                    } else if let hotkey = hotkeyString, hotkey.isEmpty {
+                        // Empty string means user explicitly disabled hotkey
+                        LOG_DEBUG("Hotkey explicitly disabled for \(displayName)")
+                        hotkeyString = nil  // Clear it to prevent registration
                     }
+                    // else: non-empty hotkeyString from config is used as-is
                     
                     // Get description for tooltip
                     description = metadata.description
@@ -957,11 +968,10 @@ class KMInputController: IMKInputController {
                 menuItem.tag = index
                 menuItem.isEnabled = true
                 
-                // Set hotkey if available
+                // Set hotkey if available (already filtered out empty strings above)
                 if let hotkeyStr = hotkeyString,
-                   hotkeyStr != "",
                    let hotkey = MacHotkey.parse(hotkeyStr) {
-                    LOG_DEBUG("Setting hotkey for \(displayName): \(hotkey.debugDescription)")
+                    LOG_DEBUG("Setting hotkey for \(displayName): \(hotkey.debugDescription)" + (hotkeyFromKM2 ? " [from KM2]" : ""))
                     hotkey.applyTo(menuItem)
                 }
                 
