@@ -135,8 +135,9 @@ impl KeyMagicEngine {
                     }
                     is_processed = true;
                 } else {
-                    // auto_bksp is disabled, don't process backspace
-                    is_processed = false;
+                    // auto_bksp is disabled, process backspace as simple delete
+                    state.composing_buffer_mut().backspace();
+                    is_processed = true;
                 }
             } else if let Some(ch) = input.character {
                 // if character is available, set is_processed to true
