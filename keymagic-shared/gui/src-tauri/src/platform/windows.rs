@@ -121,6 +121,10 @@ impl Platform for WindowsBackend {
                 config.general.update_remind_after = Some(remind_after);
             }
             
+            if let Ok(last_scanned) = settings_key.get_value::<String, _>("LastScannedVersion") {
+                config.general.last_scanned_version = Some(last_scanned);
+            }
+            
             // Active keyboard is stored with DefaultKeyboard name
             if let Ok(active) = settings_key.get_value::<String, _>(DEFAULT_KEYBOARD_VALUE) {
                 config.keyboards.active = Some(active);
@@ -182,6 +186,10 @@ impl Platform for WindowsBackend {
         
         if let Some(ref remind_after) = config.general.update_remind_after {
             settings_key.set_value("UpdateRemindAfter", remind_after)?;
+        }
+        
+        if let Some(ref last_scanned) = config.general.last_scanned_version {
+            settings_key.set_value("LastScannedVersion", last_scanned)?;
         }
         
         // Active keyboard uses DefaultKeyboard name
