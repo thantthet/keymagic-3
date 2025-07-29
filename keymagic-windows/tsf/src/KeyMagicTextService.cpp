@@ -968,7 +968,7 @@ HRESULT CKeyMagicTextService::RegisterPreservedKeys()
                         
                         // Load KM2 to get hotkey
                         std::string utf8Path = ConvertUtf16ToUtf8(km2Path);
-                        void* km2Handle = keymagic_km2_load(utf8Path.c_str());
+                        Km2FileHandle* km2Handle = keymagic_km2_load(utf8Path.c_str());
                         if (km2Handle)
                         {
                             char* hotkeyStr = keymagic_km2_get_hotkey(km2Handle);
