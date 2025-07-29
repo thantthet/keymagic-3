@@ -642,8 +642,9 @@ keymagic_engine_update_preedit(KeyMagicEngine* engine, const gchar* text)
     engine->preedit_visible = TRUE;
     
     /* Update IBus preedit - IBus takes ownership of the text object */
-    ibus_engine_update_preedit_text(ibus_engine, preedit, 
-                                   engine->preedit_cursor_pos, TRUE);
+    ibus_engine_update_preedit_text_with_mode(ibus_engine, preedit, 
+                                             engine->preedit_cursor_pos, TRUE,
+                                             IBUS_ENGINE_PREEDIT_COMMIT);
     
     /* Store a copy for our reference */
     engine->preedit_text = ibus_text_new_from_string(text);
