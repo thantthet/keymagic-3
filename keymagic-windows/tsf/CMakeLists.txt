@@ -86,6 +86,10 @@ else()
     )
 endif()
 
+# Set static runtime
+set_property(TARGET KeyMagicTSF PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 # Module definition file
 set_target_properties(KeyMagicTSF PROPERTIES
     LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/KeyMagicTSF.def"
