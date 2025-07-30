@@ -32,11 +32,6 @@ void IconVisibilityManager::PromoteIcon(const std::wstring& exePath) {
         OutputDebugStringW(L"IconVisibilityManager: Using Windows 10 method\n");
         result = PromoteIconWindows10(exePath);
     }
-    
-    // Only refresh the notification area if we successfully promoted the icon
-    if (result == PromotionResult::Promoted) {
-        RefreshNotificationArea();
-    }
 }
 
 bool IconVisibilityManager::IsWindows11() {
@@ -306,21 +301,4 @@ std::wstring IconVisibilityManager::ResolveKnownFolderPath(const std::wstring& p
     
     // Return original path if it's not a known folder path
     return path;
-}
-
-void IconVisibilityManager::RefreshNotificationArea() {
-    // Notify explorer to refresh the notification area
-    HWND hShellTrayWnd = FindWindowW(L"Shell_TrayWnd", nullptr);
-    if (hShellTrayWnd) {
-        SendMessage(hShellTrayWnd, WM_SETTINGCHANGE, 0, 0);
-        
-        // Also try sending a more specific notification
-        HWND hTrayNotifyWnd = FindWindowExW(hShellTrayWnd, nullptr, L"TrayNotifyWnd", nullptr);
-        if (hTrayNotifyWnd) {
-            SendMessage(hTrayNotifyWnd, WM_SETTINGCHANGE, 0, 0);
-        }
-        
-        // Send refresh command
-        SendMessage(hShellTrayWnd, WM_COMMAND, 419, 0);
-    }
 }
