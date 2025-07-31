@@ -66,6 +66,7 @@ private:
     std::unique_ptr<KeyboardPreviewWindow> m_previewWindow;
     std::wstring m_currentKeyboardId;
     std::wstring m_currentKeyboardPath;
+    bool m_isMenuShowing;
     
     // Menu constants
     static constexpr UINT IDM_KEYBOARD_BASE = 1000;

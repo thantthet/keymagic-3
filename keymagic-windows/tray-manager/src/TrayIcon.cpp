@@ -21,7 +21,8 @@ TrayIcon::TrayIcon()
     : m_hWnd(nullptr)
     , m_hIcon(nullptr)
     , m_hDefaultIcon(nullptr)
-    , m_visible(false) {
+    , m_visible(false)
+    , m_isMenuShowing(false) {
     ZeroMemory(&m_nid, sizeof(m_nid));
 }
 
@@ -122,6 +123,14 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<KeyboardInfo>& keybo
                                const std::wstring& currentKeyboardId, MenuCallback callback) {
     m_menuCallback = callback;
     
+    // Set flag to indicate menu is showing
+    m_isMenuShowing = true;
+    
+    // Hide preview window when showing context menu
+    if (m_previewWindow) {
+        m_previewWindow->Hide();
+    }
+    
     // Notify that menu is about to be shown (use SendMessage for immediate handling)
     SendMessage(hWnd, WM_MENU_SHOWN, 0, 0);
     
@@ -176,6 +185,9 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<KeyboardInfo>& keybo
         m_menuCallback(cmd);
     }
     
+    // Clear menu showing flag
+    m_isMenuShowing = false;
+    
     // Notify that menu has been dismissed (use SendMessage for immediate handling)
     SendMessage(hWnd, WM_MENU_DISMISSED, 0, 0);
 }
@@ -187,15 +199,6 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     
     switch (LOWORD(lParam)) {
         case WM_LBUTTONUP:
-            // Show keyboard preview window if enabled
-            if (m_previewWindow && !m_currentKeyboardId.empty() && IsPreviewWindowEnabled()) {
-                POINT pt;
-                GetCursorPos(&pt);
-                m_previewWindow->Show(pt, m_currentKeyboardId, m_currentKeyboardPath);
-            }
-            break;
-            
-        case WM_RBUTTONUP:
             // Hide preview window when showing context menu
             if (m_previewWindow) {
                 m_previewWindow->Hide();
@@ -204,9 +207,13 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
             PostMessage(hWnd, WM_COMMAND, MAKEWPARAM(0, 0), 0);
             break;
             
+        case WM_RBUTTONUP:
+            // Right-click does nothing
+            break;
+            
         case WM_MOUSEMOVE:
-            // Show preview on hover if enabled
-            if (m_previewWindow && !m_currentKeyboardId.empty() && IsPreviewWindowEnabled()) {
+            // Show preview on hover if enabled and menu is not showing
+            if (m_previewWindow && !m_currentKeyboardId.empty() && IsPreviewWindowEnabled() && !m_isMenuShowing) {
                 // Check if preview is already visible to avoid flickering
                 if (!m_previewWindow->IsVisible()) {
                     POINT pt;
