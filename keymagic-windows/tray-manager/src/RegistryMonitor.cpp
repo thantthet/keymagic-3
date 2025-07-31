@@ -1,6 +1,6 @@
 #include "RegistryMonitor.h"
 #include "SecurityUtils.h"
-#include "keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 
 RegistryMonitor::RegistryMonitor()
     : m_hKeyboardsKey(nullptr)
@@ -112,49 +112,13 @@ void RegistryMonitor::Stop() {
 }
 
 std::vector<KeyboardInfo> RegistryMonitor::GetKeyboards() {
-    std::vector<KeyboardInfo> keyboards;
-    
-    if (!m_hKeyboardsKey) {
-        return keyboards;
-    }
-    
-    DWORD index = 0;
-    WCHAR keyName[256];
-    DWORD keyNameSize = 256;
-    
-    while (RegEnumKeyExW(m_hKeyboardsKey, index, keyName, &keyNameSize,
-                         nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
-        KeyboardInfo info;
-        info.id = keyName;
-        
-        if (ReadKeyboardInfo(m_hKeyboardsKey, keyName, info)) {
-            keyboards.push_back(info);
-        }
-        
-        keyNameSize = 256;
-        index++;
-    }
-    
-    return keyboards;
+    // Use shared utility function
+    return RegistryUtils::GetInstalledKeyboards();
 }
 
 std::wstring RegistryMonitor::GetDefaultKeyboard() {
-    if (!m_hSettingsKey) {
-        return L"";
-    }
-    
-    WCHAR buffer[256];
-    DWORD bufferSize = sizeof(buffer);
-    DWORD type;
-    
-    if (RegQueryValueExW(m_hSettingsKey, L"DefaultKeyboard", nullptr, &type,
-                         reinterpret_cast<LPBYTE>(buffer), &bufferSize) == ERROR_SUCCESS) {
-        if (type == REG_SZ) {
-            return std::wstring(buffer);
-        }
-    }
-    
-    return L"";
+    // Use shared utility function
+    return RegistryUtils::GetDefaultKeyboardId();
 }
 
 bool RegistryMonitor::SetDefaultKeyboard(const std::wstring& keyboardId) {
@@ -173,12 +137,8 @@ bool RegistryMonitor::SetDefaultKeyboard(const std::wstring& keyboardId) {
 }
 
 bool RegistryMonitor::GetKeyboardInfo(const std::wstring& keyboardId, KeyboardInfo& info) {
-    if (!m_hKeyboardsKey) {
-        return false;
-    }
-    
-    info.id = keyboardId;
-    return ReadKeyboardInfo(m_hKeyboardsKey, keyboardId, info);
+    // Use shared utility function
+    return RegistryUtils::GetKeyboardInfoById(keyboardId, info);
 }
 
 void RegistryMonitor::NotifyTipsOfChange() {
@@ -321,31 +281,11 @@ bool RegistryMonitor::ReadKeyboardInfo(HKEY hKey, const std::wstring& keyboardId
         OutputDebugStringW((L"RegistryMonitor: Hotkey explicitly disabled for keyboard " + keyboardId + L"\n").c_str());
     }
     
-    readString(L"Description", info.description);
-    readString(L"FontFamily", info.fontFamily);
-    
     RegCloseKey(hSubKey);
     return true;
 }
 
 void RegistryMonitor::EnsureRegistryStructure() {
-    HKEY hKey;
-    
-    // Create KeyMagic key
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, KEYMAGIC_REGISTRY_PATH, 0, nullptr,
-                        REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
-        RegCloseKey(hKey);
-    }
-    
-    // Create Keyboards subkey
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, KEYMAGIC_KEYBOARDS_PATH, 0, nullptr,
-                        REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
-        RegCloseKey(hKey);
-    }
-    
-    // Create Settings subkey
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, nullptr,
-                        REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
-        RegCloseKey(hKey);
-    }
+    // Use shared utility function
+    RegistryUtils::EnsureRegistryStructure();
 }

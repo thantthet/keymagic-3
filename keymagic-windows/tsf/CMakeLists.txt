@@ -40,6 +40,7 @@ endif()
 # Include directories
 target_include_directories(KeyMagicTSF PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
 )
 
 # Link libraries

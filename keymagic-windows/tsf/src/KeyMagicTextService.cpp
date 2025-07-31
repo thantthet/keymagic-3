@@ -10,6 +10,8 @@
 #include "Registry.h"
 #include "HUD.h"
 #include "TrayClient.h"
+#include "../../shared/include/RegistryUtils.h"
+#include "../../shared/include/KeyboardInfo.h"
 #include <string>
 #include <codecvt>
 #include <locale>
@@ -708,20 +710,15 @@ STDAPI CKeyMagicTextService::OnPreservedKey(ITfContext *pic, REFGUID rguid, BOOL
             LoadKeyboardByID(preservedKey.keyboardId);
             
             // Show HUD notification
-            // Get keyboard display name from registry
+            // Get keyboard display name from registry using shared utility
             std::wstring displayName = preservedKey.keyboardId;
-            std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + preservedKey.keyboardId;
-            HKEY hKeyboardKey;
-            if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKeyboardKey) == ERROR_SUCCESS)
+            KeyboardInfo kbInfo;
+            if (RegistryUtils::GetKeyboardInfoById(preservedKey.keyboardId, kbInfo))
             {
-                WCHAR szName[256];
-                DWORD dwType = REG_SZ;
-                DWORD dwSize = sizeof(szName);
-                if (RegQueryValueExW(hKeyboardKey, L"Name", nullptr, &dwType, (LPBYTE)szName, &dwSize) == ERROR_SUCCESS)
+                if (!kbInfo.name.empty())
                 {
-                    displayName = szName;
+                    displayName = kbInfo.name;
                 }
-                RegCloseKey(hKeyboardKey);
             }
             
             KeyMagicHUD::GetInstance().ShowKeyboard(displayName);
@@ -891,142 +888,83 @@ HRESULT CKeyMagicTextService::RegisterPreservedKeys()
     // Clear any existing preserved keys
     UnregisterPreservedKeys();
     
-    // Open keyboards registry key
-    HKEY hKeyboardsKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Keyboards", 0, 
-                      KEY_READ, &hKeyboardsKey) != ERROR_SUCCESS)
+    // Get all installed keyboards using shared utility
+    std::vector<KeyboardInfo> keyboards = RegistryUtils::GetInstalledKeyboards();
+    
+    if (keyboards.empty())
     {
-        DEBUG_LOG(L"Failed to open keyboards registry key");
+        DEBUG_LOG(L"No keyboards configured");
         return S_OK; // Not an error if no keyboards configured
     }
     
-    // Enumerate all keyboards
-    DWORD dwIndex = 0;
-    WCHAR szKeyboardId[256];
-    DWORD dwKeyboardIdSize = sizeof(szKeyboardId) / sizeof(WCHAR);
-    
-    while (RegEnumKeyExW(hKeyboardsKey, dwIndex++, szKeyboardId, &dwKeyboardIdSize, 
-                         nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS)
+    // Process each keyboard
+    for (const auto& keyboard : keyboards)
     {
-        HKEY hKeyboardKey;
-        if (RegOpenKeyExW(hKeyboardsKey, szKeyboardId, 0, KEY_READ, 
-                          &hKeyboardKey) == ERROR_SUCCESS)
+        // Determine hotkey to use
+        std::wstring hotkeyToUse;
+        bool hotkeyFromKM2 = false;
+        
+        // Check if keyboard has a hotkey configured
+        if (!keyboard.hotkey.empty())
         {
-            // Determine hotkey to use (consistent with IBus logic)
-            std::wstring hotkeyToUse;
-            bool hotkeyFromKM2 = false;
-            
-            // Read hotkey value from registry
-            WCHAR szHotkey[256] = {0};
-            DWORD dwType = REG_SZ;
-            DWORD dwSize = sizeof(szHotkey);
-            LONG queryResult = RegQueryValueExW(hKeyboardKey, L"Hotkey", nullptr, &dwType, 
-                                              (LPBYTE)szHotkey, &dwSize);
-            
-            if (queryResult == ERROR_SUCCESS && szHotkey[0] != L'\0')
+            // Hotkey explicitly set in registry
+            hotkeyToUse = keyboard.hotkey;
+            DEBUG_LOG(L"Using hotkey from registry for keyboard " + keyboard.id + L": " + hotkeyToUse);
+        }
+        else if (!keyboard.path.empty())
+        {
+            // No hotkey in registry - try to get from KM2 file
+            // Load KM2 to get hotkey
+            std::string utf8Path = ConvertUtf16ToUtf8(keyboard.path);
+            Km2FileHandle* km2Handle = keymagic_km2_load(utf8Path.c_str());
+            if (km2Handle)
             {
-                // Hotkey explicitly set in config (non-empty string)
-                hotkeyToUse = szHotkey;
-                DEBUG_LOG(L"Using hotkey from registry for keyboard " + std::wstring(szKeyboardId) + L": " + hotkeyToUse);
-            }
-            else if (queryResult == ERROR_FILE_NOT_FOUND)
-            {
-                // Hotkey not set in config - try to get from KM2 file
-                // First get the keyboard filename
-                WCHAR szFilename[256] = {0};
-                dwSize = sizeof(szFilename);
-                if (RegQueryValueExW(hKeyboardKey, L"FileName", nullptr, &dwType, 
-                                   (LPBYTE)szFilename, &dwSize) == ERROR_SUCCESS && szFilename[0] != L'\0')
+                char* hotkeyStr = keymagic_km2_get_hotkey(km2Handle);
+                if (hotkeyStr && hotkeyStr[0] != '\0')
                 {
-                    // Get keyboards directory
-                    std::wstring keyboardsDir;
-                    HKEY hSettingsKey;
-                    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_READ, &hSettingsKey) == ERROR_SUCCESS)
-                    {
-                        WCHAR dirPath[MAX_PATH] = {0};
-                        DWORD dirSize = sizeof(dirPath);
-                        if (RegQueryValueExW(hSettingsKey, L"KeyboardsPath", nullptr, &dwType, (LPBYTE)dirPath, &dirSize) == ERROR_SUCCESS && dirPath[0] != L'\0')
-                        {
-                            keyboardsDir = dirPath;
-                        }
-                        RegCloseKey(hSettingsKey);
-                    }
-                    
-                    // Use default if not found
-                    if (keyboardsDir.empty())
-                    {
-                        WCHAR localAppData[MAX_PATH];
-                        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData)))
-                        {
-                            keyboardsDir = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
-                        }
-                    }
-                    
-                    if (!keyboardsDir.empty())
-                    {
-                        std::wstring km2Path = keyboardsDir + L"\\" + szFilename;
-                        
-                        // Load KM2 to get hotkey
-                        std::string utf8Path = ConvertUtf16ToUtf8(km2Path);
-                        Km2FileHandle* km2Handle = keymagic_km2_load(utf8Path.c_str());
-                        if (km2Handle)
-                        {
-                            char* hotkeyStr = keymagic_km2_get_hotkey(km2Handle);
-                            if (hotkeyStr && hotkeyStr[0] != '\0')
-                            {
-                                hotkeyToUse = ConvertUtf8ToUtf16(hotkeyStr);
-                                hotkeyFromKM2 = true;
-                                DEBUG_LOG(L"Got hotkey from KM2 file for keyboard " + std::wstring(szKeyboardId) + L": " + hotkeyToUse);
-                            }
-                            if (hotkeyStr) keymagic_free_string(hotkeyStr);
-                            keymagic_km2_free(km2Handle);
-                        }
-                    }
+                    hotkeyToUse = ConvertUtf8ToUtf16(hotkeyStr);
+                    hotkeyFromKM2 = true;
+                    DEBUG_LOG(L"Got hotkey from KM2 file for keyboard " + keyboard.id + L": " + hotkeyToUse);
                 }
+                if (hotkeyStr) keymagic_free_string(hotkeyStr);
+                keymagic_km2_free(km2Handle);
             }
-            // else: szHotkey is empty string - user explicitly disabled hotkey
-            
-            // Register the preserved key if we have a valid hotkey
-            if (!hotkeyToUse.empty())
-            {
-                TF_PRESERVEDKEY tfKey;
-                if (SUCCEEDED(ParseHotkeyString(hotkeyToUse, tfKey)))
-                {
-                    // Generate unique GUID for this keyboard
-                    GUID guid = GenerateGuidForKeyboard(szKeyboardId);
-                    
-                    // Register the preserved key
-                    HRESULT hr = m_pKeystrokeMgr->PreserveKey(m_tfClientId, guid, &tfKey, nullptr, 0);
-                    if (SUCCEEDED(hr))
-                    {
-                        // Store the mapping
-                        PreservedKeyInfo info;
-                        info.keyboardId = szKeyboardId;
-                        info.tfKey = tfKey;
-                        info.guid = guid;
-                        m_preservedKeys.push_back(info);
-                        
-                        DEBUG_LOG(L"Registered preserved key for keyboard: " + std::wstring(szKeyboardId) + 
-                                 L" with hotkey: " + hotkeyToUse + (hotkeyFromKM2 ? L" [from KM2]" : L""));
-                    }
-                    else
-                    {
-                        DEBUG_LOG(L"Failed to register preserved key for keyboard: " + std::wstring(szKeyboardId));
-                    }
-                }
-            }
-            else
-            {
-                DEBUG_LOG(L"No hotkey registered for keyboard: " + std::wstring(szKeyboardId) + L" (disabled or not configured)");
-            }
-            
-            RegCloseKey(hKeyboardKey);
         }
         
-        dwKeyboardIdSize = sizeof(szKeyboardId) / sizeof(WCHAR);
+        // Register the preserved key if we have a valid hotkey
+        if (!hotkeyToUse.empty())
+        {
+            TF_PRESERVEDKEY tfKey;
+            if (SUCCEEDED(ParseHotkeyString(hotkeyToUse, tfKey)))
+            {
+                // Generate unique GUID for this keyboard
+                GUID guid = GenerateGuidForKeyboard(keyboard.id);
+                
+                // Register the preserved key
+                HRESULT hr = m_pKeystrokeMgr->PreserveKey(m_tfClientId, guid, &tfKey, nullptr, 0);
+                if (SUCCEEDED(hr))
+                {
+                    // Store the mapping
+                    PreservedKeyInfo info;
+                    info.keyboardId = keyboard.id;
+                    info.tfKey = tfKey;
+                    info.guid = guid;
+                    m_preservedKeys.push_back(info);
+                    
+                    DEBUG_LOG(L"Registered preserved key for keyboard: " + keyboard.id + 
+                             L" with hotkey: " + hotkeyToUse + (hotkeyFromKM2 ? L" [from KM2]" : L""));
+                }
+                else
+                {
+                    DEBUG_LOG(L"Failed to register preserved key for keyboard: " + keyboard.id);
+                }
+            }
+        }
+        else
+        {
+            DEBUG_LOG(L"No hotkey registered for keyboard: " + keyboard.id + L" (disabled or not configured)");
+        }
     }
-    
-    RegCloseKey(hKeyboardsKey);
     return S_OK;
 }
 
@@ -1230,128 +1168,43 @@ BOOL CKeyMagicTextService::LoadKeyboardByID(const std::wstring& keyboardId)
         }
     }
 
-    // Build registry key path for this keyboard
-    std::wstring keyPath = L"Software\\KeyMagic\\Keyboards\\" + keyboardId;
-    HKEY hKey;
-    
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS)
-    {
-        // Try to read the new FileName value first, fall back to Path for backward compatibility
-        wchar_t filename[MAX_PATH] = {0};
-        wchar_t km2Path[MAX_PATH] = {0};
-        DWORD dataSize = sizeof(filename);
-        bool hasValidPath = false;
-        
-        // Try the new FileName value first
-        if (RegGetValueW(hKey, NULL, L"FileName", RRF_RT_REG_SZ, NULL, filename, &dataSize) == ERROR_SUCCESS && filename[0] != L'\0')
-        {
-            // Construct full path from filename
-            // Get keyboards directory from settings or use default
-            std::wstring keyboardsDir;
-            HKEY hSettingsKey;
-            if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_READ, &hSettingsKey) == ERROR_SUCCESS)
-            {
-                wchar_t dirPath[MAX_PATH] = {0};
-                DWORD dirSize = sizeof(dirPath);
-                if (RegGetValueW(hSettingsKey, NULL, L"KeyboardsPath", RRF_RT_REG_SZ, NULL, dirPath, &dirSize) == ERROR_SUCCESS && dirPath[0] != L'\0')
-                {
-                    keyboardsDir = dirPath;
-                }
-                RegCloseKey(hSettingsKey);
-            }
-            
-            // Use default if not found in registry
-            if (keyboardsDir.empty())
-            {
-                wchar_t localAppData[MAX_PATH];
-                if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData)))
-                {
-                    keyboardsDir = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
-                }
-                else
-                {
-                    // Fallback to environment variable
-                    wchar_t* appData = nullptr;
-                    size_t len = 0;
-                    if (_wdupenv_s(&appData, &len, L"LOCALAPPDATA") == 0 && appData)
-                    {
-                        keyboardsDir = std::wstring(appData) + L"\\KeyMagic\\Keyboards";
-                        free(appData);
-                    }
-                    else
-                    {
-                        // Failed to determine keyboards directory
-                        DEBUG_LOG(L"Failed to determine keyboards directory - cannot load keyboard");
-                        RegCloseKey(hKey);
-                        return FALSE;
-                    }
-                }
-            }
-            
-            // Construct full path
-            wcscpy_s(km2Path, (keyboardsDir + L"\\" + filename).c_str());
-            hasValidPath = true;
-            DEBUG_LOG(L"Using keyboard filename: " + std::wstring(filename) + L" with full path: " + std::wstring(km2Path));
-        }
-        else
-        {
-            // Fall back to old Path value for backward compatibility
-            dataSize = sizeof(km2Path);
-            if (RegGetValueW(hKey, NULL, L"Path", RRF_RT_REG_SZ, NULL, km2Path, &dataSize) == ERROR_SUCCESS && km2Path[0] != L'\0')
-            {
-                hasValidPath = true;
-                DEBUG_LOG(L"Using legacy Path value: " + std::wstring(km2Path));
-            }
-        }
-        
-        if (hasValidPath)
-        {
-            // Check if keyboard is enabled
-            DWORD enabled = 0;
-            dataSize = sizeof(enabled);
-            
-            if (RegGetValueW(hKey, NULL, L"Enabled", RRF_RT_REG_DWORD, NULL, &enabled, &dataSize) == ERROR_SUCCESS)
-            {
-                if (!enabled)
-                {
-                    DEBUG_LOG(L"Keyboard is disabled: " + keyboardId);
-                    RegCloseKey(hKey);
-                    return FALSE;
-                }
-            }
-            
-            // Load the keyboard
-            BOOL result = LoadKeyboard(km2Path);
-            
-            if (result)
-            {
-                // Store keyboard info
-                m_currentKeyboardId = keyboardId;
-                
-                // Read keyboard name
-                wchar_t name[256] = {0};
-                dataSize = sizeof(name);
-                if (RegGetValueW(hKey, NULL, L"Name", RRF_RT_REG_SZ, NULL, name, &dataSize) == ERROR_SUCCESS)
-                {
-                    DEBUG_LOG(L"Loaded keyboard: " + std::wstring(name) + L" (" + keyboardId + L")");
-                }
-                
-                // Notify tray manager of keyboard change
-                NotifyTrayManagerKeyboardChange();
-            }
-            
-            RegCloseKey(hKey);
-            return result;
-        }
-        
-        RegCloseKey(hKey);
-    }
-    else
+    // Get keyboard info using shared utility
+    KeyboardInfo kbInfo;
+    if (!RegistryUtils::GetKeyboardInfoById(keyboardId, kbInfo))
     {
         DEBUG_LOG(L"Keyboard not found in registry: " + keyboardId);
+        return FALSE;
     }
     
-    return FALSE;
+    // Check if keyboard has a valid path
+    if (kbInfo.path.empty())
+    {
+        DEBUG_LOG(L"Keyboard has no path configured: " + keyboardId);
+        return FALSE;
+    }
+    
+    // Check if keyboard is enabled
+    if (!kbInfo.enabled)
+    {
+        DEBUG_LOG(L"Keyboard is disabled: " + keyboardId);
+        return FALSE;
+    }
+    
+    // Load the keyboard
+    BOOL result = LoadKeyboard(kbInfo.path.c_str());
+    
+    if (result)
+    {
+        // Store keyboard info
+        m_currentKeyboardId = keyboardId;
+        
+        DEBUG_LOG(L"Loaded keyboard: " + kbInfo.name + L" (" + keyboardId + L")");
+        
+        // Notify tray manager of keyboard change
+        NotifyTrayManagerKeyboardChange();
+    }
+    
+    return result;
 }
 
 void CKeyMagicTextService::ResetEngine()

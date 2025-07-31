@@ -1,52 +1,15 @@
 #include "TrayClient.h"
+#include "../../shared/include/KeyMagicUtils.h"
 #include <psapi.h>
 #include <shlwapi.h>
 #include <strsafe.h>
 #include <algorithm>
-#include <sddl.h>
-#include <memory>
-
-// Helper function to get user SID
-static std::wstring GetUserSID() {
-    HANDLE hToken;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
-        return L"";
-    }
-
-    DWORD dwBufferSize = 0;
-    GetTokenInformation(hToken, TokenUser, nullptr, 0, &dwBufferSize);
-    
-    auto buffer = std::make_unique<BYTE[]>(dwBufferSize);
-    if (!GetTokenInformation(hToken, TokenUser, buffer.get(), dwBufferSize, &dwBufferSize)) {
-        CloseHandle(hToken);
-        return L"";
-    }
-
-    TOKEN_USER* pTokenUser = reinterpret_cast<TOKEN_USER*>(buffer.get());
-    
-    LPWSTR stringSid = nullptr;
-    if (!ConvertSidToStringSidW(pTokenUser->User.Sid, &stringSid)) {
-        CloseHandle(hToken);
-        return L"";
-    }
-
-    std::wstring result(stringSid);
-    LocalFree(stringSid);
-    CloseHandle(hToken);
-    
-    return result;
-}
-
-// Helper function to get pipe name
-static std::wstring GetPipeName() {
-    return L"\\\\.\\pipe\\KeyMagicTray-" + GetUserSID();
-}
 
 TrayClient::TrayClient()
     : m_hPipe(INVALID_HANDLE_VALUE)
     , m_connected(false)
     , m_reconnectDelay(1000) {
-    m_pipeName = GetPipeName();
+    m_pipeName = KeyMagicUtils::GetPipeName();
 }
 
 TrayClient::~TrayClient() {

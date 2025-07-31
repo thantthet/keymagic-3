@@ -3,7 +3,7 @@
 #include <Windows.h>
 #include <string>
 #include <sstream>
-#include "../include/keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 
 // Key processing utilities shared between edit sessions
 namespace KeyProcessingUtils

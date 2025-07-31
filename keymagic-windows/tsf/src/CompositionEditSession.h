@@ -4,7 +4,7 @@
 #include <windows.h>
 #include <msctf.h>
 #include <string>
-#include "../include/keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 
 // Forward declaration
 class CKeyMagicTextService;

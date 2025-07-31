@@ -5,7 +5,7 @@
 #include <msctf.h>
 #include <string>
 #include <vector>
-#include "../include/keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 
 // Forward declaration
 class CKeyMagicTextService;

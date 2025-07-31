@@ -3,6 +3,7 @@
 #include "KeyMagicGuids.h"
 #include "LanguageUtils.h"
 #include "resource.h"
+#include "../../shared/include/RegistryUtils.h"
 #include <strsafe.h>
 #include <msctf.h>
 #include <windows.h>
@@ -31,38 +32,18 @@ static const int g_SupportedCategoriesCount = ARRAYSIZE(g_SupportedCategories);
 std::vector<LANGID> GetEnabledLanguagesFromRegistry()
 {
     std::vector<LANGID> languages;
-    HKEY hKey;
     
-    // Open KeyMagic settings key
-    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    // Get enabled language codes using shared utility
+    std::vector<std::wstring> languageCodes = RegistryUtils::GetEnabledLanguages();
+    
+    // Convert language codes to LANGIDs
+    for (const auto& languageCode : languageCodes)
     {
-        DWORD dwType = REG_MULTI_SZ;
-        DWORD dwSize = 0;
-        
-        // Get size first
-        if (RegQueryValueEx(hKey, L"EnabledLanguages", nullptr, &dwType, nullptr, &dwSize) == ERROR_SUCCESS && dwSize > 0)
+        LANGID langId = LanguageCodeToLangId(languageCode);
+        if (langId != 0)
         {
-            // Allocate buffer and read data
-            std::vector<WCHAR> buffer(dwSize / sizeof(WCHAR));
-            if (RegQueryValueEx(hKey, L"EnabledLanguages", nullptr, &dwType, 
-                               reinterpret_cast<LPBYTE>(buffer.data()), &dwSize) == ERROR_SUCCESS)
-            {
-                // Parse multi-string data
-                LPCWSTR pszCurrent = buffer.data();
-                while (*pszCurrent)
-                {
-                    std::wstring languageCode(pszCurrent);
-                    LANGID langId = LanguageCodeToLangId(languageCode);
-                    if (langId != 0)
-                    {
-                        languages.push_back(langId);
-                    }
-                    pszCurrent += languageCode.length() + 1;
-                }
-            }
+            languages.push_back(langId);
         }
-        
-        RegCloseKey(hKey);
     }
     
     return languages;

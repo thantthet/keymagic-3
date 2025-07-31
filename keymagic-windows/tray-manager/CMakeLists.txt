@@ -29,7 +29,6 @@ set(HEADERS
     include/IconCacheManager.h
     include/ProfileMonitor.h
     include/TrayIcon.h
-    include/TrayProtocol.h
     include/SecurityUtils.h
     include/Common.h
     include/IconVisibilityManager.h
@@ -41,7 +40,7 @@ add_executable(keymagic-tray WIN32 ${SOURCES} ${HEADERS})
 # Include directories
 target_include_directories(keymagic-tray PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../tsf/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
 )
 
 # Windows specific settings

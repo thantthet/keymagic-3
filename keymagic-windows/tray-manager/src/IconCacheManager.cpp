@@ -1,5 +1,5 @@
 #include "IconCacheManager.h"
-#include "keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 #include <windows.h>
 #include <objbase.h>
 #include <gdiplus.h>

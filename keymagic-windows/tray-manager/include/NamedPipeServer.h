@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Common.h"
-#include "TrayProtocol.h"
+#include "../../shared/include/TrayProtocol.h"
 #include <functional>
 
 class NamedPipeServer {

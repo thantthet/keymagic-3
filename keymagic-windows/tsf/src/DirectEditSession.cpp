@@ -3,7 +3,7 @@
 #include "Debug.h"
 #include "Globals.h"
 #include "KeyProcessingUtils.h"
-#include "../include/keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 
 extern std::wstring ConvertUtf8ToUtf16(const std::string &utf8);
 extern std::string ConvertUtf16ToUtf8(const std::wstring &utf16);

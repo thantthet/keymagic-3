@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
-#include "../include/keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 
 // Debug logging macros and functions for KeyMagic TSF
 

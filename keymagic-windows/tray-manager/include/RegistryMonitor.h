@@ -1,16 +1,8 @@
 #pragma once
 
 #include "Common.h"
-
-// Forward declaration to avoid circular dependency
-struct KeyboardInfo {
-    std::wstring id;
-    std::wstring name;
-    std::wstring path;
-    std::wstring hotkey;
-    std::wstring description;
-    std::wstring fontFamily;
-};
+#include "../../shared/include/KeyboardInfo.h"
+#include "../../shared/include/RegistryUtils.h"
 
 class RegistryMonitor {
 public:

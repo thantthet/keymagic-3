@@ -3,7 +3,7 @@
 #include <windows.h>
 #include <string>
 #include <mutex>
-#include "TrayProtocol.h"
+#include "../../shared/include/TrayProtocol.h"
 
 // TrayClient is used by the TIP to communicate with the tray manager
 class TrayClient {

@@ -6,7 +6,7 @@
 #include <string>
 #include <memory>
 #include <vector>
-#include "../include/keymagic_ffi.h"
+#include "../../shared/include/keymagic_ffi.h"
 #include "Composition.h"
 #include "DisplayAttribute.h"
 
