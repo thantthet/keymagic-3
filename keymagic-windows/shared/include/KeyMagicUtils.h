@@ -119,4 +119,77 @@ inline std::wstring LoadHotkeyFromKm2(const std::wstring& km2Path)
     return result;
 }
 
+// Normalize hotkey string for display
+// Converts hotkey string to a consistent display format
+// Example: "ctrl+shift+a" -> "Ctrl+Shift+A"
+inline std::wstring NormalizeHotkeyForDisplay(const std::wstring& hotkey)
+{
+    if (hotkey.empty())
+        return L"";
+    
+    // Convert to UTF-8 for parsing
+    std::string utf8Hotkey = ConvertUtf16ToUtf8(hotkey);
+    if (utf8Hotkey.empty())
+        return L"";
+    
+    // Parse hotkey using FFI
+    HotkeyInfo info = {0};
+    if (keymagic_parse_hotkey(utf8Hotkey.c_str(), &info) == 0)
+    {
+        // Failed to parse, return original
+        return hotkey;
+    }
+    
+    // Build normalized display string
+    std::wstring normalized;
+    
+    // Add modifiers in consistent order: Ctrl, Alt, Shift
+    if (info.ctrl)
+    {
+        normalized += L"Ctrl";
+    }
+    
+    if (info.alt)
+    {
+        if (!normalized.empty())
+            normalized += L"+";
+        normalized += L"Alt";
+    }
+    
+    if (info.shift)
+    {
+        if (!normalized.empty())
+            normalized += L"+";
+        normalized += L"Shift";
+    }
+    
+    // Add the main key
+    if (info.key_code != 0)
+    {
+        if (!normalized.empty())
+            normalized += L"+";
+        
+        // Use FFI function to get key display name
+        char* keyNameStr = keymagic_virtual_key_to_string(info.key_code);
+        if (keyNameStr)
+        {
+            // Convert UTF-8 to UTF-16
+            std::wstring keyName = ConvertUtf8ToUtf16(keyNameStr);
+            normalized += keyName;
+            
+            // Free the allocated string
+            keymagic_free_string(keyNameStr);
+        }
+        else
+        {
+            // Fallback for unknown keys
+            wchar_t fallback[32];
+            swprintf_s(fallback, L"Key%d", info.key_code);
+            normalized += fallback;
+        }
+    }
+    
+    return normalized;
+}
+
 } // namespace KeyMagicUtils

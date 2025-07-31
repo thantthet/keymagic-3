@@ -3,6 +3,7 @@
 #include "IconVisibilityManager.h"
 #include "KeyboardPreviewWindow.h"
 #include "../../shared/include/RegistryUtils.h"
+#include "../../shared/include/KeyMagicUtils.h"
 #include <strsafe.h>
 
 // Helper function to check if preview window is enabled
@@ -151,7 +152,7 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<KeyboardInfo>& keybo
         
         std::wstring menuText = keyboard.name;
         if (!keyboard.hotkey.empty()) {
-            menuText += L"\t" + keyboard.hotkey;
+            menuText += L"\t" + KeyMagicUtils::NormalizeHotkeyForDisplay(keyboard.hotkey);
         }
         
         AppendMenuW(hMenu, flags, menuId++, menuText.c_str());

@@ -121,6 +121,127 @@ pub enum VirtualKey {
 }
 
 impl VirtualKey {
+    /// Convert this VirtualKey to a display string
+    pub fn to_display_string(&self) -> &'static str {
+        match self {
+            // Control keys
+            VirtualKey::Back => "Backspace",
+            VirtualKey::Tab => "Tab",
+            VirtualKey::Return => "Enter",
+            VirtualKey::Shift => "Shift",
+            VirtualKey::Control => "Ctrl",
+            VirtualKey::Menu => "Alt",
+            VirtualKey::Pause => "Pause",
+            VirtualKey::Capital => "CapsLock",
+            VirtualKey::Kanji => "Kanji",
+            VirtualKey::Escape => "Esc",
+            VirtualKey::Space => "Space",
+            VirtualKey::Prior => "PageUp",
+            VirtualKey::Next => "PageDown",
+            VirtualKey::Delete => "Delete",
+            
+            // Number keys
+            VirtualKey::Key0 => "0",
+            VirtualKey::Key1 => "1",
+            VirtualKey::Key2 => "2",
+            VirtualKey::Key3 => "3",
+            VirtualKey::Key4 => "4",
+            VirtualKey::Key5 => "5",
+            VirtualKey::Key6 => "6",
+            VirtualKey::Key7 => "7",
+            VirtualKey::Key8 => "8",
+            VirtualKey::Key9 => "9",
+            
+            // Letter keys
+            VirtualKey::KeyA => "A",
+            VirtualKey::KeyB => "B",
+            VirtualKey::KeyC => "C",
+            VirtualKey::KeyD => "D",
+            VirtualKey::KeyE => "E",
+            VirtualKey::KeyF => "F",
+            VirtualKey::KeyG => "G",
+            VirtualKey::KeyH => "H",
+            VirtualKey::KeyI => "I",
+            VirtualKey::KeyJ => "J",
+            VirtualKey::KeyK => "K",
+            VirtualKey::KeyL => "L",
+            VirtualKey::KeyM => "M",
+            VirtualKey::KeyN => "N",
+            VirtualKey::KeyO => "O",
+            VirtualKey::KeyP => "P",
+            VirtualKey::KeyQ => "Q",
+            VirtualKey::KeyR => "R",
+            VirtualKey::KeyS => "S",
+            VirtualKey::KeyT => "T",
+            VirtualKey::KeyU => "U",
+            VirtualKey::KeyV => "V",
+            VirtualKey::KeyW => "W",
+            VirtualKey::KeyX => "X",
+            VirtualKey::KeyY => "Y",
+            VirtualKey::KeyZ => "Z",
+            
+            // Numpad keys
+            VirtualKey::Numpad0 => "Num0",
+            VirtualKey::Numpad1 => "Num1",
+            VirtualKey::Numpad2 => "Num2",
+            VirtualKey::Numpad3 => "Num3",
+            VirtualKey::Numpad4 => "Num4",
+            VirtualKey::Numpad5 => "Num5",
+            VirtualKey::Numpad6 => "Num6",
+            VirtualKey::Numpad7 => "Num7",
+            VirtualKey::Numpad8 => "Num8",
+            VirtualKey::Numpad9 => "Num9",
+            
+            // Numpad operators
+            VirtualKey::Multiply => "Multiply",
+            VirtualKey::Add => "Add",
+            VirtualKey::Separator => "Separator",
+            VirtualKey::Subtract => "Subtract",
+            VirtualKey::Decimal => "Decimal",
+            VirtualKey::Divide => "Divide",
+            
+            // Function keys
+            VirtualKey::F1 => "F1",
+            VirtualKey::F2 => "F2",
+            VirtualKey::F3 => "F3",
+            VirtualKey::F4 => "F4",
+            VirtualKey::F5 => "F5",
+            VirtualKey::F6 => "F6",
+            VirtualKey::F7 => "F7",
+            VirtualKey::F8 => "F8",
+            VirtualKey::F9 => "F9",
+            VirtualKey::F10 => "F10",
+            VirtualKey::F11 => "F11",
+            VirtualKey::F12 => "F12",
+            
+            // Modifier keys
+            VirtualKey::LShift => "LShift",
+            VirtualKey::RShift => "RShift",
+            VirtualKey::LControl => "LCtrl",
+            VirtualKey::RControl => "RCtrl",
+            VirtualKey::LMenu => "LAlt",
+            VirtualKey::RMenu => "RAlt",
+            
+            // OEM keys
+            VirtualKey::Oem1 => ";",
+            VirtualKey::OemPlus => "+",
+            VirtualKey::OemComma => ",",
+            VirtualKey::OemMinus => "-",
+            VirtualKey::OemPeriod => ".",
+            VirtualKey::Oem2 => "/",
+            VirtualKey::Oem3 => "`",
+            VirtualKey::Oem4 => "[",
+            VirtualKey::Oem5 => "\\",
+            VirtualKey::Oem6 => "]",
+            VirtualKey::Oem7 => "'",
+            VirtualKey::Oem8 => "OEM8",
+            VirtualKey::OemAx => "AX",
+            VirtualKey::Oem102 => "OEM102",
+            VirtualKey::IcoHelp => "Help",
+            VirtualKey::Ico00 => "00",
+        }
+    }
+
     /// Convert this VirtualKey to Windows Virtual Key code
     pub fn to_win_vk(&self) -> u16 {
         match self {

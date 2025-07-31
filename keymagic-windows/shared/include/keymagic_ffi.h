@@ -124,6 +124,11 @@ char* keymagic_km2_get_hotkey(Km2FileHandle* handle);
 // Returns 0 if no icon is defined or on error
 size_t keymagic_km2_get_icon_data(Km2FileHandle* handle, uint8_t* buffer, size_t buffer_size);
 
+// Convert VirtualKey enum value to display string
+// Returns a newly allocated C string that must be freed with keymagic_free_string
+// Returns NULL if the key code is invalid
+char* keymagic_virtual_key_to_string(int key_code);
+
 #ifdef __cplusplus
 }
 #endif

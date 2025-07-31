@@ -660,3 +660,128 @@ pub extern "C" fn keymagic_km2_get_icon_data(
     }
 }
 
+/// Convert VirtualKey enum value to display string
+/// Returns a newly allocated C string that must be freed with keymagic_free_string
+/// Returns NULL if the key code is invalid
+#[no_mangle]
+pub extern "C" fn keymagic_virtual_key_to_string(key_code: c_int) -> *mut c_char {
+    // Try to convert the key_code to VirtualKey enum
+    // Since VirtualKey uses u16 internally, we need to check bounds
+    if key_code < 0 || key_code > u16::MAX as c_int {
+        return ptr::null_mut();
+    }
+    
+    // Find matching VirtualKey by iterating through all values
+    let virtual_key = match key_code as u16 {
+        2 => VirtualKey::Back,
+        3 => VirtualKey::Tab,
+        4 => VirtualKey::Return,
+        5 => VirtualKey::Shift,
+        6 => VirtualKey::Control,
+        7 => VirtualKey::Menu,
+        8 => VirtualKey::Pause,
+        9 => VirtualKey::Capital,
+        10 => VirtualKey::Kanji,
+        11 => VirtualKey::Escape,
+        12 => VirtualKey::Space,
+        13 => VirtualKey::Prior,
+        14 => VirtualKey::Next,
+        15 => VirtualKey::Delete,
+        16 => VirtualKey::Key0,
+        17 => VirtualKey::Key1,
+        18 => VirtualKey::Key2,
+        19 => VirtualKey::Key3,
+        20 => VirtualKey::Key4,
+        21 => VirtualKey::Key5,
+        22 => VirtualKey::Key6,
+        23 => VirtualKey::Key7,
+        24 => VirtualKey::Key8,
+        25 => VirtualKey::Key9,
+        26 => VirtualKey::KeyA,
+        27 => VirtualKey::KeyB,
+        28 => VirtualKey::KeyC,
+        29 => VirtualKey::KeyD,
+        30 => VirtualKey::KeyE,
+        31 => VirtualKey::KeyF,
+        32 => VirtualKey::KeyG,
+        33 => VirtualKey::KeyH,
+        34 => VirtualKey::KeyI,
+        35 => VirtualKey::KeyJ,
+        36 => VirtualKey::KeyK,
+        37 => VirtualKey::KeyL,
+        38 => VirtualKey::KeyM,
+        39 => VirtualKey::KeyN,
+        40 => VirtualKey::KeyO,
+        41 => VirtualKey::KeyP,
+        42 => VirtualKey::KeyQ,
+        43 => VirtualKey::KeyR,
+        44 => VirtualKey::KeyS,
+        45 => VirtualKey::KeyT,
+        46 => VirtualKey::KeyU,
+        47 => VirtualKey::KeyV,
+        48 => VirtualKey::KeyW,
+        49 => VirtualKey::KeyX,
+        50 => VirtualKey::KeyY,
+        51 => VirtualKey::KeyZ,
+        52 => VirtualKey::Numpad0,
+        53 => VirtualKey::Numpad1,
+        54 => VirtualKey::Numpad2,
+        55 => VirtualKey::Numpad3,
+        56 => VirtualKey::Numpad4,
+        57 => VirtualKey::Numpad5,
+        58 => VirtualKey::Numpad6,
+        59 => VirtualKey::Numpad7,
+        60 => VirtualKey::Numpad8,
+        61 => VirtualKey::Numpad9,
+        62 => VirtualKey::Multiply,
+        63 => VirtualKey::Add,
+        64 => VirtualKey::Separator,
+        65 => VirtualKey::Subtract,
+        66 => VirtualKey::Decimal,
+        67 => VirtualKey::Divide,
+        68 => VirtualKey::F1,
+        69 => VirtualKey::F2,
+        70 => VirtualKey::F3,
+        71 => VirtualKey::F4,
+        72 => VirtualKey::F5,
+        73 => VirtualKey::F6,
+        74 => VirtualKey::F7,
+        75 => VirtualKey::F8,
+        76 => VirtualKey::F9,
+        77 => VirtualKey::F10,
+        78 => VirtualKey::F11,
+        79 => VirtualKey::F12,
+        80 => VirtualKey::LShift,
+        81 => VirtualKey::RShift,
+        82 => VirtualKey::LControl,
+        83 => VirtualKey::RControl,
+        84 => VirtualKey::LMenu,
+        85 => VirtualKey::RMenu,
+        86 => VirtualKey::Oem1,
+        87 => VirtualKey::OemPlus,
+        88 => VirtualKey::OemComma,
+        89 => VirtualKey::OemMinus,
+        90 => VirtualKey::OemPeriod,
+        91 => VirtualKey::Oem2,
+        92 => VirtualKey::Oem3,
+        93 => VirtualKey::Oem4,
+        94 => VirtualKey::Oem5,
+        95 => VirtualKey::Oem6,
+        96 => VirtualKey::Oem7,
+        97 => VirtualKey::Oem8,
+        98 => VirtualKey::OemAx,
+        99 => VirtualKey::Oem102,
+        100 => VirtualKey::IcoHelp,
+        101 => VirtualKey::Ico00,
+        _ => return ptr::null_mut(),
+    };
+    
+    // Get display string from the enum method
+    let display_name = virtual_key.to_display_string();
+    
+    match CString::new(display_name) {
+        Ok(c_string) => c_string.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
