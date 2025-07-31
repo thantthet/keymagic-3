@@ -223,8 +223,8 @@ impl Platform for MacOSBackend {
                 // Add the main key using the display string method
                 parts.push(binding.key.to_display_string());
                 
-                // No separator for macOS style
-                parts.join("")
+                // Use thin space separator for macOS style
+                parts.join("\u{2009}")
             }
             Err(_) => {
                 // If parsing fails, return the original
