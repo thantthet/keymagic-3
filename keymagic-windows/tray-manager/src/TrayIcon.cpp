@@ -4,6 +4,26 @@
 #include "KeyboardPreviewWindow.h"
 #include <strsafe.h>
 
+// Helper function to check if preview window is enabled
+static bool IsPreviewWindowEnabled() {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        WCHAR value[256] = {0};
+        DWORD size = sizeof(value);
+        DWORD type;
+        
+        if (RegQueryValueExW(hKey, L"preview_window_enabled", nullptr, &type, (LPBYTE)value, &size) == ERROR_SUCCESS) {
+            RegCloseKey(hKey);
+            // Check if value is "false" (case insensitive)
+            return _wcsicmp(value, L"false") != 0;
+        }
+        RegCloseKey(hKey);
+    }
+    
+    // Default to enabled if setting doesn't exist
+    return true;
+}
+
 TrayIcon::TrayIcon()
     : m_hWnd(nullptr)
     , m_hIcon(nullptr)
@@ -39,10 +59,13 @@ bool TrayIcon::Initialize(HWND hWnd) {
     m_nid.cbSize = sizeof(NOTIFYICONDATAW);
     m_nid.hWnd = m_hWnd;
     m_nid.uID = TRAY_ICON_ID;
-    m_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+    m_nid.uFlags = NIF_MESSAGE | NIF_ICON;
     m_nid.uCallbackMessage = WM_TRAYICON;
     m_nid.hIcon = m_hDefaultIcon;
     StringCchCopyW(m_nid.szTip, ARRAYSIZE(m_nid.szTip), L"KeyMagic");
+    
+    // Set tooltip visibility based on preview window setting
+    UpdateTooltipVisibility();
     
     // Set version for Windows Vista+ features
     m_nid.uVersion = NOTIFYICON_VERSION_4;
@@ -93,6 +116,9 @@ void TrayIcon::SetIcon(HICON hIcon) {
 
 void TrayIcon::SetTooltip(const std::wstring& tooltip) {
     StringCchCopyW(m_nid.szTip, ARRAYSIZE(m_nid.szTip), tooltip.c_str());
+    
+    // Update tooltip visibility based on preview window setting
+    UpdateTooltipVisibility();
     
     if (m_visible) {
         UpdateNotificationIcon(NIM_MODIFY);
@@ -168,8 +194,8 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     
     switch (LOWORD(lParam)) {
         case WM_LBUTTONUP:
-            // Show keyboard preview window
-            if (m_previewWindow && !m_currentKeyboardId.empty()) {
+            // Show keyboard preview window if enabled
+            if (m_previewWindow && !m_currentKeyboardId.empty() && IsPreviewWindowEnabled()) {
                 POINT pt;
                 GetCursorPos(&pt);
                 m_previewWindow->Show(pt, m_currentKeyboardId, m_currentKeyboardPath);
@@ -186,8 +212,8 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
             break;
             
         case WM_MOUSEMOVE:
-            // Show preview on hover
-            if (m_previewWindow && !m_currentKeyboardId.empty()) {
+            // Show preview on hover if enabled
+            if (m_previewWindow && !m_currentKeyboardId.empty() && IsPreviewWindowEnabled()) {
                 // Check if preview is already visible to avoid flickering
                 if (!m_previewWindow->IsVisible()) {
                     POINT pt;
@@ -200,6 +226,21 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
         case WM_CONTEXTMENU:
             // Already handled by WM_RBUTTONUP
             break;
+    }
+}
+
+void TrayIcon::UpdateTooltipVisibility() {
+    // Check if preview window is enabled
+    bool previewEnabled = IsPreviewWindowEnabled();
+    
+    // If preview is enabled and we have a keyboard set, hide tooltip
+    // Otherwise show tooltip
+    if (previewEnabled && !m_currentKeyboardId.empty()) {
+        // Remove tooltip flags
+        m_nid.uFlags &= ~(NIF_TIP | NIF_SHOWTIP);
+    } else {
+        // Add tooltip flags
+        m_nid.uFlags |= (NIF_TIP | NIF_SHOWTIP);
     }
 }
 
@@ -277,4 +318,10 @@ void TrayIcon::EnsureIconVisibility() {
 void TrayIcon::SetKeyboardInfo(const std::wstring& keyboardId, const std::wstring& keyboardPath) {
     m_currentKeyboardId = keyboardId;
     m_currentKeyboardPath = keyboardPath;
+    
+    // Update tooltip visibility when keyboard info changes
+    UpdateTooltipVisibility();
+    if (m_visible) {
+        UpdateNotificationIcon(NIM_MODIFY);
+    }
 }

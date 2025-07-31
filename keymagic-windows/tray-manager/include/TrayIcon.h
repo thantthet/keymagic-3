@@ -50,6 +50,9 @@ private:
     
     // Try to ensure icon is always visible
     void EnsureIconVisibility();
+    
+    // Update tooltip visibility based on preview window setting
+    void UpdateTooltipVisibility();
 
 private:
     HWND m_hWnd;

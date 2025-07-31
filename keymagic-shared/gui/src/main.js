@@ -371,8 +371,51 @@ async function loadSettings() {
     } else {
       await loadCompositionModeHosts();
     }
+    
+    // Load preview window setting on Windows
+    if (platformInfo.os === 'windows') {
+      await loadPreviewWindowSetting();
+    }
   } catch (error) {
     console.error('Failed to load settings:', error);
+  }
+}
+
+// Preview Window Settings
+async function loadPreviewWindowSetting() {
+  try {
+    const enabled = await invoke('get_setting', { key: 'preview_window_enabled' });
+    const checkbox = document.getElementById('preview-window-enabled');
+    if (checkbox) {
+      // Default to true if not set
+      checkbox.checked = enabled === '' || enabled === 'true';
+    }
+  } catch (error) {
+    console.error('Failed to load preview window setting:', error);
+    // Default to enabled on error
+    const checkbox = document.getElementById('preview-window-enabled');
+    if (checkbox) {
+      checkbox.checked = true;
+    }
+  }
+}
+
+window.togglePreviewWindow = async function() {
+  const checkbox = document.getElementById('preview-window-enabled');
+  const enabled = checkbox.checked;
+  
+  try {
+    await invoke('set_setting', { 
+      key: 'preview_window_enabled', 
+      value: enabled.toString() 
+    });
+    
+    showSuccess(enabled ? 'Keyboard preview enabled' : 'Keyboard preview disabled');
+  } catch (error) {
+    console.error('Failed to save preview window setting:', error);
+    showError('Failed to save preview window setting');
+    // Revert checkbox on error
+    checkbox.checked = !enabled;
   }
 }
 
@@ -1455,6 +1498,16 @@ function updatePlatformSpecificUI() {
   const windowsSettingsBtn = document.querySelector('button[onclick="openWindowsInputSettings()"]');
   if (windowsSettingsBtn && platformInfo.os !== 'windows') {
     windowsSettingsBtn.style.display = 'none';
+  }
+  
+  // Show preview window section only on Windows
+  const previewWindowSection = document.getElementById('preview-window-section');
+  if (previewWindowSection) {
+    if (platformInfo.os === 'windows') {
+      previewWindowSection.style.display = 'block';
+    } else {
+      previewWindowSection.style.display = 'none';
+    }
   }
 }
 

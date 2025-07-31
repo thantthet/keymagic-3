@@ -143,6 +143,23 @@
               </div>
             </section>
             
+            <section class="settings-section" id="preview-window-section" style="display: none;">
+              <h2>Keyboard Preview</h2>
+              <div class="setting-item">
+                <div class="preview-window-settings">
+                  <p class="setting-description">Show a preview of the keyboard layout when hovering over the KeyMagic tray icon.</p>
+                  <div class="toggle-setting">
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="preview-window-enabled" onchange="togglePreviewWindow()">
+                      <span class="toggle-slider"></span>
+                    </label>
+                    <label for="preview-window-enabled" class="toggle-label">Enable keyboard preview on hover</label>
+                  </div>
+                  <p class="setting-hint">When enabled, hovering over the KeyMagic icon in the system tray will show a visual preview of the active keyboard layout.</p>
+                </div>
+              </div>
+            </section>
+            
             <section class="settings-section" id="composition-mode-section">
               <h2>Composition Mode</h2>
               <div class="setting-item">
