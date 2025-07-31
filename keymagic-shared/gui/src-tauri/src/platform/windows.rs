@@ -602,14 +602,8 @@ impl Platform for WindowsBackend {
         
         // Read EnabledLanguages from Settings key
         if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
-            if let Ok(languages_str) = settings_key.get_value::<String, _>("EnabledLanguages") {
-                // Split by semicolon
-                let languages: Vec<String> = languages_str
-                    .split(';')
-                    .filter(|s| !s.trim().is_empty())
-                    .map(|s| s.trim().to_string())
-                    .collect();
-                    
+            // Read as REG_MULTI_SZ
+            if let Ok(languages) = read_multi_string_value(&settings_key, "EnabledLanguages") {
                 if !languages.is_empty() {
                     return Ok(languages);
                 }
@@ -626,9 +620,8 @@ impl Platform for WindowsBackend {
             .create_subkey(SETTINGS_KEY)
             .context("Failed to create Settings key")?;
         
-        // Save as semicolon-delimited string
-        let languages_str = languages.join(";");
-        settings_key.set_value("EnabledLanguages", &languages_str)?;
+        // Save as REG_MULTI_SZ
+        write_multi_string_value(&settings_key, "EnabledLanguages", languages)?;
         
         Ok(())
     }
