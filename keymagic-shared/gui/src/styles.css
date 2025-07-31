@@ -471,7 +471,6 @@ body {
 .keyboard-hotkey {
   font-size: 12px;
   color: var(--text-secondary);
-  font-family: monospace;
 }
 
 .keyboard-actions {
