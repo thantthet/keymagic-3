@@ -355,11 +355,25 @@ impl Platform for WindowsBackend {
             settings_key.set_value(DEFAULT_KEYBOARD_VALUE, active)?;
         }
         
-        // Save keyboards
+        // Open or create the Keyboards key
         let (keyboards_key, _) = hkcu
             .create_subkey(KEYBOARDS_KEY)
             .context("Failed to create Keyboards key")?;
         
+        // Get currently installed keyboard IDs from config
+        let current_keyboard_ids: std::collections::HashSet<String> = config.keyboards.installed
+            .iter()
+            .map(|kb| kb.id.clone())
+            .collect();
+        
+        // Delete keyboards that are no longer in the config
+        for existing_kb_id in keyboards_key.enum_keys().filter_map(Result::ok) {
+            if !current_keyboard_ids.contains(&existing_kb_id) {
+                let _ = keyboards_key.delete_subkey_all(&existing_kb_id);
+            }
+        }
+        
+        // Save current keyboards
         for keyboard in &config.keyboards.installed {
             let (kb_key, _) = keyboards_key.create_subkey(&keyboard.id)?;
             kb_key.set_value(KEYBOARD_NAME_VALUE, &keyboard.name)?;
