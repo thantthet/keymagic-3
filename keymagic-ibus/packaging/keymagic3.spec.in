@@ -1,5 +1,5 @@
 Name:           keymagic3
-Version:        @VERSION@
+Version:        0.0.6
 Release:        1%{?dist}
 Summary:        KeyMagic 3 - Smart keyboard input method
 License:        GPL-3.0
@@ -126,6 +126,3 @@ if [ "$1" = "0" ] && [ -f /usr/bin/keymagic3-ibus-refresh ]; then
     rm -f /usr/bin/keymagic3-ibus-refresh
 fi
 
-%changelog
-* @DATE@ Thant Thet Khin Zaw <contact@keymagic.net> - @VERSION@-1
-- Initial release of KeyMagic 3
