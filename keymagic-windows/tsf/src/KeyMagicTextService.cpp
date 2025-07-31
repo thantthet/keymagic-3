@@ -12,6 +12,7 @@
 #include "TrayClient.h"
 #include "../../shared/include/RegistryUtils.h"
 #include "../../shared/include/KeyboardInfo.h"
+#include "../../shared/include/KeyMagicUtils.h"
 #include <string>
 #include <codecvt>
 #include <locale>
@@ -20,30 +21,6 @@
 #include <tlhelp32.h>
 #include <functional>
 #include <shlobj.h>
-
-// Helper function to convert UTF-8 to UTF-16
-std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
-{
-    if (utf8.empty())
-        return std::wstring();
-        
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.length()), NULL, 0);
-    std::wstring utf16(size_needed, 0);
-    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.length()), &utf16[0], size_needed);
-    return utf16;
-}
-
-// Helper function to convert UTF-16 to UTF-8
-std::string ConvertUtf16ToUtf8(const std::wstring& utf16)
-{
-    if (utf16.empty())
-        return std::string();
-        
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), static_cast<int>(utf16.length()), NULL, 0, NULL, NULL);
-    std::string utf8(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), static_cast<int>(utf16.length()), &utf8[0], size_needed, NULL, NULL);
-    return utf8;
-}
 
 CKeyMagicTextService::CKeyMagicTextService()
 {
@@ -914,20 +891,11 @@ HRESULT CKeyMagicTextService::RegisterPreservedKeys()
         else if (!keyboard.path.empty())
         {
             // No hotkey in registry - try to get from KM2 file
-            // Load KM2 to get hotkey
-            std::string utf8Path = ConvertUtf16ToUtf8(keyboard.path);
-            Km2FileHandle* km2Handle = keymagic_km2_load(utf8Path.c_str());
-            if (km2Handle)
+            hotkeyToUse = KeyMagicUtils::LoadHotkeyFromKm2(keyboard.path);
+            if (!hotkeyToUse.empty())
             {
-                char* hotkeyStr = keymagic_km2_get_hotkey(km2Handle);
-                if (hotkeyStr && hotkeyStr[0] != '\0')
-                {
-                    hotkeyToUse = ConvertUtf8ToUtf16(hotkeyStr);
-                    hotkeyFromKM2 = true;
-                    DEBUG_LOG(L"Got hotkey from KM2 file for keyboard " + keyboard.id + L": " + hotkeyToUse);
-                }
-                if (hotkeyStr) keymagic_free_string(hotkeyStr);
-                keymagic_km2_free(km2Handle);
+                hotkeyFromKM2 = true;
+                DEBUG_LOG(L"Got hotkey from KM2 file for keyboard " + keyboard.id + L": " + hotkeyToUse);
             }
         }
         
@@ -1138,7 +1106,7 @@ BOOL CKeyMagicTextService::LoadKeyboard(const std::wstring& km2Path)
     if (!m_pEngine)
         return FALSE;
 
-    std::string utf8Path = ConvertUtf16ToUtf8(km2Path);
+    std::string utf8Path = KeyMagicUtils::ConvertUtf16ToUtf8(km2Path);
     KeyMagicResult result = keymagic_engine_load_keyboard(m_pEngine, utf8Path.c_str());
     
     if (result == KeyMagicResult_Success)

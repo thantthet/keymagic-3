@@ -5,9 +5,7 @@
 #include "Globals.h"
 #include "KeyProcessingUtils.h"
 #include "../../shared/include/keymagic_ffi.h"
-
-extern std::wstring ConvertUtf8ToUtf16(const std::string &utf8);
-extern std::string ConvertUtf16ToUtf8(const std::wstring &utf16);
+#include "../../shared/include/KeyMagicUtils.h"
 
 // CCompositionEditSession implementation
 CCompositionEditSession::CCompositionEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
@@ -159,7 +157,7 @@ HRESULT CCompositionEditSession::ProcessKey(TfEditCookie ec)
     if (output.composing_text && strlen(output.composing_text) > 0)
     {
         std::string composingUtf8(output.composing_text);
-        std::wstring composingText = ConvertUtf8ToUtf16(composingUtf8);
+        std::wstring composingText = KeyMagicUtils::ConvertUtf8ToUtf16(composingUtf8);
         
         DEBUG_LOG_TEXT(L"Engine composing text", composingText);
         
@@ -252,7 +250,7 @@ HRESULT CCompositionEditSession::SyncEngineWithDocument(TfEditCookie ec)
             if (SUCCEEDED(m_pCompositionManager->GetCompositionText(ec, documentCompositionText)))
             {
                 // Convert to UTF-8 for comparison
-                std::string documentTextUtf8 = ConvertUtf16ToUtf8(documentCompositionText);
+                std::string documentTextUtf8 = KeyMagicUtils::ConvertUtf16ToUtf8(documentCompositionText);
                 
                 // Compare engine and document composition text
                 if (engineText == documentTextUtf8)

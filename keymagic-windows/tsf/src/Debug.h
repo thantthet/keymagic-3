@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <chrono>
 #include "../../shared/include/keymagic_ffi.h"
+#include "../../shared/include/KeyMagicUtils.h"
 
 // Debug logging macros and functions for KeyMagic TSF
 
@@ -20,7 +21,7 @@
     #define DEBUG_LOG_ENGINE(output) DebugLogEngineOutput(output)
     #define DEBUG_LOG_TEXT(context, text) DebugLog(std::wstring(context) + L": \"" + text + L"\"")
     #define DEBUG_LOG_SYNC_MISMATCH(engineText, documentText) \
-        DebugLog(L"Composition text mismatch - Engine: \"" + ConvertUtf8ToUtf16(engineText) + \
+        DebugLog(L"Composition text mismatch - Engine: \"" + KeyMagicUtils::ConvertUtf8ToUtf16(engineText) + \
                  L"\", Document: \"" + documentText + L"\" - continuing with sync")
 #else
     // Release build - censor key events, engine output, and text content

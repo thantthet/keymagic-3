@@ -5,6 +5,8 @@
 #include <sddl.h>
 #include <string>
 #include <memory>
+#include <vector>
+#include "keymagic_ffi.h"
 
 namespace KeyMagicUtils {
 
@@ -56,6 +58,65 @@ inline std::wstring GetLocalAppDataPath() {
 // Get the icon cache path
 inline std::wstring GetIconCachePath() {
     return GetLocalAppDataPath() + L"\\IconCache";
+}
+
+// Convert UTF-8 string to UTF-16 string
+inline std::wstring ConvertUtf8ToUtf16(const std::string& utf8)
+{
+    if (utf8.empty())
+        return std::wstring();
+        
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.length()), NULL, 0);
+    std::wstring utf16(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.length()), &utf16[0], size_needed);
+    return utf16;
+}
+
+// Convert UTF-16 string to UTF-8 string
+inline std::string ConvertUtf16ToUtf8(const std::wstring& utf16)
+{
+    if (utf16.empty())
+        return std::string();
+        
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), static_cast<int>(utf16.length()), NULL, 0, NULL, NULL);
+    std::string utf8(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), static_cast<int>(utf16.length()), &utf8[0], size_needed, NULL, NULL);
+    return utf8;
+}
+
+// Load hotkey from KM2 file
+// Returns empty string if no hotkey is defined or on error
+inline std::wstring LoadHotkeyFromKm2(const std::wstring& km2Path)
+{
+    if (km2Path.empty())
+        return L"";
+    
+    // Convert path to UTF-8
+    std::string utf8Path = ConvertUtf16ToUtf8(km2Path);
+    if (utf8Path.empty())
+        return L"";
+    
+    // Load KM2 file
+    Km2FileHandle* km2Handle = keymagic_km2_load(utf8Path.c_str());
+    if (!km2Handle)
+        return L"";
+    
+    std::wstring result;
+    
+    // Get hotkey from KM2 file
+    char* hotkeyStr = keymagic_km2_get_hotkey(km2Handle);
+    if (hotkeyStr && hotkeyStr[0] != '\0')
+    {
+        // Convert UTF-8 hotkey to wide string
+        result = ConvertUtf8ToUtf16(hotkeyStr);
+    }
+    
+    // Clean up
+    if (hotkeyStr)
+        keymagic_free_string(hotkeyStr);
+    keymagic_km2_free(km2Handle);
+    
+    return result;
 }
 
 } // namespace KeyMagicUtils

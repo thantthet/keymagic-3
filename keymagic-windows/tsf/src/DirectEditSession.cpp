@@ -4,9 +4,7 @@
 #include "Globals.h"
 #include "KeyProcessingUtils.h"
 #include "../../shared/include/keymagic_ffi.h"
-
-extern std::wstring ConvertUtf8ToUtf16(const std::string &utf8);
-extern std::string ConvertUtf16ToUtf8(const std::wstring &utf16);
+#include "../../shared/include/KeyMagicUtils.h"
 
 // CDirectEditSession implementation
 CDirectEditSession::CDirectEditSession(CKeyMagicTextService *pTextService, ITfContext *pContext, 
@@ -155,7 +153,7 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
         // Handle text insertion
         if (output.text && strlen(output.text) > 0)
         {
-            std::wstring textToInsert = ConvertUtf8ToUtf16(output.text);
+            std::wstring textToInsert = KeyMagicUtils::ConvertUtf8ToUtf16(output.text);
             DEBUG_LOG_TEXT(L"Sending text", textToInsert);
             SendUnicodeText(textToInsert, KEYMAGIC_EXTRAINFO_SIGNATURE, nullptr);
         }
@@ -165,7 +163,7 @@ HRESULT CDirectEditSession::ProcessKey(TfEditCookie ec)
     if (output.composing_text)
     {
         std::string composingUtf8(output.composing_text);
-        std::wstring composingText = ConvertUtf8ToUtf16(composingUtf8);
+        std::wstring composingText = KeyMagicUtils::ConvertUtf8ToUtf16(composingUtf8);
         
         switch (m_wParam)
         {
@@ -274,7 +272,7 @@ HRESULT CDirectEditSession::SyncEngineWithDocument(TfEditCookie ec)
             }
             
             // Convert to UTF-8 and set as engine composition
-            std::string utf8Text = ConvertUtf16ToUtf8(composeText);
+            std::string utf8Text = KeyMagicUtils::ConvertUtf16ToUtf8(composeText);
             DEBUG_LOG_TEXT(L"Syncing engine with document text", composeText);
             
             KeyMagicResult result = keymagic_engine_set_composition(m_pEngine, utf8Text.c_str());

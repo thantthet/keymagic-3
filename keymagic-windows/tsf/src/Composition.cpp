@@ -3,9 +3,6 @@
 #include "Debug.h"
 #include <string>
 
-// Helper function to convert UTF-8 to UTF-16
-extern std::wstring ConvertUtf8ToUtf16(const std::string& utf8);
-
 CCompositionManager::CCompositionManager(CKeyMagicTextService *pTextService)
 {
     m_cRef = 1;

@@ -36,9 +36,6 @@ private:
     // Monitor thread
     void MonitorThread();
     
-    // Read keyboard info from registry
-    bool ReadKeyboardInfo(HKEY hKey, const std::wstring& keyboardId, KeyboardInfo& info);
-    
     // Ensure registry structure exists
     void EnsureRegistryStructure();
 
