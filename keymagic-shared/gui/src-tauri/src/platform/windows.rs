@@ -32,6 +32,27 @@ const KEYBOARD_HOTKEY_VALUE: &str = "Hotkey";
 const KEYBOARD_ENABLED_VALUE: &str = "Enabled";
 const KEYBOARD_HASH_VALUE: &str = "Hash";
 
+/// Helper function to convert snake_case to PascalCase
+fn snake_case_to_pascal_case(snake_case: &str) -> String {
+    let mut pascal_case = String::new();
+    let mut capitalize_next = true;
+    
+    for ch in snake_case.chars() {
+        if ch == '_' {
+            capitalize_next = true;
+        } else {
+            if capitalize_next {
+                pascal_case.push(ch.to_uppercase().next().unwrap());
+                capitalize_next = false;
+            } else {
+                pascal_case.push(ch);
+            }
+        }
+    }
+    
+    pascal_case
+}
+
 /// Helper function to read REG_MULTI_SZ values from registry
 fn read_multi_string_value(key: &RegKey, value_name: &str) -> Result<Vec<String>> {
     use windows::Win32::Foundation::ERROR_MORE_DATA;
@@ -520,7 +541,14 @@ impl Platform for WindowsBackend {
             _ => {
                 // Read from Settings key
                 if let Ok(settings_key) = hkcu.open_subkey(SETTINGS_KEY) {
-                    if let Ok(value) = settings_key.get_value::<String, _>(key) {
+                    // Convert snake_case to PascalCase if needed
+                    let actual_key = if key.contains('_') {
+                        snake_case_to_pascal_case(key)
+                    } else {
+                        key.to_string()
+                    };
+                    
+                    if let Ok(value) = settings_key.get_value::<String, _>(&actual_key) {
                         Ok(Some(value))
                     } else {
                         Ok(None)
@@ -540,8 +568,15 @@ impl Platform for WindowsBackend {
         
         match key {
             _ => {
+                // Convert snake_case to PascalCase if needed
+                let actual_key = if key.contains('_') {
+                    snake_case_to_pascal_case(key)
+                } else {
+                    key.to_string()
+                };
+                
                 // Save to Settings key
-                settings_key.set_value(key, &value)?;
+                settings_key.set_value(&actual_key, &value)?;
                 Ok(())
             }
         }

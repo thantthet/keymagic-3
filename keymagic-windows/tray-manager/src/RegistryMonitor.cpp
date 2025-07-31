@@ -203,22 +203,7 @@ bool RegistryMonitor::ReadKeyboardInfo(HKEY hKey, const std::wstring& keyboardId
     if (readString(L"FileName", filename) && !filename.empty()) {
         // Construct full path from filename
         // Get keyboards directory from settings or use default
-        std::wstring keyboardsDir;
-        HKEY hSettingsKey;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, KEY_READ, &hSettingsKey) == ERROR_SUCCESS) {
-            wchar_t dirPath[MAX_PATH] = {0};
-            DWORD dirSize = sizeof(dirPath);
-            if (RegQueryValueExW(hSettingsKey, L"KeyboardsPath", nullptr, nullptr, 
-                               reinterpret_cast<LPBYTE>(dirPath), &dirSize) == ERROR_SUCCESS && dirPath[0] != L'\0') {
-                keyboardsDir = dirPath;
-            }
-            RegCloseKey(hSettingsKey);
-        }
-        
-        // Use default if not found in registry
-        if (keyboardsDir.empty()) {
-            keyboardsDir = GetLocalAppDataPath() + L"\\Keyboards";
-        }
+        std::wstring keyboardsDir = RegistryUtils::GetKeyboardsPath();
         
         // Construct full path
         info.path = keyboardsDir + L"\\" + filename;

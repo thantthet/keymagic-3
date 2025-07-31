@@ -2,22 +2,15 @@
 #include "RegistryMonitor.h"
 #include "IconVisibilityManager.h"
 #include "KeyboardPreviewWindow.h"
+#include "../../shared/include/RegistryUtils.h"
 #include <strsafe.h>
 
 // Helper function to check if preview window is enabled
 static bool IsPreviewWindowEnabled() {
-    HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-        WCHAR value[256] = {0};
-        DWORD size = sizeof(value);
-        DWORD type;
-        
-        if (RegQueryValueExW(hKey, L"preview_window_enabled", nullptr, &type, (LPBYTE)value, &size) == ERROR_SUCCESS) {
-            RegCloseKey(hKey);
-            // Check if value is "false" (case insensitive)
-            return _wcsicmp(value, L"false") != 0;
-        }
-        RegCloseKey(hKey);
+    std::wstring value;
+    if (RegistryUtils::ReadKeyMagicSetting(L"PreviewWindowEnabled", value)) {
+        // Check if value is "false" (case insensitive)
+        return _wcsicmp(value.c_str(), L"false") != 0;
     }
     
     // Default to enabled if setting doesn't exist

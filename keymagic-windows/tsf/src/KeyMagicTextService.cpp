@@ -1451,31 +1451,18 @@ void CKeyMagicTextService::ReloadRegistrySettings()
 {
     DEBUG_LOG(L"Reloading registry settings");
     
-    // Read from registry
-    HKEY hKey = OpenSettingsKey(KEY_READ);
-    if (hKey)
+    // Read DefaultKeyboard using RegistryUtils
+    std::wstring defaultKeyboard;
+    if (RegistryUtils::ReadKeyMagicSetting(L"DefaultKeyboard", defaultKeyboard))
     {
-        // Read DefaultKeyboard
-        wchar_t defaultKeyboard[256] = {0};
-        DWORD dataSize = sizeof(defaultKeyboard);
-        if (RegGetValueW(hKey, NULL, L"DefaultKeyboard", RRF_RT_REG_SZ, 
-                         NULL, defaultKeyboard, &dataSize) == ERROR_SUCCESS)
-        {
-            DEBUG_LOG(L"Read DefaultKeyboard: " + std::wstring(defaultKeyboard));
-        }
-        
-        // Determine UseCompositionEditSession based on current process
-        m_useCompositionEditSession = ShouldUseCompositionEditSession();
-        
-        RegCloseKey(hKey);
-        
-        // Apply settings
-        UpdateSettings(defaultKeyboard);
+        DEBUG_LOG(L"Read DefaultKeyboard: " + defaultKeyboard);
     }
-    else
-    {
-        DEBUG_LOG(L"Failed to open registry key for reading");
-    }
+    
+    // Determine UseCompositionEditSession based on current process
+    m_useCompositionEditSession = ShouldUseCompositionEditSession();
+    
+    // Apply settings
+    UpdateSettings(defaultKeyboard.empty() ? nullptr : defaultKeyboard.c_str());
 }
 
 // Composition edit session determination
@@ -1487,82 +1474,49 @@ bool CKeyMagicTextService::ShouldUseCompositionEditSession()
     DEBUG_LOG(L"Checking composition mode for process: " + processToCheck);
     
     // Read the list of executables that should use composition mode from registry
-    HKEY hKey = OpenSettingsKey(KEY_READ);
-    if (hKey)
+    std::vector<std::wstring> compositionModeHosts;
+    if (RegistryUtils::ReadKeyMagicSetting(L"CompositionModeHosts", compositionModeHosts))
     {
-        // Try to read the CompositionModeHosts value
-        DWORD dataSize = 0;
-        LONG result = RegGetValueW(hKey, NULL, L"CompositionModeHosts", RRF_RT_REG_MULTI_SZ, NULL, NULL, &dataSize);
-        
-        if (result == ERROR_SUCCESS && dataSize > 0)
+        // Check if current process is in the list
+        for (const auto& processName : compositionModeHosts)
         {
-            // Allocate buffer for the multi-string data
-            std::vector<wchar_t> buffer(dataSize / sizeof(wchar_t));
-            result = RegGetValueW(hKey, NULL, L"CompositionModeHosts", RRF_RT_REG_MULTI_SZ, NULL, buffer.data(), &dataSize);
+            // Convert to lowercase for comparison
+            std::wstring lowerProcessName = processName;
+            std::transform(lowerProcessName.begin(), lowerProcessName.end(), lowerProcessName.begin(), ::towlower);
             
-            if (result == ERROR_SUCCESS)
+            if (processToCheck == lowerProcessName)
             {
-                // Parse the multi-string data
-                wchar_t* current = buffer.data();
-                while (*current != L'\0')
-                {
-                    std::wstring processName(current);
-                    
-                    // Convert to lowercase for comparison
-                    std::transform(processName.begin(), processName.end(), processName.begin(), ::towlower);
-                    
-                    if (processToCheck == processName)
-                    {
-                        DEBUG_LOG(L"Process found in composition mode list: " + processToCheck);
-                        RegCloseKey(hKey);
-                        return true;
-                    }
-                    
-                    // Move to next string
-                    current += wcslen(current) + 1;
-                }
-                
-                DEBUG_LOG(L"Process not found in composition mode list: " + processToCheck);
-                RegCloseKey(hKey);
-                return false;  // Not in the list, use direct mode
-            }
-            else
-            {
-                DEBUG_LOG(L"Failed to read CompositionModeHosts value, using default");
+                DEBUG_LOG(L"Process found in composition mode list: " + processToCheck);
+                return true;
             }
         }
-        else
-        {
-            DEBUG_LOG(L"CompositionModeHosts value not found, using default list");
-            
-            // Use default list of processes that should use composition mode
-            std::vector<std::wstring> defaultProcesses = {
-                L"ms-teams.exe"
-            };
-            
-            // Check if current process is in the default list
-            for (const auto& process : defaultProcesses)
-            {
-                std::wstring lowerProcess = process;
-                std::transform(lowerProcess.begin(), lowerProcess.end(), lowerProcess.begin(), ::towlower);
-                
-                if (processToCheck == lowerProcess)
-                {
-                    DEBUG_LOG(L"Process found in default composition mode list: " + processToCheck);
-                    RegCloseKey(hKey);
-                    return true;
-                }
-            }
-            
-            DEBUG_LOG(L"Process not found in default composition mode list: " + processToCheck);
-        }
         
-        RegCloseKey(hKey);
+        DEBUG_LOG(L"Process not found in composition mode list: " + processToCheck);
+        return false;  // Not in the list, use direct mode
     }
     else
     {
-        DEBUG_LOG(L"Failed to open registry key, defaulting to composition mode");
-        return true;  // Default to composition mode if registry access fails
+        DEBUG_LOG(L"CompositionModeHosts value not found, using default list");
+        
+        // Use default list of processes that should use composition mode
+        std::vector<std::wstring> defaultProcesses = {
+            L"ms-teams.exe"
+        };
+        
+        // Check if current process is in the default list
+        for (const auto& process : defaultProcesses)
+        {
+            std::wstring lowerProcess = process;
+            std::transform(lowerProcess.begin(), lowerProcess.end(), lowerProcess.begin(), ::towlower);
+            
+            if (processToCheck == lowerProcess)
+            {
+                DEBUG_LOG(L"Process found in default composition mode list: " + processToCheck);
+                return true;
+            }
+        }
+        
+        DEBUG_LOG(L"Process not found in default composition mode list: " + processToCheck);
     }
     
     return false;  // Default to direct mode

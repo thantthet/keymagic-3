@@ -26,11 +26,118 @@ inline bool ReadRegistryString(HKEY hKey, const std::wstring& valueName, std::ws
     return false;
 }
 
+// Helper function to read a DWORD value from registry
+inline bool ReadRegistryDword(HKEY hKey, const std::wstring& valueName, DWORD& value) {
+    DWORD dataSize = sizeof(DWORD);
+    DWORD type;
+    
+    if (RegQueryValueExW(hKey, valueName.c_str(), nullptr, &type,
+                         reinterpret_cast<LPBYTE>(&value), &dataSize) == ERROR_SUCCESS) {
+        if (type == REG_DWORD) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Helper function to write a string value to registry
 inline bool WriteRegistryString(HKEY hKey, const std::wstring& valueName, const std::wstring& value) {
     return RegSetValueExW(hKey, valueName.c_str(), 0, REG_SZ,
                           reinterpret_cast<const BYTE*>(value.c_str()),
                           static_cast<DWORD>((value.length() + 1) * sizeof(WCHAR))) == ERROR_SUCCESS;
+}
+
+// Helper function to read a multi-string value from registry
+inline bool ReadRegistryMultiString(HKEY hKey, const std::wstring& valueName, std::vector<std::wstring>& values) {
+    values.clear();
+    DWORD dataSize = 0;
+    DWORD type;
+    
+    // Get size first
+    if (RegQueryValueExW(hKey, valueName.c_str(), nullptr, &type, nullptr, &dataSize) != ERROR_SUCCESS || 
+        type != REG_MULTI_SZ || dataSize == 0) {
+        return false;
+    }
+    
+    // Allocate buffer and read data
+    std::vector<WCHAR> buffer(dataSize / sizeof(WCHAR));
+    if (RegQueryValueExW(hKey, valueName.c_str(), nullptr, &type, 
+                         reinterpret_cast<LPBYTE>(buffer.data()), &dataSize) == ERROR_SUCCESS) {
+        // Parse multi-string data
+        LPCWSTR pszCurrent = buffer.data();
+        while (*pszCurrent) {
+            values.push_back(pszCurrent);
+            pszCurrent += wcslen(pszCurrent) + 1;
+        }
+        return true;
+    }
+    return false;
+}
+
+// Helper function to convert snake_case to PascalCase
+inline std::wstring SnakeCaseToPascalCase(const std::wstring& snakeCase) {
+    std::wstring pascalCase;
+    bool capitalizeNext = true;
+    
+    for (wchar_t ch : snakeCase) {
+        if (ch == L'_') {
+            capitalizeNext = true;
+        } else {
+            if (capitalizeNext) {
+                pascalCase += towupper(ch);
+                capitalizeNext = false;
+            } else {
+                pascalCase += ch;
+            }
+        }
+    }
+    
+    return pascalCase;
+}
+
+// Helper function to read a setting value from KeyMagic settings registry
+// Automatically converts snake_case names to PascalCase (e.g., "preview_window_enabled" -> "PreviewWindowEnabled")
+template<typename T>
+inline bool ReadKeyMagicSetting(const std::wstring& valueName, T& value) {
+    HKEY hSettingsKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, KEY_READ, &hSettingsKey) != ERROR_SUCCESS) {
+        return false;
+    }
+    
+    // Check if the value name contains underscores (snake_case)
+    std::wstring actualValueName = valueName;
+    if (valueName.find(L'_') != std::wstring::npos) {
+        // Convert snake_case to PascalCase
+        actualValueName = SnakeCaseToPascalCase(valueName);
+    }
+    
+    bool result = false;
+    if constexpr (std::is_same_v<T, std::wstring>) {
+        result = ReadRegistryString(hSettingsKey, actualValueName, value);
+    } else if constexpr (std::is_same_v<T, DWORD>) {
+        result = ReadRegistryDword(hSettingsKey, actualValueName, value);
+    } else if constexpr (std::is_same_v<T, std::vector<std::wstring>>) {
+        result = ReadRegistryMultiString(hSettingsKey, actualValueName, value);
+    }
+    
+    RegCloseKey(hSettingsKey);
+    return result;
+}
+
+// Get keyboards directory path from settings
+inline std::wstring GetKeyboardsPath() {
+    std::wstring keyboardsPath;
+    ReadKeyMagicSetting(L"KeyboardsPath", keyboardsPath);
+    
+    // Use default if not found
+    if (keyboardsPath.empty()) {
+        wchar_t localAppData[MAX_PATH];
+        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+            keyboardsPath = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
+        }
+    }
+    
+    return keyboardsPath;
 }
 
 // Helper function to read keyboard info from a registry key
@@ -49,20 +156,7 @@ inline bool ReadKeyboardInfo(HKEY hKeyboardsKey, const std::wstring& keyboardId,
     std::wstring filename;
     if (ReadRegistryString(hSubKey, L"FileName", filename) && !filename.empty()) {
         // Get keyboards directory
-        std::wstring keyboardsDir;
-        HKEY hSettingsKey;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, KEY_READ, &hSettingsKey) == ERROR_SUCCESS) {
-            ReadRegistryString(hSettingsKey, L"KeyboardsPath", keyboardsDir);
-            RegCloseKey(hSettingsKey);
-        }
-        
-        // Use default if not found
-        if (keyboardsDir.empty()) {
-            wchar_t localAppData[MAX_PATH];
-            if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
-                keyboardsDir = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
-            }
-        }
+        std::wstring keyboardsDir = GetKeyboardsPath();
         
         if (!keyboardsDir.empty()) {
             info.path = keyboardsDir + L"\\" + filename;
@@ -137,15 +231,8 @@ inline std::vector<KeyboardInfo> GetInstalledKeyboards() {
 
 // Get current default keyboard ID
 inline std::wstring GetDefaultKeyboardId() {
-    HKEY hSettingsKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, KEY_READ, &hSettingsKey) != ERROR_SUCCESS) {
-        return L"";
-    }
-    
     std::wstring defaultKeyboard;
-    ReadRegistryString(hSettingsKey, L"DefaultKeyboard", defaultKeyboard);
-    
-    RegCloseKey(hSettingsKey);
+    ReadKeyMagicSetting(L"DefaultKeyboard", defaultKeyboard);
     return defaultKeyboard;
 }
 
@@ -187,31 +274,7 @@ inline void EnsureRegistryStructure() {
 // Read enabled languages from registry (returns language codes like "en", "my")
 inline std::vector<std::wstring> GetEnabledLanguages() {
     std::vector<std::wstring> languages;
-    HKEY hSettingsKey;
-    
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, KEYMAGIC_SETTINGS_PATH, 0, KEY_READ, &hSettingsKey) != ERROR_SUCCESS) {
-        return languages;
-    }
-    
-    DWORD dwType = REG_MULTI_SZ;
-    DWORD dwSize = 0;
-    
-    // Get size first
-    if (RegQueryValueExW(hSettingsKey, L"EnabledLanguages", nullptr, &dwType, nullptr, &dwSize) == ERROR_SUCCESS && dwSize > 0) {
-        // Allocate buffer and read data
-        std::vector<WCHAR> buffer(dwSize / sizeof(WCHAR));
-        if (RegQueryValueExW(hSettingsKey, L"EnabledLanguages", nullptr, &dwType, 
-                           reinterpret_cast<LPBYTE>(buffer.data()), &dwSize) == ERROR_SUCCESS) {
-            // Parse multi-string data
-            LPCWSTR pszCurrent = buffer.data();
-            while (*pszCurrent) {
-                languages.push_back(pszCurrent);
-                pszCurrent += wcslen(pszCurrent) + 1;
-            }
-        }
-    }
-    
-    RegCloseKey(hSettingsKey);
+    ReadKeyMagicSetting(L"EnabledLanguages", languages);
     return languages;
 }
 
