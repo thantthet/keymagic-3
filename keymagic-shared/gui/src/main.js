@@ -841,12 +841,9 @@ function recordHotkey(e) {
     }
   }
   
-  // Record the main key
-  if (e.key && e.key.length === 1) {
-    // Single character key
-    recordedKeys.push(e.key.toUpperCase());
-  } else if (e.code) {
-    // Special keys
+  // Record the main key - use e.code for reliability, especially with Ctrl+Alt
+  if (e.code) {
+    // Special keys mapping
     const keyMap = {
       'F1': 'F1', 'F2': 'F2', 'F3': 'F3', 'F4': 'F4',
       'F5': 'F5', 'F6': 'F6', 'F7': 'F7', 'F8': 'F8',
@@ -857,19 +854,30 @@ function recordHotkey(e) {
       'ArrowUp': 'Up', 'ArrowDown': 'Down', 'ArrowLeft': 'Left', 'ArrowRight': 'Right'
     };
     
-    for (const [code, name] of Object.entries(keyMap)) {
-      if (e.code === code || e.key === code) {
-        recordedKeys.push(name);
-        break;
-      }
+    // Check if it's a special key
+    if (keyMap[e.code]) {
+      recordedKeys.push(keyMap[e.code]);
     }
-    
-    // Handle digit keys
-    if (e.code.startsWith('Digit')) {
+    // Handle digit keys (Digit0-Digit9)
+    else if (e.code.startsWith('Digit')) {
       recordedKeys.push(e.code.replace('Digit', ''));
-    } else if (e.code.startsWith('Key')) {
+    }
+    // Handle letter keys (KeyA-KeyZ)
+    else if (e.code.startsWith('Key')) {
       recordedKeys.push(e.code.replace('Key', ''));
     }
+    // Handle numpad keys
+    else if (e.code.startsWith('Numpad')) {
+      recordedKeys.push('Num' + e.code.replace('Numpad', ''));
+    }
+    // Handle other keys by code
+    else if (e.code && !e.code.includes('Shift') && !e.code.includes('Control') && !e.code.includes('Alt') && !e.code.includes('Meta')) {
+      // For other keys, try to extract a meaningful name
+      recordedKeys.push(e.code);
+    }
+  } else if (e.key && e.key.length === 1) {
+    // Fallback to e.key only if e.code is not available
+    recordedKeys.push(e.key.toUpperCase());
   }
   
   // Update the input display
@@ -966,6 +974,10 @@ window.saveHotkey = async function() {
             errorDiv.style.display = 'block';
             errorDiv.className = 'validation-error';
           }
+          // Re-add the event listener since we removed it at the start
+          if (input) {
+            input.addEventListener('keydown', recordHotkey);
+          }
           return; // Don't close the dialog
         }
         
@@ -988,9 +1000,8 @@ window.saveHotkey = async function() {
         hotkey: hotkeyValue
       });
       
-      // Update local data
-      currentHotkeyKeyboard.hotkey = hotkeyValue;
-      renderKeyboardList();
+      // Reload keyboard list to get the updated display_hotkey from backend
+      await loadKeyboards();
       await updateTrayMenu();
       
       showSuccess(successMessage);
