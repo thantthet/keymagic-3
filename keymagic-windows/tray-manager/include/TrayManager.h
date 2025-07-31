@@ -46,6 +46,9 @@ private:
     
     // Launch KeyMagic GUI application
     void LaunchKeyMagicApp();
+    
+    // Check if mouse is over tray area
+    bool IsMouseOverTrayArea() const;
 
 private:
     // Core components

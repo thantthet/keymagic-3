@@ -132,10 +132,12 @@ LRESULT TrayManager::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARA
                 KillTimer(hWnd, TIMER_HIDE_DELAY);
                 m_hideTimerId = 0;
                 
-                // Only hide if context menu is not active
-                if (!m_contextMenuActive) {
+                // Only hide if context menu is not active AND mouse is not over tray area
+                if (!m_contextMenuActive && !IsMouseOverTrayArea()) {
                     OutputDebugStringW(L"TrayManager: Hiding icon (delayed)\n");
                     UpdateTrayIcon();
+                } else if (IsMouseOverTrayArea()) {
+                    OutputDebugStringW(L"TrayManager: Not hiding - mouse is still over tray area\n");
                 }
             }
             return 0;
@@ -284,6 +286,14 @@ void TrayManager::OnPipeMessage(const TrayMessage& msg) {
             
         case MSG_FOCUS_GAINED:
             OutputDebugStringW(L"  -> MSG_FOCUS_GAINED\n");
+            
+            // Cancel any pending hide timer
+            if (m_hideTimerId) {
+                KillTimer(m_hWnd, m_hideTimerId);
+                m_hideTimerId = 0;
+                OutputDebugStringW(L"  Cancelled hide timer\n");
+            }
+            
             m_hasFocus = true;
             if (msg.keyboardId[0]) {
                 OutputDebugStringW((L"  Setting keyboard: " + std::wstring(msg.keyboardId) + L"\n").c_str());
@@ -295,10 +305,16 @@ void TrayManager::OnPipeMessage(const TrayMessage& msg) {
         case MSG_FOCUS_LOST:
             OutputDebugStringW(L"  -> MSG_FOCUS_LOST\n");
             m_hasFocus = false;
-            OutputDebugStringW(L"  Starting hide timer\n");
-            // Set timer to hide icon after delay
-            if (m_hWnd && !m_contextMenuActive) {
-                m_hideTimerId = SetTimer(m_hWnd, TIMER_HIDE_DELAY, HIDE_DELAY_MS, nullptr);
+            
+            // Only start hide timer if mouse is NOT over tray area
+            if (!IsMouseOverTrayArea()) {
+                OutputDebugStringW(L"  Starting hide timer (mouse not over tray area)\n");
+                // Set timer to hide icon after delay
+                if (m_hWnd && !m_contextMenuActive) {
+                    m_hideTimerId = SetTimer(m_hWnd, TIMER_HIDE_DELAY, HIDE_DELAY_MS, nullptr);
+                }
+            } else {
+                OutputDebugStringW(L"  Not hiding - mouse is over tray area\n");
             }
             break;
             
@@ -375,6 +391,54 @@ void TrayManager::OnMenuCommand(UINT cmdId) {
             UpdateTrayIcon();
         }
     }
+}
+
+bool TrayManager::IsMouseOverTrayArea() const {
+    // Get current mouse position
+    POINT pt;
+    if (!GetCursorPos(&pt)) {
+        return false;
+    }
+    
+    // Find the main taskbar window
+    HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+    if (!hTaskbar) {
+        return false;
+    }
+    
+    // Find the tray notification area within the taskbar
+    HWND hTrayNotify = FindWindowExW(hTaskbar, nullptr, L"TrayNotifyWnd", nullptr);
+    if (hTrayNotify) {
+        RECT trayRect;
+        if (GetWindowRect(hTrayNotify, &trayRect) && PtInRect(&trayRect, pt)) {
+            return true;
+        }
+    }
+    
+    // Check system tray overflow window (when tray icons are hidden)
+    HWND hOverflow = FindWindowW(L"NotifyIconOverflowWindow", nullptr);
+    if (hOverflow && IsWindowVisible(hOverflow)) {
+        RECT overflowRect;
+        if (GetWindowRect(hOverflow, &overflowRect) && PtInRect(&overflowRect, pt)) {
+            return true;
+        }
+    }
+    
+    // For secondary monitors, check their tray areas too
+    HWND hSecondaryTaskbar = FindWindowW(L"Shell_SecondaryTrayWnd", nullptr);
+    while (hSecondaryTaskbar) {
+        // Find the tray area in secondary taskbar
+        HWND hSecondaryTray = FindWindowExW(hSecondaryTaskbar, nullptr, L"ClockButton", nullptr);
+        if (hSecondaryTray) {
+            RECT secondaryTrayRect;
+            if (GetWindowRect(hSecondaryTray, &secondaryTrayRect) && PtInRect(&secondaryTrayRect, pt)) {
+                return true;
+            }
+        }
+        hSecondaryTaskbar = FindWindowExW(nullptr, hSecondaryTaskbar, L"Shell_SecondaryTrayWnd", nullptr);
+    }
+    
+    return false;
 }
 
 void TrayManager::UpdateTrayIcon() {
