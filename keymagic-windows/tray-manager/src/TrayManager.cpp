@@ -358,13 +358,10 @@ void TrayManager::OnRegistryChange() {
 
 void TrayManager::OnMenuCommand(UINT cmdId) {
     const UINT IDM_KEYBOARD_BASE = 1000;
-    const UINT IDM_EXIT = 999;
     const UINT IDM_ABOUT = 998;
     const UINT IDM_SETTINGS = 997;
     
-    if (cmdId == IDM_EXIT) {
-        PostMessage(m_hWnd, WM_CLOSE, 0, 0);
-    } else if (cmdId == IDM_SETTINGS) {
+    if (cmdId == IDM_SETTINGS) {
         // Launch KeyMagic GUI application
         LaunchKeyMagicApp();
     } else if (cmdId >= IDM_KEYBOARD_BASE) {
