@@ -1,0 +1,177 @@
+#!/bin/bash
+# Package KeyMagic for macOS as a DMG with embedded IMK bundle
+
+set -e
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Configuration
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+BUILD_DIR="$PROJECT_ROOT/target/release/bundle/macos"
+DMG_DIR="$PROJECT_ROOT/target/dmg"
+APP_NAME="KeyMagic3.app"
+DMG_NAME="KeyMagic3-$1.dmg"
+IMK_BUNDLE_PATH="$PROJECT_ROOT/keymagic-macos/build/KeyMagic3.app"
+
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}[*]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[!]${NC} $1" >&2
+}
+
+print_warning() {
+    echo -e "${YELLOW}[!]${NC} $1"
+}
+
+# Check if version is provided
+if [ -z "$1" ]; then
+    print_error "Usage: $0 <version>"
+    print_error "Example: $0 0.0.6"
+    exit 1
+fi
+
+VERSION="$1"
+
+# Check if Tauri app bundle exists
+if [ ! -d "$BUILD_DIR/$APP_NAME" ]; then
+    print_error "Tauri app bundle not found at: $BUILD_DIR/$APP_NAME"
+    print_error "Please run 'cargo tauri build' first"
+    exit 1
+fi
+
+# Build IMK bundle if needed
+if [ ! -d "$IMK_BUNDLE_PATH" ]; then
+    print_status "Building IMK bundle..."
+    cd "$PROJECT_ROOT/keymagic-macos"
+    make clean
+    make
+    cd "$PROJECT_ROOT"
+fi
+
+# Check if IMK bundle was built
+if [ ! -d "$IMK_BUNDLE_PATH" ]; then
+    print_error "IMK bundle not found at: $IMK_BUNDLE_PATH"
+    print_error "Failed to build IMK bundle"
+    exit 1
+fi
+
+# Create DMG directory
+print_status "Creating DMG staging directory..."
+rm -rf "$DMG_DIR"
+mkdir -p "$DMG_DIR/dmg"
+
+# Copy Tauri app bundle
+print_status "Copying Tauri app bundle..."
+cp -R "$BUILD_DIR/$APP_NAME" "$DMG_DIR/dmg/"
+
+# Embed IMK bundle in Tauri app resources
+print_status "Embedding IMK bundle in app resources..."
+RESOURCES_DIR="$DMG_DIR/dmg/$APP_NAME/Contents/Resources"
+mkdir -p "$RESOURCES_DIR/resources"
+cp -R "$IMK_BUNDLE_PATH" "$RESOURCES_DIR/resources/"
+
+# Update IMK bundle version to match
+print_status "Updating IMK bundle version..."
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+    "$RESOURCES_DIR/resources/KeyMagic3.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" \
+    "$RESOURCES_DIR/resources/KeyMagic3.app/Contents/Info.plist"
+
+# Applications symlink will be created by create-dmg
+
+# Sign the app bundle if certificates are available
+if [ -n "$DEVELOPER_ID_APP" ]; then
+    print_status "Signing app bundle..."
+    "$PROJECT_ROOT/keymagic-macos/scripts/sign-bundle.sh" "$DMG_DIR/dmg/$APP_NAME"
+else
+    print_warning "DEVELOPER_ID_APP not set, skipping code signing"
+fi
+
+# Create DMG
+print_status "Creating DMG..."
+DMG_PATH="$PROJECT_ROOT/target/$DMG_NAME"
+
+# Remove old DMG if exists
+rm -f "$DMG_PATH"
+
+# Check if custom background exists
+BACKGROUND_IMAGE="$PROJECT_ROOT/keymagic-macos/assets/dmg-background.png"
+if [ ! -f "$BACKGROUND_IMAGE" ]; then
+    print_warning "DMG background image not found at: $BACKGROUND_IMAGE"
+    print_warning "Using default DMG layout"
+    
+    # Create DMG using hdiutil (fallback)
+    hdiutil create -volname "KeyMagic $VERSION" \
+        -srcfolder "$DMG_DIR/dmg" \
+        -ov -format UDZO \
+        "$DMG_PATH"
+else
+    # Create DMG using create-dmg with custom background
+    print_status "Creating DMG with custom background..."
+    
+    create-dmg \
+        --volname "KeyMagic $VERSION" \
+        --volicon "$PROJECT_ROOT/resources/icons/KeyMagic.icns" \
+        --background "$BACKGROUND_IMAGE" \
+        --window-pos 200 120 \
+        --window-size 600 400 \
+        --icon-size 100 \
+        --icon "KeyMagic3.app" 150 200 \
+        --hide-extension "KeyMagic3.app" \
+        --app-drop-link 450 200 \
+        --no-internet-enable \
+        "$DMG_PATH" \
+        "$DMG_DIR/dmg"
+fi
+
+# Sign DMG if certificates are available
+if [ -n "$DEVELOPER_ID_APP" ]; then
+    print_status "Signing DMG..."
+    codesign --force --sign "$DEVELOPER_ID_APP" "$DMG_PATH"
+    
+    # Notarize if requested
+    if [ "$2" == "--notarize" ]; then
+        print_status "Notarizing DMG..."
+        xcrun notarytool submit "$DMG_PATH" \
+            --keychain-profile "${KEYCHAIN_PROFILE:-keymagic-notarize}" \
+            --wait
+        
+        print_status "Stapling notarization ticket..."
+        xcrun stapler staple "$DMG_PATH"
+    fi
+fi
+
+# Clean up
+print_status "Cleaning up..."
+rm -rf "$DMG_DIR"
+
+# Final output
+print_status "DMG created successfully: $DMG_PATH"
+print_status "Size: $(du -h "$DMG_PATH" | cut -f1)"
+
+# Verify DMG
+print_status "Verifying DMG..."
+hdiutil verify "$DMG_PATH"
+
+if [ -n "$DEVELOPER_ID_APP" ]; then
+    print_status "Verifying signature..."
+    spctl -a -t open --context context:primary-signature -v "$DMG_PATH"
+fi
+
+print_status "Done! The DMG is ready for distribution."
+
+# Instructions
+echo
+echo "Installation instructions for users:"
+echo "1. Open $DMG_NAME"
+echo "2. Drag KeyMagic to Applications folder"
+echo "3. Launch KeyMagic from Applications"
+echo "4. KeyMagic will automatically install the input method on first launch"
+echo "5. Add KeyMagic in System Preferences > Keyboard > Input Sources"
