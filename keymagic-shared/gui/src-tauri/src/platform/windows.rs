@@ -499,17 +499,6 @@ impl Platform for WindowsBackend {
         }
     }
     
-    fn register_language_profile(&self, _keyboard_id: &str) -> Result<()> {
-        // Register with Windows TSF
-        // This would involve registering the keyboard as a TSF text service
-        Ok(())
-    }
-    
-    fn unregister_language_profile(&self, _keyboard_id: &str) -> Result<()> {
-        // Unregister from Windows TSF
-        Ok(())
-    }
-    
     fn get_setting(&self, key: &str) -> Result<Option<String>> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         

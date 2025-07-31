@@ -97,15 +97,6 @@ pub trait Platform: Send + Sync {
     // Platform info
     fn get_platform_info(&self) -> PlatformInfo;
     
-    // Optional platform-specific methods with default implementations
-    fn register_language_profile(&self, _keyboard_id: &str) -> Result<()> {
-        Ok(())
-    }
-    
-    fn unregister_language_profile(&self, _keyboard_id: &str) -> Result<()> {
-        Ok(())
-    }
-    
     // Language profile management
     fn get_enabled_languages(&self) -> Result<Vec<String>> {
         Ok(vec!["en-US".to_string()]) // Default implementation

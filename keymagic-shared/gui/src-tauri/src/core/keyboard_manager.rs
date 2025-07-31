@@ -221,12 +221,6 @@ impl KeyboardManager {
         // Update config
         self.save_keyboards_to_config()?;
         
-        // Unregister from platform if supported
-        let platform_info = self.platform.get_platform_info();
-        if platform_info.features.language_profiles {
-            self.platform.unregister_language_profile(keyboard_id)?;
-        }
-        
         Ok(())
     }
     
@@ -376,12 +370,6 @@ impl KeyboardManager {
         
         // Add to manager
         self.add_keyboard(keyboard_info.clone())?;
-        
-        // Register with platform if supported
-        let platform_info = self.platform.get_platform_info();
-        if platform_info.features.language_profiles {
-            self.platform.register_language_profile(&final_id)?;
-        }
         
         Ok(keyboard_info)
     }
