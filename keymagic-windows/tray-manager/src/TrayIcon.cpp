@@ -1,6 +1,7 @@
 #include "TrayIcon.h"
 #include "RegistryMonitor.h"
 #include "IconVisibilityManager.h"
+#include "KeyboardPreviewWindow.h"
 #include <strsafe.h>
 
 TrayIcon::TrayIcon()
@@ -46,6 +47,13 @@ bool TrayIcon::Initialize(HWND hWnd) {
     // Set version for Windows Vista+ features
     m_nid.uVersion = NOTIFYICON_VERSION_4;
     
+    // Initialize keyboard preview window
+    m_previewWindow = std::make_unique<KeyboardPreviewWindow>();
+    if (!m_previewWindow->Initialize(GetModuleHandle(nullptr))) {
+        // Non-fatal, continue without preview
+        m_previewWindow.reset();
+    }
+    
     return true;
 }
 
@@ -66,6 +74,11 @@ void TrayIcon::Hide() {
     if (m_visible) {
         UpdateNotificationIcon(NIM_DELETE);
         m_visible = false;
+        
+        // Also hide preview window
+        if (m_previewWindow) {
+            m_previewWindow->Hide();
+        }
     }
 }
 
@@ -155,12 +168,33 @@ void TrayIcon::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     
     switch (LOWORD(lParam)) {
         case WM_LBUTTONUP:
-            // Could show keyboard switcher UI here
+            // Show keyboard preview window
+            if (m_previewWindow && !m_currentKeyboardId.empty()) {
+                POINT pt;
+                GetCursorPos(&pt);
+                m_previewWindow->Show(pt, m_currentKeyboardId, m_currentKeyboardPath);
+            }
             break;
             
         case WM_RBUTTONUP:
+            // Hide preview window when showing context menu
+            if (m_previewWindow) {
+                m_previewWindow->Hide();
+            }
             // Context menu will be shown by TrayManager
             PostMessage(hWnd, WM_COMMAND, MAKEWPARAM(0, 0), 0);
+            break;
+            
+        case WM_MOUSEMOVE:
+            // Show preview on hover
+            if (m_previewWindow && !m_currentKeyboardId.empty()) {
+                // Check if preview is already visible to avoid flickering
+                if (!m_previewWindow->IsVisible()) {
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    m_previewWindow->Show(pt, m_currentKeyboardId, m_currentKeyboardPath);
+                }
+            }
             break;
             
         case WM_CONTEXTMENU:
@@ -238,4 +272,9 @@ void TrayIcon::EnsureIconVisibility() {
     // Use IconVisibilityManager to ensure the icon is visible
     IconVisibilityManager visibilityManager;
     visibilityManager.EnsureIconVisible();
+}
+
+void TrayIcon::SetKeyboardInfo(const std::wstring& keyboardId, const std::wstring& keyboardPath) {
+    m_currentKeyboardId = keyboardId;
+    m_currentKeyboardPath = keyboardPath;
 }

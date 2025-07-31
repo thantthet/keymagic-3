@@ -395,6 +395,9 @@ void TrayManager::UpdateTrayIcon() {
             // Update tooltip
             std::wstring tooltip = L"KeyMagic - " + info.name;
             m_trayIcon->SetTooltip(tooltip);
+            
+            // Update keyboard info for preview
+            m_trayIcon->SetKeyboardInfo(m_currentKeyboardId, info.path);
         }
         
         m_trayIcon->Show();

@@ -2,9 +2,11 @@
 
 #include "Common.h"
 #include <shellapi.h>
+#include <memory>
 
-// Forward declaration
+// Forward declarations
 struct KeyboardInfo;
+class KeyboardPreviewWindow;
 
 class TrayIcon {
 public:
@@ -35,6 +37,9 @@ public:
     
     // Check if icon is visible
     bool IsVisible() const { return m_visible; }
+    
+    // Set keyboard info for preview
+    void SetKeyboardInfo(const std::wstring& keyboardId, const std::wstring& keyboardPath);
 
 private:
     // Create default icon
@@ -53,6 +58,11 @@ private:
     NOTIFYICONDATAW m_nid;
     bool m_visible;
     MenuCallback m_menuCallback;
+    
+    // Keyboard preview window
+    std::unique_ptr<KeyboardPreviewWindow> m_previewWindow;
+    std::wstring m_currentKeyboardId;
+    std::wstring m_currentKeyboardPath;
     
     // Menu constants
     static constexpr UINT IDM_KEYBOARD_BASE = 1000;

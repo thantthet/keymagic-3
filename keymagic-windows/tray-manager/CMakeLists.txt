@@ -20,6 +20,7 @@ set(SOURCES
     src/TrayIcon.cpp
     src/SecurityUtils.cpp
     src/IconVisibilityManager.cpp
+    src/KeyboardPreviewWindow.cpp
 )
 
 set(HEADERS
@@ -32,6 +33,7 @@ set(HEADERS
     include/SecurityUtils.h
     include/Common.h
     include/IconVisibilityManager.h
+    include/KeyboardPreviewWindow.h
 )
 
 # Create executable
@@ -69,6 +71,7 @@ target_link_libraries(keymagic-tray PRIVATE
     userenv
     ntdll
     comctl32
+    usp10
 )
 
 # Determine Rust target based on architecture
