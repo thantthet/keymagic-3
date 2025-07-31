@@ -1,5 +1,6 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
+import { checkMacOSSetup } from './js/macos-setup.js';
 
 // State management
 let keyboards = [];
@@ -1533,6 +1534,9 @@ async function init() {
   
   // Load platform info first
   await loadPlatformInfo();
+  
+  // Check macOS setup if needed
+  await checkMacOSSetup(platformInfo);
   
   // Set up event listeners
   setupEventListeners();

@@ -4,6 +4,9 @@ mod hotkey;
 mod platform;
 mod updater;
 
+#[cfg(target_os = "macos")]
+mod imk_installer;
+
 
 #[cfg(target_os = "windows")]
 mod keyboard_icon;
@@ -168,6 +171,14 @@ pub fn run() {
             commands::convert_kms_to_km2,
             commands::validate_kms_file,
             commands::convert_kms_file,
+            #[cfg(target_os = "macos")]
+            imk_installer::check_imk_status,
+            #[cfg(target_os = "macos")]
+            imk_installer::install_imk_bundle,
+            #[cfg(target_os = "macos")]
+            imk_installer::uninstall_imk_bundle,
+            #[cfg(target_os = "macos")]
+            imk_installer::open_input_sources_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

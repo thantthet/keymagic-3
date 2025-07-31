@@ -78,7 +78,7 @@ build-swift: build-core
 	@echo "Build complete: $(BUILD_DIR)/$(IMK_APP_NAME)"
 
 # Build GUI application bundle
-build-gui: build-core
+build-gui: build-core build-swift
 	@echo "Building KeyMagic GUI application ($(BUILD_CONFIG))..."
 	cd ../keymagic-shared/gui && cargo tauri build $(TAURI_FLAGS) --bundles app
 	
@@ -94,7 +94,12 @@ build-gui: build-core
 		exit 1; \
 	fi
 	
-	@echo "GUI build complete: $(BUILD_DIR)/$(GUI_APP_NAME)"
+	# Embed the IMK server bundle inside the GUI app
+	@echo "Embedding IMK server into GUI application..."
+	@mkdir -p "$(BUILD_DIR)/$(GUI_APP_NAME)/Contents/Resources"
+	@cp -R "$(BUILD_DIR)/$(IMK_APP_NAME)" "$(BUILD_DIR)/$(GUI_APP_NAME)/Contents/Resources/"
+	
+	@echo "GUI build complete with embedded IMK: $(BUILD_DIR)/$(GUI_APP_NAME)"
 
 # Clean build artifacts
 clean:
