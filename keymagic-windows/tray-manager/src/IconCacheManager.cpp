@@ -64,7 +64,7 @@ HICON IconCacheManager::GetIcon(const std::wstring& keyboardId, const std::wstri
     std::vector<BYTE> iconData;
     if (ExtractIcon(km2Path, iconData) && !iconData.empty()) {
         // Convert to requested size and create HICON
-        hIcon = PngToIcon(iconData, size);
+        hIcon = ImageDataToIcon(iconData, size);
         if (hIcon) {
             // Save to cache for future use
             SaveToCache(keyboardId, size, iconData);
@@ -158,7 +158,7 @@ bool IconCacheManager::ExtractIcon(const std::wstring& km2Path, std::vector<BYTE
     return true;
 }
 
-HICON IconCacheManager::PngToIcon(const std::vector<BYTE>& imageData, int size) {
+HICON IconCacheManager::ImageDataToIcon(const std::vector<BYTE>& imageData, int size) {
     if (!EnsureGdiPlusInitialized()) {
         return nullptr;
     }
@@ -211,7 +211,7 @@ HICON IconCacheManager::PngToIcon(const std::vector<BYTE>& imageData, int size) 
     return hIcon;
 }
 
-bool IconCacheManager::SaveToCache(const std::wstring& keyboardId, int size, const std::vector<BYTE>& pngData) {
+bool IconCacheManager::SaveToCache(const std::wstring& keyboardId, int size, const std::vector<BYTE>& iconData) {
     std::wstring cachePath = GetCachePath(keyboardId, size);
     
     std::ofstream file(cachePath, std::ios::binary);
@@ -219,7 +219,7 @@ bool IconCacheManager::SaveToCache(const std::wstring& keyboardId, int size, con
         return false;
     }
     
-    file.write(reinterpret_cast<const char*>(pngData.data()), pngData.size());
+    file.write(reinterpret_cast<const char*>(iconData.data()), iconData.size());
     return file.good();
 }
 
@@ -240,12 +240,12 @@ HICON IconCacheManager::LoadFromCache(const std::wstring& keyboardId, int size) 
     std::streamsize fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
     
-    std::vector<BYTE> pngData(fileSize);
-    if (!file.read(reinterpret_cast<char*>(pngData.data()), fileSize)) {
+    std::vector<BYTE> iconData(fileSize);
+    if (!file.read(reinterpret_cast<char*>(iconData.data()), fileSize)) {
         return nullptr;
     }
     
-    return PngToIcon(pngData, size);
+    return ImageDataToIcon(iconData, size);
 }
 
 std::wstring IconCacheManager::GetCachePath(const std::wstring& keyboardId, int size) {

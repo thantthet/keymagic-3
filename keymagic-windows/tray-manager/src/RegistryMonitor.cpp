@@ -1,5 +1,6 @@
 #include "RegistryMonitor.h"
 #include "SecurityUtils.h"
+#include "keymagic_ffi.h"
 
 RegistryMonitor::RegistryMonitor()
     : m_hKeyboardsKey(nullptr)
@@ -271,7 +272,55 @@ bool RegistryMonitor::ReadKeyboardInfo(HKEY hKey, const std::wstring& keyboardId
         }
     }
     
-    readString(L"Hotkey", info.hotkey);
+    // Read hotkey with TSF-style logic
+    DWORD queryResult = ERROR_SUCCESS;
+    WCHAR hotkeyBuffer[256] = {0};
+    DWORD hotkeySize = sizeof(hotkeyBuffer);
+    DWORD hotkeyType;
+    
+    queryResult = RegQueryValueExW(hSubKey, L"Hotkey", nullptr, &hotkeyType,
+                                  reinterpret_cast<LPBYTE>(hotkeyBuffer), &hotkeySize);
+    
+    if (queryResult == ERROR_SUCCESS && hotkeyType == REG_SZ && hotkeyBuffer[0] != L'\0') {
+        // Hotkey explicitly set in config (non-empty string)
+        info.hotkey = hotkeyBuffer;
+        OutputDebugStringW((L"RegistryMonitor: Using hotkey from registry for keyboard " + keyboardId + L": " + info.hotkey + L"\n").c_str());
+    } else if (queryResult == ERROR_FILE_NOT_FOUND && !info.path.empty()) {
+        // Hotkey not set in config - try to get from KM2 file
+        OutputDebugStringW((L"RegistryMonitor: No registry hotkey for keyboard " + keyboardId + L", checking KM2 file\n").c_str());
+        
+        // Convert wide string path to UTF-8
+        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, info.path.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (utf8Len > 0) {
+            std::vector<char> utf8Path(utf8Len);
+            WideCharToMultiByte(CP_UTF8, 0, info.path.c_str(), -1, utf8Path.data(), utf8Len, nullptr, nullptr);
+            
+            // Load KM2 file to get hotkey
+            Km2FileHandle* km2Handle = keymagic_km2_load(utf8Path.data());
+            if (km2Handle) {
+                char* hotkeyStr = keymagic_km2_get_hotkey(km2Handle);
+                if (hotkeyStr && hotkeyStr[0] != '\0') {
+                    // Convert UTF-8 hotkey to wide string
+                    int wideLen = MultiByteToWideChar(CP_UTF8, 0, hotkeyStr, -1, nullptr, 0);
+                    if (wideLen > 0) {
+                        std::vector<WCHAR> wideHotkey(wideLen);
+                        MultiByteToWideChar(CP_UTF8, 0, hotkeyStr, -1, wideHotkey.data(), wideLen);
+                        info.hotkey = wideHotkey.data();
+                        OutputDebugStringW((L"RegistryMonitor: Got hotkey from KM2 file for keyboard " + keyboardId + L": " + info.hotkey + L"\n").c_str());
+                    }
+                }
+                if (hotkeyStr) keymagic_free_string(hotkeyStr);
+                keymagic_km2_free(km2Handle);
+            } else {
+                OutputDebugStringW((L"RegistryMonitor: Failed to load KM2 file: " + info.path + L"\n").c_str());
+            }
+        }
+    } else if (queryResult == ERROR_SUCCESS && hotkeyType == REG_SZ && hotkeyBuffer[0] == L'\0') {
+        // Empty string means user explicitly disabled hotkey
+        info.hotkey.clear();
+        OutputDebugStringW((L"RegistryMonitor: Hotkey explicitly disabled for keyboard " + keyboardId + L"\n").c_str());
+    }
+    
     readString(L"Description", info.description);
     readString(L"FontFamily", info.fontFamily);
     

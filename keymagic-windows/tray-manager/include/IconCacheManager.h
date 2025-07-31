@@ -26,13 +26,13 @@ public:
 
 private:
     // Extract icon from KM2 file using FFI
-    bool ExtractIcon(const std::wstring& km2Path, std::vector<BYTE>& pngData);
+    bool ExtractIcon(const std::wstring& km2Path, std::vector<BYTE>& iconData);
     
-    // Convert PNG data to HICON
-    HICON PngToIcon(const std::vector<BYTE>& pngData, int size);
+    // Convert image data (PNG, BMP, etc.) to HICON using GDI+
+    HICON ImageDataToIcon(const std::vector<BYTE>& imageData, int size);
     
-    // Save PNG to cache
-    bool SaveToCache(const std::wstring& keyboardId, int size, const std::vector<BYTE>& pngData);
+    // Save icon data to cache
+    bool SaveToCache(const std::wstring& keyboardId, int size, const std::vector<BYTE>& iconData);
     
     // Load icon from cache
     HICON LoadFromCache(const std::wstring& keyboardId, int size);
