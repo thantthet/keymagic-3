@@ -36,6 +36,10 @@ public:
     void Hide();
     bool IsVisible() const { return m_visible; }
     
+    // Scaling
+    void SetScale(float scale);
+    float GetScale() const { return m_scale; }
+    
     // Window procedure
     static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     
@@ -63,6 +67,9 @@ private:
     void AddKey(int row, int col, int colSpan, const std::wstring& label, 
                 const std::wstring& keyCode, bool isModifier = false);
     
+    // Layout offset for centering
+    int m_keyboardXOffset;
+    
     // Message handling
     LRESULT HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     
@@ -89,13 +96,17 @@ private:
     // KeyMagic engine handle for simulation
     void* m_engineHandle;  // EngineHandle from FFI
     
-    // Layout constants
-    static const int WINDOW_WIDTH = 800;
-    static const int WINDOW_HEIGHT = 320;
-    static const int KEY_SIZE = 48;
-    static const int KEY_GAP = 4;
-    static const int MARGIN = 20;
-    static const int TITLE_HEIGHT = 40;
+    // Layout constants (base values at scale 1.0)
+    static const int BASE_WINDOW_WIDTH = 800;
+    static const int BASE_WINDOW_HEIGHT = 320;
+    static const int BASE_KEY_SIZE = 48;
+    static const int BASE_KEY_GAP = 4;
+    static const int BASE_MARGIN = 20;
+    static const int BASE_TITLE_HEIGHT = 40;
+    
+    // Scaling
+    float m_scale;
+    int Scale(int value) const { return static_cast<int>(value * m_scale); }
     
     // Timer for auto-hide
     UINT_PTR m_hideTimer;

@@ -58,7 +58,9 @@ KeyboardPreviewWindow::KeyboardPreviewWindow()
     , m_visible(false)
     , m_gdiplusToken(0)
     , m_hideTimer(0)
-    , m_engineHandle(nullptr) {
+    , m_engineHandle(nullptr)
+    , m_scale(0.7f)  // Default to 0.7 scale for compact view
+    , m_keyboardXOffset(0) {
     s_instance = this;
 }
 
@@ -103,16 +105,16 @@ bool KeyboardPreviewWindow::Initialize(HINSTANCE hInstance) {
         return false;
     }
     
-    // Create fonts for rendering
+    // Create fonts for rendering with scaling
     // Use a font that supports complex scripts (e.g., Segoe UI, Arial Unicode MS, or Noto Sans)
-    m_fontNormal = std::make_unique<Gdiplus::Font>(L"Segoe UI", 14.0f, Gdiplus::FontStyleRegular);
-    m_fontSmall = std::make_unique<Gdiplus::Font>(L"Segoe UI", 10.0f, Gdiplus::FontStyleRegular);
-    m_fontLabel = std::make_unique<Gdiplus::Font>(L"Segoe UI", 9.0f, Gdiplus::FontStyleBold);
+    m_fontNormal = std::make_unique<Gdiplus::Font>(L"Segoe UI", 14.0f * m_scale, Gdiplus::FontStyleRegular);
+    m_fontSmall = std::make_unique<Gdiplus::Font>(L"Segoe UI", 10.0f * m_scale, Gdiplus::FontStyleRegular);
+    m_fontLabel = std::make_unique<Gdiplus::Font>(L"Segoe UI", 9.0f * m_scale, Gdiplus::FontStyleBold);
     
     // If Segoe UI doesn't support the script, try fallback fonts
     if (m_fontNormal->GetLastStatus() != Gdiplus::Ok) {
-        m_fontNormal = std::make_unique<Gdiplus::Font>(L"Arial Unicode MS", 14.0f, Gdiplus::FontStyleRegular);
-        m_fontSmall = std::make_unique<Gdiplus::Font>(L"Arial Unicode MS", 10.0f, Gdiplus::FontStyleRegular);
+        m_fontNormal = std::make_unique<Gdiplus::Font>(L"Arial Unicode MS", 14.0f * m_scale, Gdiplus::FontStyleRegular);
+        m_fontSmall = std::make_unique<Gdiplus::Font>(L"Arial Unicode MS", 10.0f * m_scale, Gdiplus::FontStyleRegular);
     }
     
     // Create KeyMagic engine for simulation
@@ -169,6 +171,24 @@ void KeyboardPreviewWindow::Hide() {
     }
 }
 
+void KeyboardPreviewWindow::SetScale(float scale) {
+    m_scale = scale;
+    
+    // Update window size if already created
+    if (m_hWnd) {
+        SetWindowPos(m_hWnd, nullptr, 0, 0, 
+                     Scale(BASE_WINDOW_WIDTH), Scale(BASE_WINDOW_HEIGHT), 
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        
+        // Recreate fonts with scaled sizes
+        m_fontNormal = std::make_unique<Gdiplus::Font>(L"Segoe UI", 14.0f * m_scale, Gdiplus::FontStyleRegular);
+        m_fontSmall = std::make_unique<Gdiplus::Font>(L"Segoe UI", 10.0f * m_scale, Gdiplus::FontStyleRegular);
+        m_fontLabel = std::make_unique<Gdiplus::Font>(L"Segoe UI", 9.0f * m_scale, Gdiplus::FontStyleBold);
+        
+        InvalidateRect(m_hWnd, nullptr, TRUE);
+    }
+}
+
 bool KeyboardPreviewWindow::RegisterWindowClass() {
     WNDCLASSEXW wcex = {};
     wcex.cbSize = sizeof(WNDCLASSEXW);
@@ -189,7 +209,7 @@ bool KeyboardPreviewWindow::CreatePreviewWindow() {
         WINDOW_CLASS_NAME,
         L"KeyMagic Preview",
         WS_POPUP,
-        0, 0, WINDOW_WIDTH, WINDOW_HEIGHT,
+        0, 0, Scale(BASE_WINDOW_WIDTH), Scale(BASE_WINDOW_HEIGHT),
         nullptr,
         nullptr,
         m_hInstance,
@@ -207,14 +227,14 @@ void KeyboardPreviewWindow::PositionWindow(const POINT& anchorPoint) {
     GetMonitorInfo(hMonitor, &mi);
     
     // Calculate position - try to show above the anchor point
-    int x = anchorPoint.x - WINDOW_WIDTH / 2;
-    int y = anchorPoint.y - WINDOW_HEIGHT - 10;
+    int x = anchorPoint.x - Scale(BASE_WINDOW_WIDTH) / 2;
+    int y = anchorPoint.y - Scale(BASE_WINDOW_HEIGHT) - 10;
     
     // Adjust if window goes off screen
     if (x < mi.rcWork.left) {
         x = mi.rcWork.left + 10;
-    } else if (x + WINDOW_WIDTH > mi.rcWork.right) {
-        x = mi.rcWork.right - WINDOW_WIDTH - 10;
+    } else if (x + Scale(BASE_WINDOW_WIDTH) > mi.rcWork.right) {
+        x = mi.rcWork.right - Scale(BASE_WINDOW_WIDTH) - 10;
     }
     
     if (y < mi.rcWork.top) {
@@ -451,6 +471,12 @@ void KeyboardPreviewWindow::InitializeDefaultLayout() {
 void KeyboardPreviewWindow::GenerateKeyboardLayout() {
     m_visualKeys.clear();
     
+    // Calculate total keyboard width (30 half-key units)
+    const int totalColumns = 30;
+    const int keyboardWidth = totalColumns * Scale(BASE_KEY_SIZE + BASE_KEY_GAP) / 2 - Scale(BASE_KEY_GAP);
+    const int windowInnerWidth = Scale(BASE_WINDOW_WIDTH) - 2 * Scale(BASE_MARGIN);
+    m_keyboardXOffset = (windowInnerWidth - keyboardWidth) / 2;  // Center the keyboard
+    
     // Define keyboard rows with their keys
     // Row 0: Number row
     AddKey(0, 0, 2, L"`", L"Backquote");
@@ -506,10 +532,10 @@ void KeyboardPreviewWindow::GenerateKeyboardLayout() {
 void KeyboardPreviewWindow::AddKey(int row, int col, int colSpan, const std::wstring& label, 
                                    const std::wstring& keyCode, bool isModifier) {
     VisualKey key;
-    key.x = MARGIN + col * (KEY_SIZE + KEY_GAP) / 2;
-    key.y = TITLE_HEIGHT + MARGIN + row * (KEY_SIZE + KEY_GAP);
-    key.width = (KEY_SIZE + KEY_GAP) * colSpan / 2 - KEY_GAP;
-    key.height = KEY_SIZE;
+    key.x = Scale(BASE_MARGIN) + m_keyboardXOffset + col * Scale(BASE_KEY_SIZE + BASE_KEY_GAP) / 2;
+    key.y = Scale(BASE_TITLE_HEIGHT + BASE_MARGIN) + row * Scale(BASE_KEY_SIZE + BASE_KEY_GAP);
+    key.width = Scale(BASE_KEY_SIZE + BASE_KEY_GAP) * colSpan / 2 - Scale(BASE_KEY_GAP);
+    key.height = Scale(BASE_KEY_SIZE);
     key.label = label;
     key.isModifier = isModifier;
     
@@ -611,20 +637,21 @@ void KeyboardPreviewWindow::OnPaint(HDC hdc) {
     
     // Clear background
     Gdiplus::SolidBrush backgroundBrush(Gdiplus::Color(245, 245, 245));
-    graphics.FillRectangle(&backgroundBrush, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    graphics.FillRectangle(&backgroundBrush, 0, 0, Scale(BASE_WINDOW_WIDTH), Scale(BASE_WINDOW_HEIGHT));
     
     // Draw border
-    Gdiplus::Pen borderPen(Gdiplus::Color(200, 200, 200), 1.0f);
-    graphics.DrawRectangle(&borderPen, 0, 0, WINDOW_WIDTH - 1, WINDOW_HEIGHT - 1);
+    Gdiplus::Pen borderPen(Gdiplus::Color(200, 200, 200), 1.0f * m_scale);
+    graphics.DrawRectangle(&borderPen, 0, 0, Scale(BASE_WINDOW_WIDTH) - 1, Scale(BASE_WINDOW_HEIGHT) - 1);
     
     // Draw title
     Gdiplus::SolidBrush titleBrush(Gdiplus::Color(51, 51, 51));
-    Gdiplus::Font titleFont(L"Segoe UI", 16.0f, Gdiplus::FontStyleBold);
+    Gdiplus::Font titleFont(L"Segoe UI", 16.0f * m_scale, Gdiplus::FontStyleBold);
     Gdiplus::StringFormat titleFormat;
     titleFormat.SetAlignment(Gdiplus::StringAlignmentCenter);
     titleFormat.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+    titleFormat.SetFormatFlags(Gdiplus::StringFormatFlagsNoClip);  // Allow text overflow
     
-    Gdiplus::RectF titleRect(0, 0, WINDOW_WIDTH, TITLE_HEIGHT);
+    Gdiplus::RectF titleRect(0, 0, Scale(BASE_WINDOW_WIDTH), Scale(BASE_TITLE_HEIGHT));
     graphics.DrawString(m_keyboardName.c_str(), -1, &titleFont, titleRect, &titleFormat, &titleBrush);
     
     // Draw keyboard
@@ -640,12 +667,12 @@ void KeyboardPreviewWindow::DrawKeyboard(Gdiplus::Graphics& graphics) {
 void KeyboardPreviewWindow::DrawKey(Gdiplus::Graphics& graphics, const VisualKey& key) {
     // Draw key background
     Gdiplus::SolidBrush keyBrush(key.isModifier ? Gdiplus::Color(220, 220, 220) : Gdiplus::Color(250, 250, 250));
-    Gdiplus::Pen keyPen(Gdiplus::Color(200, 200, 200), 1.0f);
+    Gdiplus::Pen keyPen(Gdiplus::Color(200, 200, 200), 1.0f * m_scale);
     
     Gdiplus::RectF keyRect(key.x, key.y, key.width, key.height);
     
     // Draw rounded rectangle for key
-    float radius = 4.0f;
+    float radius = 4.0f * m_scale;
     Gdiplus::GraphicsPath path;
     path.AddArc(keyRect.X, keyRect.Y, radius * 2, radius * 2, 180, 90);
     path.AddArc(keyRect.X + keyRect.Width - radius * 2, keyRect.Y, radius * 2, radius * 2, 270, 90);
@@ -662,30 +689,33 @@ void KeyboardPreviewWindow::DrawKey(Gdiplus::Graphics& graphics, const VisualKey
         Gdiplus::StringFormat format;
         format.SetAlignment(Gdiplus::StringAlignmentCenter);
         format.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+        format.SetFormatFlags(Gdiplus::StringFormatFlagsNoClip);  // Allow text overflow
         
         Gdiplus::SolidBrush textBrush(Gdiplus::Color(100, 100, 100));
-        DrawTextWithComplexScript(graphics, key.label, keyRect, format, textBrush, 9.0f);
+        DrawTextWithComplexScript(graphics, key.label, keyRect, format, textBrush, 9.0f * m_scale);
     } else {
         // Draw shifted character (top-left)
         if (!key.shifted.empty() && key.shifted != key.unshifted) {
-            Gdiplus::RectF shiftedRect(key.x + 4, key.y + 3, key.width - 8, key.height / 3);
+            Gdiplus::RectF shiftedRect(key.x + Scale(4), key.y + Scale(3), key.width - Scale(8), key.height / 3);
             Gdiplus::StringFormat shiftedFormat;
             shiftedFormat.SetAlignment(Gdiplus::StringAlignmentNear);
             shiftedFormat.SetLineAlignment(Gdiplus::StringAlignmentNear);
+            shiftedFormat.SetFormatFlags(Gdiplus::StringFormatFlagsNoClip);  // Allow text overflow
             
             Gdiplus::SolidBrush shiftedBrush(Gdiplus::Color(120, 120, 120));
-            DrawTextWithComplexScript(graphics, key.shifted, shiftedRect, shiftedFormat, shiftedBrush, 10.0f);
+            DrawTextWithComplexScript(graphics, key.shifted, shiftedRect, shiftedFormat, shiftedBrush, 10.0f * m_scale);
         }
         
         // Draw unshifted character (bottom-right)
         if (!key.unshifted.empty()) {
-            Gdiplus::RectF unshiftedRect(key.x + key.width / 3, key.y + key.height / 2, key.width * 2 / 3 - 4, key.height / 2 - 4);
+            Gdiplus::RectF unshiftedRect(key.x + key.width / 3, key.y + key.height / 2, key.width * 2 / 3 - Scale(4), key.height / 2 - Scale(4));
             Gdiplus::StringFormat unshiftedFormat;
             unshiftedFormat.SetAlignment(Gdiplus::StringAlignmentFar);
             unshiftedFormat.SetLineAlignment(Gdiplus::StringAlignmentFar);
+            unshiftedFormat.SetFormatFlags(Gdiplus::StringFormatFlagsNoClip);  // Allow text overflow
             
             Gdiplus::SolidBrush unshiftedBrush(Gdiplus::Color(34, 34, 34));
-            DrawTextWithComplexScript(graphics, key.unshifted, unshiftedRect, unshiftedFormat, unshiftedBrush, 16.0f);
+            DrawTextWithComplexScript(graphics, key.unshifted, unshiftedRect, unshiftedFormat, unshiftedBrush, 16.0f * m_scale);
         }
     }
 }
