@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 use winreg::enums::*;
 use winreg::RegKey;
+use keymagic_core::hotkey::HotkeyBinding;
 
 use windows::Win32::System::Registry::{
     RegQueryValueExW, RegSetValueExW, REG_MULTI_SZ, REG_VALUE_TYPE,
@@ -630,5 +631,38 @@ impl Platform for WindowsBackend {
         settings_key.set_value("EnabledLanguages", &languages_str)?;
         
         Ok(())
+    }
+    
+    fn normalize_hotkey_for_display(&self, hotkey: &str) -> String {
+        if hotkey.is_empty() {
+            return String::new();
+        }
+        
+        // Try to parse the hotkey
+        match HotkeyBinding::parse(hotkey) {
+            Ok(binding) => {
+                let mut parts = Vec::new();
+                
+                // Add modifiers in Windows order: Ctrl, Alt, Shift
+                if binding.ctrl {
+                    parts.push("Ctrl");
+                }
+                if binding.alt {
+                    parts.push("Alt");
+                }
+                if binding.shift {
+                    parts.push("Shift");
+                }
+                
+                // Add the main key using the display string method
+                parts.push(binding.key.to_display_string());
+                
+                parts.join("+")
+            }
+            Err(_) => {
+                // If parsing fails, return the original
+                hotkey.to_string()
+            }
+        }
     }
 }

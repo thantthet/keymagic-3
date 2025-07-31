@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use plist;
 use std::fs;
 use std::path::PathBuf;
+use keymagic_core::hotkey::HotkeyBinding;
 
 pub struct MacOSBackend {
     config_dir: PathBuf,
@@ -195,4 +196,40 @@ impl Platform for MacOSBackend {
         None
     }
     
+    fn normalize_hotkey_for_display(&self, hotkey: &str) -> String {
+        if hotkey.is_empty() {
+            return String::new();
+        }
+        
+        // Try to parse the hotkey
+        match HotkeyBinding::parse(hotkey) {
+            Ok(binding) => {
+                let mut parts = Vec::new();
+                
+                // Add modifiers in macOS order: Cmd, Ctrl, Opt, Shift
+                if binding.meta {
+                    parts.push("⌘");  // Command symbol
+                }
+                if binding.ctrl {
+                    parts.push("⌃");  // Control symbol
+                }
+                if binding.alt {
+                    parts.push("⌥");  // Option symbol
+                }
+                if binding.shift {
+                    parts.push("⇧");  // Shift symbol
+                }
+                
+                // Add the main key using the display string method
+                parts.push(binding.key.to_display_string());
+                
+                // No separator for macOS style
+                parts.join("")
+            }
+            Err(_) => {
+                // If parsing fails, return the original
+                hotkey.to_string()
+            }
+        }
+    }
 }

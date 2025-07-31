@@ -5,6 +5,7 @@ use super::{
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
+use keymagic_core::hotkey::HotkeyBinding;
 
 pub struct LinuxBackend {
     config_dir: PathBuf,
@@ -172,4 +173,39 @@ impl Platform for LinuxBackend {
         None
     }
     
+    fn normalize_hotkey_for_display(&self, hotkey: &str) -> String {
+        if hotkey.is_empty() {
+            return String::new();
+        }
+        
+        // Try to parse the hotkey
+        match HotkeyBinding::parse(hotkey) {
+            Ok(binding) => {
+                let mut parts = Vec::new();
+                
+                // Add modifiers in Linux order: Super, Ctrl, Alt, Shift
+                if binding.meta {
+                    parts.push("Super");  // Super/Windows key
+                }
+                if binding.ctrl {
+                    parts.push("Ctrl");
+                }
+                if binding.alt {
+                    parts.push("Alt");
+                }
+                if binding.shift {
+                    parts.push("Shift");
+                }
+                
+                // Add the main key using the display string method
+                parts.push(binding.key.to_display_string());
+                
+                parts.join("+")
+            }
+            Err(_) => {
+                // If parsing fails, return the original
+                hotkey.to_string()
+            }
+        }
+    }
 }

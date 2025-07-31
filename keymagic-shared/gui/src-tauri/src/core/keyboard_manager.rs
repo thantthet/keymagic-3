@@ -53,6 +53,10 @@ pub struct KeyboardInfo {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", with = "base64_serde")]
     pub icon_data: Option<Vec<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_hotkey: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_display_hotkey: Option<String>,
 }
 
 pub struct KeyboardManager {
@@ -126,6 +130,12 @@ impl KeyboardManager {
                     (None, None, None)
                 };
                 
+                // Normalize hotkeys for display
+                let display_hotkey = installed.hotkey.as_ref()
+                    .map(|h| self.platform.normalize_hotkey_for_display(h));
+                let default_display_hotkey = default_hotkey.as_ref()
+                    .map(|h| self.platform.normalize_hotkey_for_display(h));
+                
                 keyboards.insert(
                     installed.id.clone(),
                     KeyboardInfo {
@@ -139,6 +149,8 @@ impl KeyboardManager {
                         is_active: false,
                         description,
                         icon_data,
+                        display_hotkey,
+                        default_display_hotkey,
                     },
                 );
             }
@@ -176,6 +188,10 @@ impl KeyboardManager {
                 let default_hotkey = metadata.hotkey();
                 let hash = self.calculate_file_hash(&path)?;
                 
+                // Normalize default hotkey for display
+                let default_display_hotkey = default_hotkey.as_ref()
+                    .map(|h| self.platform.normalize_hotkey_for_display(h));
+                
                 found_keyboards.push(KeyboardInfo {
                     id,
                     name,
@@ -187,6 +203,8 @@ impl KeyboardManager {
                     is_active: false,
                     description,
                     icon_data,
+                    display_hotkey: None,  // No custom hotkey initially
+                    default_display_hotkey,
                 });
             }
         }
@@ -282,7 +300,10 @@ impl KeyboardManager {
     pub fn update_hotkey(&self, keyboard_id: &str, hotkey: Option<String>) -> Result<()> {
         let mut keyboards = self.keyboards.lock().unwrap();
         if let Some(keyboard) = keyboards.get_mut(keyboard_id) {
-            keyboard.hotkey = hotkey;
+            // Update hotkey and its normalized display version
+            keyboard.hotkey = hotkey.clone();
+            keyboard.display_hotkey = hotkey.as_ref()
+                .map(|h| self.platform.normalize_hotkey_for_display(h));
         }
         drop(keyboards);
         
@@ -355,6 +376,10 @@ impl KeyboardManager {
             fs::copy(file_path, &dest_path)?;
         }
         
+        // Normalize default hotkey for display
+        let default_display_hotkey = default_hotkey.as_ref()
+            .map(|h| self.platform.normalize_hotkey_for_display(h));
+        
         let keyboard_info = KeyboardInfo {
             id: final_id.clone(),
             name,
@@ -366,6 +391,8 @@ impl KeyboardManager {
             is_active: false,
             description,
             icon_data,
+            display_hotkey: None,  // No custom hotkey initially
+            default_display_hotkey,
         };
         
         // Add to manager

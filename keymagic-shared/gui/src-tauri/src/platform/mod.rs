@@ -122,6 +122,12 @@ pub trait Platform: Send + Sync {
     fn get_bundled_keyboards_path(&self) -> Option<PathBuf> {
         None // Default: no bundled keyboards
     }
+    
+    // Hotkey display normalization
+    fn normalize_hotkey_for_display(&self, hotkey: &str) -> String {
+        // Default implementation - can be overridden by platforms
+        hotkey.to_string()
+    }
 }
 
 pub fn create_platform() -> Result<Box<dyn Platform>> {
