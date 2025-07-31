@@ -114,7 +114,20 @@ void RegistryMonitor::Stop() {
 
 std::vector<KeyboardInfo> RegistryMonitor::GetKeyboards() {
     // Use shared utility function
-    return RegistryUtils::GetInstalledKeyboards();
+    std::vector<KeyboardInfo> keyboards = RegistryUtils::GetInstalledKeyboards();
+    
+    // For each keyboard, if hotkey is empty, try to load from KM2 file
+    for (auto& keyboard : keyboards) {
+        if (keyboard.hotkey.empty() && !keyboard.path.empty()) {
+            std::wstring km2Hotkey = KeyMagicUtils::LoadHotkeyFromKm2(keyboard.path);
+            if (!km2Hotkey.empty()) {
+                keyboard.hotkey = km2Hotkey;
+                OutputDebugStringW((L"RegistryMonitor: Got hotkey from KM2 file for keyboard " + keyboard.id + L": " + keyboard.hotkey + L"\n").c_str());
+            }
+        }
+    }
+    
+    return keyboards;
 }
 
 std::wstring RegistryMonitor::GetDefaultKeyboard() {
