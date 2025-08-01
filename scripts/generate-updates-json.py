@@ -78,17 +78,11 @@ def normalize_arch(arch):
     }
     return arch_map.get(arch.lower(), arch)
 
-def download_sha256(url):
-    """Download SHA256 checksum file and extract hash."""
-    sha256_url = url + ".sha256"
-    try:
-        response = requests.get(sha256_url)
-        response.raise_for_status()
-        # SHA256 files typically contain: hash  filename
-        sha256_hash = response.text.strip().split()[0]
-        return sha256_hash
-    except:
-        return None
+def extract_sha256_from_digest(digest_string):
+    """Extract SHA256 hash from GitHub asset digest field."""
+    if digest_string and digest_string.startswith('sha256:'):
+        return digest_string.replace('sha256:', '')
+    return None
 
 def generate_updates_json():
     """Generate updates.json from GitHub release information."""
@@ -118,6 +112,7 @@ def generate_updates_json():
         filename = asset['name']
         download_url = asset['browser_download_url']
         file_size = asset['size']
+        digest = asset.get('digest', '')
         
         # Determine platform and parse info
         platform = None
@@ -139,13 +134,13 @@ def generate_updates_json():
         
         print(f"Processing: {filename} ({platform}/{arch})")
         
-        # Try to download SHA256
-        sha256 = download_sha256(download_url)
-        if not sha256:
-            print(f"  Warning: Could not fetch SHA256 for {filename}")
-            sha256 = ""
-        else:
+        # Extract SHA256 from digest field
+        sha256 = extract_sha256_from_digest(digest)
+        if sha256:
             print(f"  SHA256: {sha256[:16]}...")
+        else:
+            print(f"  Warning: No SHA256 digest for {filename}")
+            sha256 = ""
         
         # Set minimum system version based on platform
         min_version = ""
