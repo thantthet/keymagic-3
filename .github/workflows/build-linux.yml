@@ -109,7 +109,11 @@ jobs:
               echo "${{ secrets.GPG_PASSPHRASE }}" | \
                 dpkg-sig --sign builder -k "${{ secrets.GPG_KEY_ID }}" \
                 --gpg-options "--batch --yes --pinentry-mode loopback --passphrase-fd 0" \
-                "$deb_file"
+                "$deb_file" 2>&1
+              
+              # Verify the signature was applied
+              echo "Verifying signature on $deb_file..."
+              dpkg-sig --verify "$deb_file" || true
             fi
           done
         env:
