@@ -12,7 +12,11 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Self {
         let mut lexer = Lexer::new(input);
-        let current = lexer.next_token().unwrap_or(None);
+        // Don't silently ignore lexer errors - we'll handle them in parse()
+        let current = match lexer.next_token() {
+            Ok(token) => token,
+            Err(_) => None, // We'll check for errors properly in parse()
+        };
         let peek = lexer.peek();
         
         Self {
@@ -23,6 +27,16 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Result<KmsFile, KmsError> {
+        // Check if we had an error getting the first token
+        // This happens when Parser::new encountered a lexer error
+        if self.current.is_none() && !self.lexer.input.is_empty() {
+            // Try to get the actual error by attempting to read the first token again
+            let mut temp_lexer = Lexer::new(self.lexer.input);
+            if let Err(e) = temp_lexer.next_token() {
+                return Err(e);
+            }
+        }
+        
         let mut ast = KmsFile::new();
         
         // First pass: collect options from the raw input
