@@ -55,13 +55,29 @@ fn test_auto_backspace_enabled() {
     assert_eq!(output_k.action, ActionType::Insert("k".to_string()));
     assert!(output_k.is_processed);
     
-    // Press backspace - no rule matches, auto_bksp should delete 'k'
+    // Type 'a' - matches "ka" => "က"
+    let input_a = key_input_vk_char(VirtualKey::KeyA, 'a');
+    
+    let output_a = engine.process_key(input_a).unwrap();
+    assert_eq!(output_a.composing_text, "က");
+    assert_eq!(output_a.action, ActionType::BackspaceDeleteAndInsert(1, "က".to_string()));
+    assert!(output_a.is_processed);
+    
+    // Press backspace - auto_bksp should act like undo, restoring to "k"
     let input_backspace = key_input_from_vk(VirtualKey::Back);
     
     let output_backspace = engine.process_key(input_backspace).unwrap();
-    assert_eq!(output_backspace.composing_text, "", "Should have backspaced the 'k'");
-    assert_eq!(output_backspace.action, ActionType::BackspaceDelete(1), "Should delete 1 character");
+    assert_eq!(output_backspace.composing_text, "k", "Should restore to previous state 'k'");
+    assert_eq!(output_backspace.action, ActionType::BackspaceDeleteAndInsert(1, "k".to_string()), "Should replace 'က' with 'k'");
     assert!(output_backspace.is_processed);
+    
+    // Press backspace again - should restore to empty state
+    let input_backspace2 = key_input_from_vk(VirtualKey::Back);
+    
+    let output_backspace2 = engine.process_key(input_backspace2).unwrap();
+    assert_eq!(output_backspace2.composing_text, "", "Should restore to empty state");
+    assert_eq!(output_backspace2.action, ActionType::BackspaceDelete(1), "Should delete 'k'");
+    assert!(output_backspace2.is_processed);
 }
 
 #[test]
@@ -78,13 +94,21 @@ fn test_auto_backspace_disabled() {
     assert_eq!(output_k.action, ActionType::Insert("k".to_string()));
     assert!(output_k.is_processed);
     
-    // Press backspace - no rule matches, auto_bksp disabled, should NOT delete
+    // Type 'a' - matches "ka" => "က"
+    let input_a = key_input_vk_char(VirtualKey::KeyA, 'a');
+    
+    let output_a = engine.process_key(input_a).unwrap();
+    assert_eq!(output_a.composing_text, "က");
+    assert_eq!(output_a.action, ActionType::BackspaceDeleteAndInsert(1, "က".to_string()));
+    assert!(output_a.is_processed);
+    
+    // Press backspace - auto_bksp disabled, should simply delete last character
     let input_backspace = key_input_from_vk(VirtualKey::Back);
     
     let output_backspace = engine.process_key(input_backspace).unwrap();
-    assert_eq!(output_backspace.composing_text, "k", "Should keep 'k' as backspace has no character");
-    assert_eq!(output_backspace.action, ActionType::None);
-    assert!(!output_backspace.is_processed, "Backspace without auto_bksp should not be processed");
+    assert_eq!(output_backspace.composing_text, "", "Should delete last character, leaving empty");
+    assert_eq!(output_backspace.action, ActionType::BackspaceDelete(1), "Should delete 1 character");
+    assert!(output_backspace.is_processed, "Backspace should be processed when buffer is not empty");
 }
 
 #[test]
@@ -141,4 +165,53 @@ fn test_auto_backspace_with_normal_character() {
     assert_eq!(output_x.composing_text, "kx", "Should append 'x' normally");
     assert_eq!(output_x.action, ActionType::Insert("x".to_string()));
     assert!(output_x.is_processed, "Character input should be processed");
+}
+
+#[test]
+fn test_auto_backspace_disabled_simple_delete() {
+    let keyboard = create_test_keyboard_without_auto_bksp();
+    let binary = create_km2_binary(&keyboard).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
+    
+    // Type "test" - no rules match, just appending
+    for ch in "test".chars() {
+        let input = key_input_from_char(ch);
+        engine.process_key(input).unwrap();
+    }
+    assert_eq!(engine.composing_text(), "test");
+    
+    // Press backspace - should delete 't'
+    let input_backspace = key_input_from_vk(VirtualKey::Back);
+    let output = engine.process_key(input_backspace).unwrap();
+    assert_eq!(output.composing_text, "tes", "Should delete last character");
+    assert_eq!(output.action, ActionType::BackspaceDelete(1));
+    assert!(output.is_processed);
+    
+    // Press backspace again - should delete 's'
+    let input_backspace2 = key_input_from_vk(VirtualKey::Back);
+    let output2 = engine.process_key(input_backspace2).unwrap();
+    assert_eq!(output2.composing_text, "te", "Should delete last character");
+    assert_eq!(output2.action, ActionType::BackspaceDelete(1));
+    assert!(output2.is_processed);
+}
+
+#[test]
+fn test_auto_backspace_enabled_without_history() {
+    let keyboard = create_test_keyboard_with_auto_bksp();
+    let binary = create_km2_binary(&keyboard).unwrap();
+    let mut engine = create_engine_from_binary(&binary).unwrap();
+    
+    // Type "test" - no rules match, just appending
+    for ch in "test".chars() {
+        let input = key_input_from_char(ch);
+        engine.process_key(input).unwrap();
+    }
+    assert_eq!(engine.composing_text(), "test");
+    
+    // Press backspace - no history to restore, should delete 't'
+    let input_backspace = key_input_from_vk(VirtualKey::Back);
+    let output = engine.process_key(input_backspace).unwrap();
+    assert_eq!(output.composing_text, "tes", "Should delete last character when no history");
+    assert_eq!(output.action, ActionType::BackspaceDelete(1));
+    assert!(output.is_processed);
 }

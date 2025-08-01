@@ -49,11 +49,20 @@ fn test_backspace_without_auto_bksp() {
     process_char(&mut engine, 'c').unwrap();
     assert_eq!(get_composing_text(&engine), "abc");
     
-    // Backspace with auto_bksp disabled should not be processed
+    // Backspace with auto_bksp disabled should simply delete last character
     let backspace_input = key_input_from_vk(VirtualKey::Back);
-    let output = process_key(&mut engine, backspace_input).unwrap();
-    assert_eq!(get_composing_text(&engine), "abc"); // Text should remain unchanged
-    assert!(!output.is_processed); // Backspace should not be processed
+    let output = process_key(&mut engine, backspace_input.clone()).unwrap();
+    assert_eq!(get_composing_text(&engine), "ab"); // Should delete 'c'
+    assert!(output.is_processed); // Backspace should be processed
+    
+    // Another backspace
+    let output2 = process_key(&mut engine, backspace_input.clone()).unwrap();
+    assert_eq!(get_composing_text(&engine), "a"); // Should delete 'b'
+    assert!(output2.is_processed);
+    
+    // Type new character - no history, so can't undo
+    process_char(&mut engine, 'x').unwrap();
+    assert_eq!(get_composing_text(&engine), "ax");
 }
 
 #[test]
