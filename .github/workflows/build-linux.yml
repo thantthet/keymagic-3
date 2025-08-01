@@ -90,6 +90,18 @@ jobs:
           echo "Package sizes:"
           du -h keymagic-ibus/dist/*
       
+      - name: Debug secrets and environment
+        if: inputs.sign
+        run: |
+          echo "=== Debug Information ==="
+          echo "GPG_KEY_ID is set: ${{ secrets.GPG_KEY_ID != '' }}"
+          echo "GPG_PASSPHRASE is set: ${{ secrets.GPG_PASSPHRASE != '' }}"
+          echo "GPG_PRIVATE_KEY is set: ${{ secrets.GPG_PRIVATE_KEY != '' }}"
+          echo "Current tty: $(tty || echo 'No TTY available')"
+          echo "Workflow trigger: ${{ github.event_name }}"
+          echo "Workflow ref: ${{ github.ref }}"
+          echo "=== End Debug ==="
+      
       - name: Import GPG key
         if: inputs.sign
         run: |
@@ -102,6 +114,16 @@ jobs:
       - name: Sign Debian packages
         if: inputs.sign
         run: |
+          # Debug GPG environment
+          echo "=== GPG Signing Debug ==="
+          echo "GPG version:"
+          gpg --version | head -n 1
+          echo "GPG keys available:"
+          gpg --list-secret-keys || echo "No secret keys found"
+          echo "Key ID being used: ${{ secrets.GPG_KEY_ID }}"
+          echo "Passphrase is set: ${{ secrets.GPG_PASSPHRASE != '' }}"
+          echo "=== End GPG Debug ==="
+          
           # Sign all .deb files with dpkg-sig (embedded signature)
           for deb_file in keymagic-ibus/dist/*.deb; do
             if [ -f "$deb_file" ]; then
