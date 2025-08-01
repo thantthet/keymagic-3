@@ -108,8 +108,6 @@ jobs:
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
           # Verify the key was imported
           gpg --list-secret-keys
-        env:
-          GPG_TTY: $(tty)
       
       - name: Sign Debian packages
         if: inputs.sign
@@ -138,8 +136,6 @@ jobs:
               dpkg-sig --verify "$deb_file" || true
             fi
           done
-        env:
-          GPG_TTY: $(tty)
       
       - name: Sign RPM packages
         if: inputs.sign
@@ -160,8 +156,6 @@ jobs:
                 rpmsign --addsign "$rpm_file"
             fi
           done
-        env:
-          GPG_TTY: $(tty)
       
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
