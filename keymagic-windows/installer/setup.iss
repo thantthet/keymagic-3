@@ -72,8 +72,8 @@ Source: "..\..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: igno
 ; Keyboard icon for TSF language profile (install to LOCALAPPDATA)
 Source: "..\..\resources\icons\keymagic-keyboard.ico"; DestDir: "{localappdata}\KeyMagic"; Flags: ignoreversion
 
-; Production keyboards (included with installer)
-Source: "keyboards\*.km2"; DestDir: "{app}\keyboards"; Flags: ignoreversion skipifsourcedoesntexist
+; Production keyboards (included with installer) from centralized location
+Source: "..\..\keyboards\bundled\*.km2"; DestDir: "{app}\keyboards"; Flags: ignoreversion
 
 ; License and documentation
 Source: "..\..\LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion

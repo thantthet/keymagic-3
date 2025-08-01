@@ -55,6 +55,18 @@ mkdir -p "$DMG_DIR/dmg"
 print_status "Copying app bundle..."
 cp -R "$BUILD_DIR/$APP_NAME" "$DMG_DIR/dmg/"
 
+# Copy bundled keyboards to app resources
+print_status "Copying bundled keyboards..."
+KEYBOARDS_DIR="$DMG_DIR/dmg/$APP_NAME/Contents/Resources/keyboards"
+mkdir -p "$KEYBOARDS_DIR"
+if [ -d "$PROJECT_ROOT/keyboards/bundled" ]; then
+    cp "$PROJECT_ROOT/keyboards/bundled"/*.km2 "$KEYBOARDS_DIR/" 2>/dev/null || true
+    KEYBOARD_COUNT=$(find "$KEYBOARDS_DIR" -name "*.km2" | wc -l)
+    print_status "Copied $KEYBOARD_COUNT keyboard files"
+else
+    print_warning "No bundled keyboards directory found"
+fi
+
 # Update app bundle version to match
 print_status "Updating app bundle version..."
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \

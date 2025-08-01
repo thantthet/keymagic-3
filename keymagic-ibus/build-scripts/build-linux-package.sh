@@ -184,15 +184,17 @@ create_package_structure() {
         cp "$PROJECT_ROOT/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" "$pkg_dir/usr/share/keymagic3/"
     fi
     
-    # Copy bundled keyboard files
-    if [ -d "$PROJECT_ROOT/keymagic-ibus/data/keyboards" ]; then
+    # Copy bundled keyboard files from centralized location
+    if [ -d "$PROJECT_ROOT/keyboards/bundled" ]; then
         echo "Copying bundled keyboard files..."
-        for km2_file in "$PROJECT_ROOT/keymagic-ibus/data/keyboards"/*.km2; do
+        for km2_file in "$PROJECT_ROOT/keyboards/bundled"/*.km2; do
             if [ -f "$km2_file" ]; then
                 cp "$km2_file" "$pkg_dir/usr/share/keymagic3/keyboards/"
                 echo "  - $(basename "$km2_file")"
             fi
         done
+    else
+        echo "Warning: No bundled keyboards directory found at $PROJECT_ROOT/keyboards/bundled"
     fi
 }
 

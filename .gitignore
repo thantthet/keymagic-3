@@ -17,6 +17,7 @@
 # Test outputs
 *.km2
 !kms2km2/tests/fixtures/*.km2
+!keyboards/**/*.km2
 
 # Python cache
 __pycache__/
