@@ -126,10 +126,15 @@ jobs:
           for deb_file in keymagic-ibus/dist/*.deb; do
             if [ -f "$deb_file" ]; then
               echo "Signing $deb_file..."
-              echo "${{ secrets.GPG_PASSPHRASE }}" | \
-                dpkg-sig --sign builder -k "${{ secrets.GPG_KEY_ID }}" \
-                --gpg-options "--batch --yes --pinentry-mode loopback --passphrase-fd 0" \
+              # Create a temporary passphrase file
+              echo "${{ secrets.GPG_PASSPHRASE }}" > /tmp/passphrase.txt
+              
+              dpkg-sig --sign builder -k "${{ secrets.GPG_KEY_ID }}" \
+                --gpg-options "--batch --yes --pinentry-mode loopback --passphrase-file /tmp/passphrase.txt" \
                 "$deb_file" 2>&1
+              
+              # Clean up passphrase file
+              rm -f /tmp/passphrase.txt
               
               # Verify the signature was applied
               echo "Verifying signature on $deb_file..."
