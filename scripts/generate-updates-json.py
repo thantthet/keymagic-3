@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate updates.json from installer files in the output directory.
-This script reads installer files and creates the updates.json file with
+Generate updates.json from the latest GitHub release.
+This script fetches release information from GitHub and creates the updates.json file with
 proper version information, file sizes, and SHA256 hashes.
 """
 
@@ -9,165 +9,288 @@ import json
 import os
 import hashlib
 import re
+import requests
 from datetime import datetime, timezone
 from pathlib import Path
 
 # Configuration
-INSTALLER_DIR = Path(__file__).parent.parent / "keymagic-windows" / "installer" / "output"
 OUTPUT_FILE = Path(__file__).parent.parent / "updates.json"
 GITHUB_REPO = "thantthet/keymagic-3"
+GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 # Pattern to extract version and architecture from filename
-# Expected format: KeyMagic3-Setup-{version}-{arch}.exe
-FILENAME_PATTERN = re.compile(r"KeyMagic3-Setup-(\d+\.\d+\.\d+(?:-\w+)?)-(\w+)\.exe")
+# Expected formats:
+# - Windows: KeyMagic3-Setup-{version}.exe or KeyMagic3-Setup-{version}-{arch}.exe
+# - macOS: KeyMagic3-{version}.dmg or KeyMagic3-{version}-{arch}.dmg  
+# - Linux: keymagic3_{version}_{arch}.deb
+# - Linux RPM: keymagic3-{version}-1.{arch}.rpm
+WINDOWS_PATTERN = re.compile(r"KeyMagic3-Setup-(\d+\.\d+\.\d+(?:-\w+)?)(?:-(\w+))?\.exe")
+MACOS_PATTERN = re.compile(r"KeyMagic3-(\d+\.\d+\.\d+(?:-\w+)?)(?:-(\w+))?\.dmg")
+LINUX_DEB_PATTERN = re.compile(r"keymagic3_(\d+\.\d+\.\d+(?:-\w+)?)_(\w+)\.deb")
+LINUX_RPM_PATTERN = re.compile(r"keymagic3-(\d+\.\d+\.\d+(?:-\w+)?)-\d+\.(\w+)\.rpm")
 
-def calculate_sha256(filepath):
-    """Calculate SHA256 hash of a file."""
-    sha256_hash = hashlib.sha256()
-    with open(filepath, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+def fetch_github_release():
+    """Fetch the latest release information from GitHub."""
+    try:
+        response = requests.get(GITHUB_API_URL)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching GitHub release: {e}")
+        return None
 
-def get_file_size(filepath):
-    """Get file size in bytes."""
-    return os.path.getsize(filepath)
-
-def parse_installer_filename(filename):
-    """Extract version and architecture from installer filename."""
-    match = FILENAME_PATTERN.match(filename)
-    if not match:
-        return None, None
-    return match.group(1), match.group(2)
+def parse_asset_info(asset, platform):
+    """Parse asset information based on platform."""
+    filename = asset['name']
+    
+    if platform == 'windows':
+        match = WINDOWS_PATTERN.match(filename)
+        if match:
+            # Default to universal for Windows if no arch specified
+            return match.group(1), match.group(2) or 'universal'
+    elif platform == 'macos':
+        match = MACOS_PATTERN.match(filename)
+        if match:
+            # Default to universal binary if no arch specified
+            return match.group(1), match.group(2) or 'universal'
+    elif platform == 'linux':
+        # Try DEB pattern first
+        match = LINUX_DEB_PATTERN.match(filename)
+        if match:
+            return match.group(1), match.group(2)
+        # Try RPM pattern
+        match = LINUX_RPM_PATTERN.match(filename)
+        if match:
+            return match.group(1), match.group(2)
+    
+    return None, None
 
 def normalize_arch(arch):
     """Normalize architecture names to match our JSON schema."""
     arch_map = {
         "x64": "x86_64",
+        "amd64": "x86_64",
+        "x86_64": "x86_64",
         "arm64": "aarch64",
+        "aarch64": "aarch64",
         "x86": "x86",
+        "universal": "universal",  # macOS universal binary
     }
     return arch_map.get(arch.lower(), arch)
 
+def download_sha256(url):
+    """Download SHA256 checksum file and extract hash."""
+    sha256_url = url + ".sha256"
+    try:
+        response = requests.get(sha256_url)
+        response.raise_for_status()
+        # SHA256 files typically contain: hash  filename
+        sha256_hash = response.text.strip().split()[0]
+        return sha256_hash
+    except:
+        return None
+
 def generate_updates_json():
-    """Generate updates.json from installer files."""
+    """Generate updates.json from GitHub release information."""
     
-    if not INSTALLER_DIR.exists():
-        print(f"Error: Installer directory not found: {INSTALLER_DIR}")
+    print("Fetching latest release from GitHub...")
+    release = fetch_github_release()
+    
+    if not release:
+        print("Error: Could not fetch release information from GitHub")
         return False
     
-    # Find all installer files
-    installers = list(INSTALLER_DIR.glob("KeyMagic3-Setup-*.exe"))
+    version = release['tag_name'].lstrip('v')
+    release_date = release['published_at']
+    release_body = release.get('body', '')
     
-    if not installers:
-        print(f"No installer files found in {INSTALLER_DIR}")
-        return False
+    print(f"Found release: v{version}")
     
-    # Group installers by version
-    versions = {}
+    # Initialize platform data structure
+    platforms = {
+        "windows": {},
+        "macos": {},
+        "linux": {}
+    }
     
-    for installer in installers:
-        version, arch = parse_installer_filename(installer.name)
-        if not version or not arch:
-            print(f"Warning: Could not parse filename: {installer.name}")
+    # Process each asset
+    for asset in release['assets']:
+        filename = asset['name']
+        download_url = asset['browser_download_url']
+        file_size = asset['size']
+        
+        # Determine platform and parse info
+        platform = None
+        if filename.endswith('.exe'):
+            platform = 'windows'
+        elif filename.endswith('.dmg'):
+            platform = 'macos'
+        elif filename.endswith('.deb') or filename.endswith('.rpm'):
+            platform = 'linux'
+        else:
+            continue
+        
+        asset_version, arch = parse_asset_info(asset, platform)
+        if not asset_version or not arch:
+            print(f"Warning: Could not parse asset: {filename}")
             continue
         
         arch = normalize_arch(arch)
         
-        if version not in versions:
-            versions[version] = {}
+        print(f"Processing: {filename} ({platform}/{arch})")
         
-        print(f"Processing: {installer.name}")
+        # Try to download SHA256
+        sha256 = download_sha256(download_url)
+        if not sha256:
+            print(f"  Warning: Could not fetch SHA256 for {filename}")
+            sha256 = ""
+        else:
+            print(f"  SHA256: {sha256[:16]}...")
         
-        # Calculate file info
-        file_size = get_file_size(installer)
-        sha256 = calculate_sha256(installer)
+        # Set minimum system version based on platform
+        min_version = ""
+        if platform == 'windows':
+            min_version = "10.0.17763"  # Windows 10 1809
+        elif platform == 'macos':
+            min_version = "11.0" if arch == "aarch64" else "10.15"
         
-        versions[version][arch] = {
-            "version": version,
-            "releaseDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "minimumSystemVersion": "10.0.17763",  # Windows 10 1809
-            "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/{installer.name}",
-            "signature": "",  # TODO: Add signature support
-            "size": file_size,
-            "sha256": sha256
-        }
-    
-    if not versions:
-        print("Error: No valid installer files found")
-        return False
-    
-    # Get the latest version
-    latest_version = sorted(versions.keys(), key=lambda v: [int(x) for x in v.split('-')[0].split('.')])[-1]
+        # For universal binaries, populate both architectures
+        if arch == 'universal':
+            if platform == 'macos':
+                for mac_arch in ['x86_64', 'aarch64']:
+                    platforms[platform][mac_arch] = {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "11.0" if mac_arch == "aarch64" else "10.15",
+                        "url": download_url,
+                        "signature": "",  # TODO: Add signature support
+                        "size": file_size,
+                        "sha256": sha256
+                    }
+            elif platform == 'windows':
+                for win_arch in ['x86_64', 'aarch64']:
+                    platforms[platform][win_arch] = {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "10.0.17763",  # Windows 10 1809
+                        "url": download_url,
+                        "signature": "",  # TODO: Add signature support
+                        "size": file_size,
+                        "sha256": sha256
+                    }
+        else:
+            platforms[platform][arch] = {
+                "version": version,
+                "releaseDate": release_date,
+                "minimumSystemVersion": min_version,
+                "url": download_url,
+                "signature": "",  # TODO: Add signature support
+                "size": file_size,
+                "sha256": sha256
+            }
     
     # Create the full JSON structure
     updates_data = {
         "name": "KeyMagic",
-        "platforms": {
-            "windows": versions[latest_version]
-        },
-        "releaseNotes": {
-            latest_version: {
-                "en": f"### KeyMagic {latest_version}\n\n- Please add release notes here\n"
-            }
-        }
+        "platforms": platforms,
+        "releaseNotes": {}
     }
     
-    # Add placeholder entries for other platforms
-    updates_data["platforms"]["macos"] = {
-        "x86_64": {
-            "version": latest_version,
-            "releaseDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "minimumSystemVersion": "10.15",
-            "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{latest_version}/KeyMagic3-{latest_version}-x64.dmg",
-            "signature": "",
-            "size": 0,
-            "sha256": ""
-        },
-        "aarch64": {
-            "version": latest_version,
-            "releaseDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "minimumSystemVersion": "11.0",
-            "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{latest_version}/KeyMagic3-{latest_version}-arm64.dmg",
-            "signature": "",
-            "size": 0,
-            "sha256": ""
+    # Parse release notes from GitHub release body
+    if release_body:
+        # Try to extract release notes format, or use the entire body
+        updates_data["releaseNotes"][version] = {
+            "en": release_body
         }
-    }
+    else:
+        updates_data["releaseNotes"][version] = {
+            "en": f"### KeyMagic {version}\n\n- See GitHub release for details\n"
+        }
     
-    updates_data["platforms"]["linux"] = {
-        "x86_64": {
-            "version": latest_version,
-            "releaseDate": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "minimumSystemVersion": "",
-            "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{latest_version}/keymagic3-{latest_version}-amd64.deb",
-            "signature": "",
-            "size": 0,
-            "sha256": ""
-        }
-    }
+    # Fill in missing platforms with placeholders if needed
+    for platform in ['windows', 'macos', 'linux']:
+        if not platforms[platform]:
+            print(f"\nWarning: No assets found for {platform} platform")
+            # Add placeholder entries
+            if platform == 'windows':
+                platforms[platform] = {
+                    "x86_64": {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "10.0.17763",
+                        "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/KeyMagic3-Setup-{version}-x64.exe",
+                        "signature": "",
+                        "size": 0,
+                        "sha256": ""
+                    },
+                    "aarch64": {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "10.0.17763",
+                        "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/KeyMagic3-Setup-{version}-arm64.exe",
+                        "signature": "",
+                        "size": 0,
+                        "sha256": ""
+                    }
+                }
+            elif platform == 'macos':
+                platforms[platform] = {
+                    "x86_64": {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "10.15",
+                        "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/KeyMagic3-{version}-x64.dmg",
+                        "signature": "",
+                        "size": 0,
+                        "sha256": ""
+                    },
+                    "aarch64": {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "11.0",
+                        "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/KeyMagic3-{version}-arm64.dmg",
+                        "signature": "",
+                        "size": 0,
+                        "sha256": ""
+                    }
+                }
+            elif platform == 'linux':
+                platforms[platform] = {
+                    "x86_64": {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "",
+                        "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/keymagic3-{version}-amd64.deb",
+                        "signature": "",
+                        "size": 0,
+                        "sha256": ""
+                    }
+                }
     
     # Write the JSON file
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         json.dump(updates_data, f, indent=2, ensure_ascii=False)
     
     print(f"\nSuccessfully generated {OUTPUT_FILE}")
-    print(f"Latest version: {latest_version}")
+    print(f"Latest version: {version}")
     print("\nFile details:")
-    for arch, info in versions[latest_version].items():
-        print(f"  {arch}: {info['size']:,} bytes, SHA256: {info['sha256'][:16]}...")
+    for platform_name, platform_data in platforms.items():
+        if platform_data:
+            print(f"\n{platform_name.capitalize()}:")
+            for arch, info in platform_data.items():
+                if info['size'] > 0:
+                    print(f"  {arch}: {info['size']:,} bytes, SHA256: {info['sha256'][:16] if info['sha256'] else 'N/A'}...")
     
     return True
 
 def main():
     """Main entry point."""
-    print("Generating updates.json from installer files...")
+    print("Generating updates.json from GitHub release...")
     
     if generate_updates_json():
         print("\nNext steps:")
         print("1. Review the generated updates.json file")
-        print("2. Add appropriate release notes")
-        print("3. Deploy to GitHub Pages using ./scripts/deploy-updates.sh")
+        print("2. Deploy to GitHub Pages using ./scripts/deploy-updates.sh")
     else:
         exit(1)
 
