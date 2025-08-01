@@ -1,0 +1,154 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.6)'
+        required: true
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build-windows:
+    needs: prepare
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  build-linux:
+    needs: prepare
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      sign: true
+    secrets: inherit
+
+  build-macos:
+    needs: prepare
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      sign: true
+    secrets: inherit
+
+  create-release:
+    needs: [prepare, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    name: Create Release
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts/
+      
+      - name: Display artifact structure
+        run: |
+          echo "Downloaded artifacts:"
+          find ./artifacts -type f -name "*" | sort
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          
+          # Windows installer
+          cp ./artifacts/windows-installer/KeyMagic3-Setup-*.exe release-assets/ || true
+          
+          # macOS DMG
+          cp ./artifacts/macos-dmg/KeyMagic3-*.dmg release-assets/ || true
+          
+          # Linux packages
+          cp ./artifacts/debian-package-amd64/keymagic3_*.deb release-assets/ || true
+          cp ./artifacts/debian-package-arm64/keymagic3_*.deb release-assets/ || true
+          cp ./artifacts/rpm-package-amd64/keymagic3-*.rpm release-assets/ || true
+          cp ./artifacts/rpm-package-arm64/keymagic3-*.rpm release-assets/ || true
+          
+          echo "Release assets:"
+          ls -la release-assets/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: KeyMagic v${{ needs.prepare.outputs.version }}
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: false
+          files: release-assets/*
+          body: |
+            # KeyMagic v${{ needs.prepare.outputs.version }}
+            
+            ## What's New
+            - [Add release notes here]
+            
+            ## Downloads
+            
+            ### Windows
+            - **Installer**: `KeyMagic3-Setup-${{ needs.prepare.outputs.version }}.exe` - Universal installer for x64 and ARM64
+            
+            ### macOS
+            - **DMG**: `KeyMagic3-${{ needs.prepare.outputs.version }}.dmg` - Universal app for Intel and Apple Silicon
+            
+            ### Linux
+            - **Debian (amd64)**: `keymagic3_${{ needs.prepare.outputs.version }}_amd64.deb`
+            - **Debian (arm64)**: `keymagic3_${{ needs.prepare.outputs.version }}_arm64.deb`
+            - **RPM (x86_64)**: `keymagic3-${{ needs.prepare.outputs.version }}-1.x86_64.rpm`
+            - **RPM (aarch64)**: `keymagic3-${{ needs.prepare.outputs.version }}-1.aarch64.rpm`
+            
+            ## Installation Instructions
+            
+            ### Windows
+            1. Download and run the installer
+            2. Follow the installation wizard
+            3. KeyMagic will be available in your system tray
+            
+            ### macOS
+            1. Download and open the DMG file
+            2. Drag KeyMagic to your Applications folder
+            3. Launch KeyMagic from Applications
+            4. Add KeyMagic in System Settings > Keyboard > Input Sources
+            
+            ### Linux
+            **Debian/Ubuntu:**
+            ```bash
+            sudo dpkg -i keymagic3_${{ needs.prepare.outputs.version }}_*.deb
+            sudo apt-get install -f  # Install any missing dependencies
+            ```
+            
+            **Fedora/RHEL:**
+            ```bash
+            sudo rpm -i keymagic3-${{ needs.prepare.outputs.version }}-1.*.rpm
+            ```
+            
+            After installation, restart IBus or log out and log back in.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

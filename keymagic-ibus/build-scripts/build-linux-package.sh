@@ -17,9 +17,17 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
+# Read version from version.txt file
+if [ -f "$PROJECT_ROOT/version.txt" ]; then
+    VERSION=$(cat "$PROJECT_ROOT/version.txt" | tr -d '\n\r')
+else
+    echo -e "${RED}Error: version.txt not found in project root${NC}"
+    exit 1
+fi
+
 echo -e "${BLUE}KeyMagic 3 Linux Package Builder${NC}"
 echo "==================================="
-echo "Version: 0.0.1"
+echo "Version: $VERSION"
 echo "Contact: contact@keymagic.net"
 echo ""
 
@@ -84,10 +92,17 @@ echo ""
 # Step 1: Build keymagic-core
 echo -e "${BLUE}Step 1: Building keymagic-core...${NC}"
 cd "$PROJECT_ROOT/keymagic-core"
+
+# Add target flag if cross-compiling
+CARGO_FLAGS=""
+if [ -n "$CARGO_BUILD_TARGET" ]; then
+    CARGO_FLAGS="--target $CARGO_BUILD_TARGET"
+fi
+
 if [ "$BUILD_TYPE" = "release" ]; then
-    cargo build --release
+    cargo build --release $CARGO_FLAGS
 else
-    cargo build
+    cargo build $CARGO_FLAGS
 fi
 echo -e "${GREEN}✓ keymagic-core built${NC}"
 echo ""
@@ -108,9 +123,9 @@ echo ""
 echo -e "${BLUE}Step 3: Building GUI application...${NC}"
 cd "$PROJECT_ROOT/keymagic-shared/gui/src-tauri"
 if [ "$BUILD_TYPE" = "release" ]; then
-    cargo build --release
+    cargo build --release $CARGO_FLAGS
 else
-    cargo build
+    cargo build $CARGO_FLAGS
 fi
 echo -e "${GREEN}✓ GUI application built${NC}"
 echo ""
@@ -136,10 +151,17 @@ create_package_structure() {
     mkdir -p "$pkg_dir/usr/share/keymagic3/keyboards"
     
     # Copy binaries
-    if [ "$BUILD_TYPE" = "release" ]; then
-        cp "$PROJECT_ROOT/target/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
+    # Determine target directory based on cross-compilation
+    if [ -n "$CARGO_BUILD_TARGET" ]; then
+        TARGET_DIR="$PROJECT_ROOT/target/$CARGO_BUILD_TARGET"
     else
-        cp "$PROJECT_ROOT/target/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
+        TARGET_DIR="$PROJECT_ROOT/target"
+    fi
+    
+    if [ "$BUILD_TYPE" = "release" ]; then
+        cp "$TARGET_DIR/release/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
+    else
+        cp "$TARGET_DIR/debug/keymagic-gui" "$pkg_dir/usr/bin/keymagic3-gui"
     fi
     
     cp "$PROJECT_ROOT/keymagic-ibus/ibus-engine-keymagic3" "$pkg_dir/usr/lib/ibus-keymagic3/ibus-engine-keymagic3"
@@ -155,7 +177,7 @@ create_package_structure() {
     
     # Copy documentation
     cp "$PROJECT_ROOT/README.md" "$pkg_dir/usr/share/doc/keymagic3/" 2>/dev/null || true
-    echo "KeyMagic 3 version 0.0.1" > "$pkg_dir/usr/share/doc/keymagic3/VERSION"
+    echo "KeyMagic 3 version $VERSION" > "$pkg_dir/usr/share/doc/keymagic3/VERSION"
     
     # Copy helper scripts
     if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/debian/keymagic3-ibus-refresh" ]; then
@@ -178,7 +200,10 @@ create_package_structure() {
 if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "deb" ]; then
     echo -e "${BLUE}Creating Debian package...${NC}"
     
-    PKG_DIR="dist/keymagic3_0.0.1_$(dpkg --print-architecture)"
+    # Determine architecture (support cross-compilation)
+    DEB_ARCH="${DEB_TARGET_ARCH:-$(dpkg --print-architecture)}"
+    
+    PKG_DIR="dist/keymagic3_${VERSION}_${DEB_ARCH}"
     rm -rf "$PKG_DIR"
     create_package_structure "$PKG_DIR"
     
@@ -187,8 +212,8 @@ if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "deb" ]; then
     
     # Generate control file from template
     if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/debian/control.in" ]; then
-        sed -e "s/@VERSION@/0.0.1/g" \
-            -e "s/@ARCH@/$(dpkg --print-architecture)/g" \
+        sed -e "s/@VERSION@/$VERSION/g" \
+            -e "s/@ARCH@/$DEB_ARCH/g" \
             "$PROJECT_ROOT/keymagic-ibus/packaging/debian/control.in" > "$PKG_DIR/DEBIAN/control"
     else
         echo -e "${RED}Debian control template not found${NC}"
@@ -217,10 +242,24 @@ if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "rpm" ]; then
         RPMBUILD_DIR="$HOME/rpmbuild"
         mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
         
+        # Parse version for RPM (handle pre-release versions)
+        # RPM doesn't allow hyphens in version, so split version and release
+        if [[ "$VERSION" =~ ^([0-9.]+)(-(.+))?$ ]]; then
+            RPM_VERSION="${BASH_REMATCH[1]}"
+            RPM_RELEASE="${BASH_REMATCH[3]:-1}"
+        else
+            RPM_VERSION="$VERSION"
+            RPM_RELEASE="1"
+        fi
+        
+        # Determine architecture (support cross-compilation)
+        RPM_ARCH="${RPM_TARGET_ARCH:-$(uname -m)}"
+        
         # Generate spec file from template
         if [ -f "$PROJECT_ROOT/keymagic-ibus/packaging/keymagic3.spec.in" ]; then
-            sed -e "s/@VERSION@/0.0.1/g" \
-                -e "s/@ARCH@/$(uname -m)/g" \
+            sed -e "s/@VERSION@/$RPM_VERSION/g" \
+                -e "s/@RELEASE@/$RPM_RELEASE/g" \
+                -e "s/@ARCH@/$RPM_ARCH/g" \
                 -e "s/@DATE@/$(date +"%a %b %d %Y")/g" \
                 -e "s|@PROJECT_ROOT@|$PROJECT_ROOT|g" \
                 "$PROJECT_ROOT/keymagic-ibus/packaging/keymagic3.spec.in" > "$RPMBUILD_DIR/SPECS/keymagic3.spec"
@@ -234,7 +273,7 @@ if [ "$PACKAGE_FORMAT" = "all" ] || [ "$PACKAGE_FORMAT" = "rpm" ]; then
         rpmbuild -bb keymagic3.spec
         
         # Copy to dist directory
-        cp "$RPMBUILD_DIR/RPMS/$(uname -m)/keymagic3-0.0.1-1."*".rpm" "$PROJECT_ROOT/keymagic-ibus/dist/"
+        cp "$RPMBUILD_DIR/RPMS/$RPM_ARCH/keymagic3-$RPM_VERSION-$RPM_RELEASE."*".rpm" "$PROJECT_ROOT/keymagic-ibus/dist/"
         echo -e "${GREEN}✓ RPM package created${NC}"
     else
         echo -e "${YELLOW}rpmbuild not found, skipping RPM creation${NC}"
@@ -255,7 +294,7 @@ echo -e "${GREEN}Build complete!${NC}"
 echo "Packages are available in the keymagic-ibus/dist/ directory"
 echo ""
 echo "To install the Debian package:"
-echo "  sudo dpkg -i keymagic-ibus/dist/keymagic3_0.0.1_*.deb"
+echo "  sudo dpkg -i keymagic-ibus/dist/keymagic3_${VERSION}_*.deb"
 echo "  sudo apt-get install -f  # Install any missing dependencies"
 echo ""
 echo "To test IBus engine directly:"

@@ -65,7 +65,11 @@ TOML_LIBS =
 
 # KeyMagic core library (Rust FFI)
 KEYMAGIC_CFLAGS = -I../keymagic-core/include
-KEYMAGIC_LIBS = ../target/release/libkeymagic_core.a
+ifeq ($(BUILD_TYPE),release)
+    KEYMAGIC_LIBS = ../target/release/libkeymagic_core.a
+else
+    KEYMAGIC_LIBS = ../target/debug/libkeymagic_core.a
+endif
 
 # Combined flags
 ALL_CFLAGS = $(CFLAGS) $(CPPFLAGS) $(IBUS_CFLAGS) $(GLIB_CFLAGS) $(TOML_CFLAGS) $(KEYMAGIC_CFLAGS)

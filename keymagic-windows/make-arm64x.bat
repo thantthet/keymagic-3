@@ -66,22 +66,40 @@ echo.
 echo [4/6] Creating empty object files...
 cd tsf
 
-:: Set up Visual Studio environment if not already set
-where cl.exe >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Setting up Visual Studio environment...
-    
-    :: Determine VS path and architecture-specific script
-    if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
-        echo Detected ARM64 system, using native ARM64 compiler...
+:: Set up Visual Studio environment for ARM64 cross-compilation
+echo Setting up Visual Studio environment for ARM64X build...
+
+:: Determine VS path and architecture-specific script
+if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
+    echo Detected ARM64 system, using native ARM64 compiler...
+    if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsarm64.bat" (
         call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsarm64.bat"
-    ) else if /i "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
-        echo Detected x64 system, using x64 to ARM64 cross compiler...
-        call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_arm64.bat"
+    ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsarm64.bat" (
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsarm64.bat"
     ) else (
-        echo [ERROR] Unsupported processor architecture: %PROCESSOR_ARCHITECTURE%
+        echo [ERROR] Could not find Visual Studio 2022 ARM64 environment script
         exit /b 1
     )
+) else if /i "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
+    echo Detected x64 system, using x64 to ARM64 cross compiler...
+    if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_arm64.bat" (
+        call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_arm64.bat"
+    ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_arm64.bat" (
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_arm64.bat"
+    ) else (
+        echo [ERROR] Could not find Visual Studio 2022 x64 to ARM64 cross-compiler environment script
+        exit /b 1
+    )
+) else (
+    echo [ERROR] Unsupported processor architecture: %PROCESSOR_ARCHITECTURE%
+    exit /b 1
+)
+
+:: Verify correct environment is set
+where cl.exe >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to set up Visual Studio environment
+    exit /b 1
 )
 
 :: Create build directory for ARM64X

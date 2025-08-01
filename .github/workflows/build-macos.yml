@@ -1,0 +1,158 @@
+name: Build macOS
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version number'
+        type: string
+        required: false
+        default: '0.0.1'
+      sign:
+        description: 'Sign and notarize the build'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    name: macOS Universal Binary
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+      
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-universal-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-universal-
+      
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: keymagic-shared/gui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('keymagic-shared/gui/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      
+      - name: Install npm dependencies
+        working-directory: keymagic-shared/gui
+        run: npm install
+      
+      - name: Cache Tauri CLI
+        id: cache-tauri-cli
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/cargo-tauri
+          key: ${{ runner.os }}-tauri-cli-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install Tauri CLI
+        if: steps.cache-tauri-cli.outputs.cache-hit != 'true'
+        run: cargo install tauri-cli
+      
+      - name: Install create-dmg
+        run: brew install create-dmg
+      
+      - name: Update version
+        run: |
+          echo ${{ inputs.version }} > version.txt
+          ./update-version.sh
+      
+      - name: Import certificates
+        if: inputs.sign
+        env:
+          CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
+          CERTIFICATES_P12_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          
+          # Import certificate from secrets
+          echo -n "$CERTIFICATES_P12" | base64 --decode -o $CERTIFICATE_PATH
+          
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$CERTIFICATES_P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          
+          # Allow codesign to access the certificate
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+      
+      - name: Store notarization credentials
+        if: inputs.sign
+        env:
+          KEYCHAIN_PROFILE: ${{ secrets.KEYCHAIN_PROFILE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARIZE_PASSWORD: ${{ secrets.NOTARIZE_PASSWORD }}
+        run: |
+          # Store notarization credentials in keychain
+          xcrun notarytool store-credentials "$KEYCHAIN_PROFILE" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$NOTARIZE_PASSWORD"
+      
+      - name: Build all components
+        working-directory: keymagic-macos
+        run: |
+          # Set environment variables for faster builds
+          export CARGO_INCREMENTAL=1
+          export CARGO_NET_GIT_FETCH_WITH_CLI=true
+          export RUSTFLAGS="-C link-arg=-s"
+          
+          # Build everything using Makefile (core, IMK server, and GUI with embedded IMK)
+          make BUILD_CONFIG=release all
+      
+      - name: Create and sign DMG
+        working-directory: keymagic-macos
+        env:
+          DEVELOPER_ID_APP: ${{ inputs.sign && secrets.DEVELOPER_ID_APP || '' }}
+          KEYCHAIN_PROFILE: ${{ secrets.KEYCHAIN_PROFILE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_TYPE: release
+        run: |
+          # Build and package
+          ./scripts/package-macos-dmg.sh ${{ inputs.version }} ${{ inputs.sign && '--notarize' || '' }}
+      
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: target/KeyMagic3-${{ inputs.version }}.dmg
+      
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-bundle
+          path: keymagic-macos/build/KeyMagic3.app
+      
+      - name: Clean up keychain
+        if: always() && inputs.sign
+        run: |
+          if [ -f "$RUNNER_TEMP/app-signing.keychain-db" ]; then
+            security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+          fi

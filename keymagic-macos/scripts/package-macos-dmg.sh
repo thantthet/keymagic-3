@@ -11,11 +11,11 @@ NC='\033[0m' # No Color
 
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/target/release/bundle/macos"
+BUILD_TYPE="${BUILD_TYPE:-release}"
+BUILD_DIR="$PROJECT_ROOT/keymagic-macos/build"
 DMG_DIR="$PROJECT_ROOT/target/dmg"
 APP_NAME="KeyMagic3.app"
 DMG_NAME="KeyMagic3-$1.dmg"
-IMK_BUNDLE_PATH="$PROJECT_ROOT/keymagic-macos/build/KeyMagic3.app"
 
 # Function to print colored output
 print_status() {
@@ -39,26 +39,10 @@ fi
 
 VERSION="$1"
 
-# Check if Tauri app bundle exists
+# Check if app bundle exists (GUI with embedded IMK)
 if [ ! -d "$BUILD_DIR/$APP_NAME" ]; then
-    print_error "Tauri app bundle not found at: $BUILD_DIR/$APP_NAME"
-    print_error "Please run 'cargo tauri build' first"
-    exit 1
-fi
-
-# Build IMK bundle if needed
-if [ ! -d "$IMK_BUNDLE_PATH" ]; then
-    print_status "Building IMK bundle..."
-    cd "$PROJECT_ROOT/keymagic-macos"
-    make clean
-    make
-    cd "$PROJECT_ROOT"
-fi
-
-# Check if IMK bundle was built
-if [ ! -d "$IMK_BUNDLE_PATH" ]; then
-    print_error "IMK bundle not found at: $IMK_BUNDLE_PATH"
-    print_error "Failed to build IMK bundle"
+    print_error "App bundle not found at: $BUILD_DIR/$APP_NAME"
+    print_error "Please run 'make all' in keymagic-macos directory first"
     exit 1
 fi
 
@@ -67,22 +51,24 @@ print_status "Creating DMG staging directory..."
 rm -rf "$DMG_DIR"
 mkdir -p "$DMG_DIR/dmg"
 
-# Copy Tauri app bundle
-print_status "Copying Tauri app bundle..."
+# Copy app bundle (already has embedded IMK)
+print_status "Copying app bundle..."
 cp -R "$BUILD_DIR/$APP_NAME" "$DMG_DIR/dmg/"
 
-# Embed IMK bundle in Tauri app resources
-print_status "Embedding IMK bundle in app resources..."
-RESOURCES_DIR="$DMG_DIR/dmg/$APP_NAME/Contents/Resources"
-mkdir -p "$RESOURCES_DIR/resources"
-cp -R "$IMK_BUNDLE_PATH" "$RESOURCES_DIR/resources/"
-
-# Update IMK bundle version to match
-print_status "Updating IMK bundle version..."
+# Update app bundle version to match
+print_status "Updating app bundle version..."
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
-    "$RESOURCES_DIR/resources/KeyMagic3.app/Contents/Info.plist"
+    "$DMG_DIR/dmg/$APP_NAME/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" \
-    "$RESOURCES_DIR/resources/KeyMagic3.app/Contents/Info.plist"
+    "$DMG_DIR/dmg/$APP_NAME/Contents/Info.plist"
+
+# Also update the embedded IMK server version
+IMK_PLIST="$DMG_DIR/dmg/$APP_NAME/Contents/Resources/KeyMagic3-Server.app/Contents/Info.plist"
+if [ -f "$IMK_PLIST" ]; then
+    print_status "Updating embedded IMK server version..."
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$IMK_PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$IMK_PLIST"
+fi
 
 # Applications symlink will be created by create-dmg
 

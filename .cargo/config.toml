@@ -1,3 +1,31 @@
+# Cargo configuration for optimized builds
+
+[build]
+# Use all available cores for parallel compilation
+jobs = -1
+
+[profile.release]
+# Optimize for size to reduce build time and artifact size
+opt-level = "z"
+lto = "thin"
+codegen-units = 1
+
+[profile.dev]
+# Faster debug builds
+opt-level = 0
+debug = 1
+incremental = true
+
+[net]
+# Retry network requests for reliability
+retry = 3
+
+# Use git CLI for better performance in CI
+git-fetch-with-cli = true
+
+[registries.crates-io]
+protocol = "sparse"
+
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
 

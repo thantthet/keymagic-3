@@ -1,0 +1,150 @@
+name: Build Linux
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version number'
+        type: string
+        required: false
+        default: '0.0.1'
+      sign:
+        description: 'Sign packages with GPG'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  build-linux:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            arch: amd64
+            rust_target: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            rust_target: aarch64-unknown-linux-gnu
+    
+    runs-on: ${{ matrix.os }}
+    name: Linux ${{ matrix.arch }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            libibus-1.0-dev \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            rpm \
+            dpkg-dev \
+            dpkg-sig \
+            file \
+            wget \
+            gnupg
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.arch }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.arch }}-
+      
+      - name: Update version
+        run: |
+          echo ${{ inputs.version }} > version.txt
+          ./update-version.sh
+      
+      - name: Build keymagic-core first
+        run: |
+          cargo build -p keymagic-core --release
+      
+      - name: Build packages
+        run: |
+          cd keymagic-ibus/build-scripts
+          ./build-linux-package.sh --all
+      
+      - name: List built packages
+        run: |
+          echo "Contents of keymagic-ibus/dist:"
+          ls -la keymagic-ibus/dist/
+          echo ""
+          echo "Package sizes:"
+          du -h keymagic-ibus/dist/*
+      
+      - name: Import GPG key
+        if: inputs.sign
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
+          # Verify the key was imported
+          gpg --list-secret-keys
+        env:
+          GPG_TTY: $(tty)
+      
+      - name: Sign Debian packages
+        if: inputs.sign
+        run: |
+          # Sign all .deb files with dpkg-sig (embedded signature)
+          for deb_file in keymagic-ibus/dist/*.deb; do
+            if [ -f "$deb_file" ]; then
+              echo "Signing $deb_file..."
+              echo "${{ secrets.GPG_PASSPHRASE }}" | \
+                dpkg-sig --sign builder -k "${{ secrets.GPG_KEY_ID }}" \
+                --gpg-options "--batch --yes --pinentry-mode loopback --passphrase-fd 0" \
+                "$deb_file"
+            fi
+          done
+        env:
+          GPG_TTY: $(tty)
+      
+      - name: Sign RPM packages
+        if: inputs.sign
+        run: |
+          # Configure RPM macros for signing
+          cat > ~/.rpmmacros << EOF
+          %_signature gpg
+          %_gpg_name ${{ secrets.GPG_KEY_ID }}
+          %__gpg /usr/bin/gpg
+          %__gpg_sign_cmd %{__gpg} --batch --yes --no-armor --pinentry-mode loopback --passphrase-fd 0 --default-key %{_gpg_name} --detach-sign --output %{__signature_filename} %{__plaintext_filename}
+          EOF
+          
+          # Sign all .rpm files
+          for rpm_file in keymagic-ibus/dist/*.rpm; do
+            if [ -f "$rpm_file" ]; then
+              echo "Signing $rpm_file..."
+              echo "${{ secrets.GPG_PASSPHRASE }}" | \
+                rpmsign --addsign "$rpm_file"
+            fi
+          done
+        env:
+          GPG_TTY: $(tty)
+      
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package-${{ matrix.arch }}
+          path: keymagic-ibus/dist/keymagic3_${{ inputs.version }}_${{ matrix.arch }}.deb
+      
+      - name: Upload RPM package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package-${{ matrix.arch }}
+          path: keymagic-ibus/dist/keymagic3-*.rpm

@@ -36,7 +36,7 @@ def validate_version(version):
 def update_file(file_path, update_func, description):
     """Update a file with the given update function."""
     if not os.path.exists(file_path):
-        print(f"⚠️  File not found: {file_path}")
+        print(f"[WARN] File not found: {file_path}")
         return False
     
     try:
@@ -48,13 +48,13 @@ def update_file(file_path, update_func, description):
         if content != new_content:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(new_content)
-            print(f"✅ Updated: {description}")
+            print(f"[OK] Updated: {description}")
             return True
         else:
-            print(f"ℹ️  No changes needed: {description}")
+            print(f"[INFO] No changes needed: {description}")
             return False
     except Exception as e:
-        print(f"❌ Error updating {description}: {e}")
+        print(f"[ERROR] Error updating {description}: {e}")
         return False
 
 
@@ -157,11 +157,6 @@ def update_desktop_file(content, version):
     return re.sub(r'^Version=.*$', f'Version={version}', content, flags=re.MULTILINE)
 
 
-def update_spec_in_file(content, version):
-    """Update version in .spec.in files."""
-    # Update the Version: line directly
-    return re.sub(r'^Version:\s+.*$', f'Version:        {version}', content, flags=re.MULTILINE)
-
 
 def main():
     parser = argparse.ArgumentParser(description='Update version across all KeyMagic components')
@@ -179,16 +174,16 @@ def main():
     else:
         new_version = read_version_from_file(version_file)
         if not new_version:
-            print("❌ No version specified and version.txt not found")
+            print("[ERROR] No version specified and version.txt not found")
             sys.exit(1)
     
     # Validate version format
     if not validate_version(new_version):
-        print(f"❌ Invalid version format: {new_version}")
+        print(f"[ERROR] Invalid version format: {new_version}")
         print("   Expected format: X.Y.Z or X.Y.Z-suffix")
         sys.exit(1)
     
-    print(f"🔄 Updating version to: {new_version}")
+    print(f"[*] Updating version to: {new_version}")
     if args.dry_run:
         print("   (DRY RUN - no files will be modified)")
     print()
@@ -235,10 +230,8 @@ def main():
          lambda c: update_desktop_file(c, new_version),
          'IBus desktop file'),
         
-        # Linux packaging files (these use placeholders)
-        (project_root / 'keymagic-ibus' / 'packaging' / 'keymagic3.spec.in',
-         lambda c: update_spec_in_file(c, new_version),
-         'RPM spec template'),
+        # Note: .spec.in files use @VERSION@ placeholder and are processed during build
+        # They should not be updated by this script
     ]
     
     # Perform updates
@@ -258,15 +251,15 @@ def main():
         try:
             with open(version_file, 'w') as f:
                 f.write(new_version)
-            print(f"✅ Updated: version.txt")
+            print(f"[OK] Updated: version.txt")
         except Exception as e:
-            print(f"❌ Error updating version.txt: {e}")
+            print(f"[ERROR] Error updating version.txt: {e}")
     
     print()
     if args.dry_run:
-        print("✨ Dry run complete! Use without --dry-run to apply changes.")
+        print("[DONE] Dry run complete! Use without --dry-run to apply changes.")
     else:
-        print(f"✨ Version update complete! All components updated to: {new_version}")
+        print(f"[DONE] Version update complete! All components updated to: {new_version}")
 
 
 if __name__ == '__main__':
