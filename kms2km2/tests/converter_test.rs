@@ -536,3 +536,107 @@ fn test_modifier_combinations() {
     // Clean up
     let _ = fs::remove_file(input_path);
 }
+
+#[test]
+fn test_string_variable_with_escapes_and_line_continuations() {
+    let kms_content = r#"
+/*
+@NAME = "String Variable Escapes Test"
+@DESCRIPTION = "Test string variables with escapes and line continuations"
+*/
+
+// Test the provided variable with various quotes, escapes, and line continuations
+$baseK =  'qwert' +\
+            'yuiop' +\
+            "[zxc"  +\
+            "vbnQ" +\
+            "OP{AKL" +\ 
+            "ZXCVBNM" +\
+            '!#@$%^' +\
+            '&*|' +\
+            '_\\]' +\
+            '`~' +\
+            'WERTYUI'
+
+// Test variable with escape sequences
+$escapeTest = "Line1\nLine2" + "\tTabbed" + "Quote\"Test" + 'Single\'Quote'
+
+// Test backslash in strings
+$backslashTest = "C:\\Windows\\System32" + '\\'
+
+// Test multi-line variable with mixed quotes
+$mixedQuotes = "double" + \
+               'single' + \
+               "mixed'quotes" + \
+               'mixed"quotes'
+
+// Rules using the variables
+$baseK => "baseK_matched"
+$escapeTest => "escapeTest_matched"
+$backslashTest => "backslashTest_matched"
+$mixedQuotes => "mixedQuotes_matched"
+
+// Test the baseK variable contains expected characters
+"q" => "found_q"
+"[" => "found_bracket"
+"=" => "found_equals"
+"\\" => "found_backslash"
+"/" => "found_slash"
+"#;
+    
+    let input_path = Path::new("target/string_escape_test.kms");
+    fs::write(input_path, kms_content).expect("Failed to write test KMS");
+    
+    let km2 = compile_kms_file(input_path).expect("Failed to compile KMS");
+    
+    // Find the baseK variable in strings
+    let base_k_string = km2.strings.iter()
+        .find(|s| s.value == "qwertyuiop[zxcvbnQOP{AKLZXCVBNM!#@$%^&*|_\\]`~WERTYUI")
+        .expect("baseK variable string not found");
+    
+    // Verify the baseK variable was properly concatenated
+    assert_eq!(
+        base_k_string.value,
+        "qwertyuiop[zxcvbnQOP{AKLZXCVBNM!#@$%^&*|_\\]`~WERTYUI",
+        "baseK variable not properly concatenated"
+    );
+    
+    // Find the escapeTest variable 
+    let escape_test_string = km2.strings.iter()
+        .find(|s| s.value.contains("Line1\nLine2\tTabbed"))
+        .expect("escapeTest variable string not found");
+    
+    // Verify escape sequences were processed
+    assert!(escape_test_string.value.contains("Line1\nLine2"), "Newline escape not processed");
+    assert!(escape_test_string.value.contains("\tTabbed"), "Tab escape not processed");
+    assert!(escape_test_string.value.contains("Quote\"Test"), "Quote escape not processed");
+    assert!(escape_test_string.value.contains("Single'Quote"), "Single quote escape not processed");
+    
+    // Find the backslashTest variable
+    let backslash_test_string = km2.strings.iter()
+        .find(|s| s.value == "C:\\Windows\\System32\\")
+        .expect("backslashTest variable string not found");
+    
+    assert_eq!(
+        backslash_test_string.value,
+        "C:\\Windows\\System32\\",
+        "Backslashes not properly handled"
+    );
+    
+    // Find the mixedQuotes variable
+    let mixed_quotes_string = km2.strings.iter()
+        .find(|s| s.value == "doublesinglemixed'quotesmixed\"quotes")
+        .expect("mixedQuotes variable string not found");
+    
+    assert_eq!(
+        mixed_quotes_string.value,
+        "doublesinglemixed'quotesmixed\"quotes",
+        "Mixed quotes not properly handled"
+    );
+    
+    // Verify we have rules for testing the characters
+    assert!(km2.rules.len() >= 9, "Expected at least 9 rules");
+    
+    // Clean up
+    let _ = fs::remove_file(input_path);
+}
