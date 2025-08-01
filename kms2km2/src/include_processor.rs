@@ -41,8 +41,13 @@ impl IncludeProcessor {
         self.processed_files.insert(canonical_path.clone());
         
         // Read the file
-        let content = fs::read_to_string(file_path)
+        let mut content = fs::read_to_string(file_path)
             .map_err(|e| KmsError::Io(e))?;
+        
+        // Strip UTF-8 BOM if present
+        if content.starts_with('\u{FEFF}') {
+            content = content.trim_start_matches('\u{FEFF}').to_string();
+        }
         
         // Parse the file
         let mut parser = Parser::new(&content);
