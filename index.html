@@ -157,7 +157,15 @@
 
     <h2>Installation Instructions</h2>
 
-    <h3>Debian/Ubuntu (APT)</h3>
+    <h3>Quick Install (All Supported Linux Distributions)</h3>
+    <p>For a quick automated installation on any supported Linux distribution:</p>
+    <pre><code>curl -fsSL https://thantthet.github.io/keymagic-3/install.sh | bash</code></pre>
+    <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+    <p style="margin-top: 10px; font-size: 0.9em; color: #586069;">This script will automatically detect your distribution and install KeyMagic with the appropriate package manager.</p>
+
+    <h3>Manual Installation</h3>
+    
+    <h4>Debian/Ubuntu (APT)</h4>
     <p>For Debian, Ubuntu, and derivatives (Linux Mint, Pop!_OS, etc.):</p>
     <pre><code># Download and add the GPG key
 curl -fsSL https://thantthet.github.io/keymagic-3/keymagic.gpg | sudo gpg --dearmor -o /usr/share/keyrings/keymagic.gpg
@@ -175,7 +183,7 @@ sudo apt install keymagic3</code></pre>
         <strong>Architecture Support:</strong> Both amd64 (Intel/AMD) and arm64 (ARM) architectures are supported. The correct package will be automatically selected for your system.
     </div>
 
-    <h3>Fedora/RHEL/CentOS (DNF/YUM)</h3>
+    <h4>Fedora/RHEL/CentOS (DNF/YUM)</h4>
     <p>For Fedora, RHEL, CentOS, Rocky Linux, AlmaLinux, and derivatives:</p>
     <pre><code># Add the repository
 sudo curl -fsSL https://thantthet.github.io/keymagic-3/rpm/keymagic.repo \
