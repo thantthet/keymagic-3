@@ -1,0 +1,199 @@
+name: Deploy Package Repository
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to deploy (e.g., v0.0.6)'
+        required: true
+        type: string
+
+jobs:
+  deploy-repository:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+      
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            dpkg-dev \
+            apt-utils \
+            createrepo-c \
+            gnupg \
+            wget
+      
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
+          echo "${{ secrets.GPG_PUBLIC_KEY }}" > keymagic.gpg
+          gpg --armor --export "${{ secrets.GPG_KEY_ID }}" > keymagic-public.asc
+      
+      - name: Determine release tag
+        id: get_release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+          else
+            # Get the latest release tag
+            RELEASE_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          fi
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download release assets
+        run: |
+          mkdir -p release-assets
+          gh release download "${{ steps.get_release.outputs.release_tag }}" \
+            --dir release-assets \
+            --pattern "*.deb" \
+            --pattern "*.rpm"
+          
+          echo "Downloaded assets:"
+          ls -la release-assets/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup repository structure
+        run: |
+          # Create directories if they don't exist
+          mkdir -p gh-pages/deb/pool/main/k/keymagic3
+          mkdir -p gh-pages/deb/dists/stable/main/binary-amd64
+          mkdir -p gh-pages/deb/dists/stable/main/binary-arm64
+          mkdir -p gh-pages/rpm/x86_64
+          mkdir -p gh-pages/rpm/aarch64
+          
+          # Copy GPG public key
+          cp keymagic-public.asc gh-pages/keymagic.gpg
+      
+      - name: Update APT repository
+        run: |
+          # Copy .deb files to pool
+          cp release-assets/*.deb gh-pages/deb/pool/main/k/keymagic3/ || true
+          
+          # Generate Packages files
+          cd gh-pages/deb
+          
+          # For amd64
+          dpkg-scanpackages pool/main/k/keymagic3 /dev/null \
+            | grep -E "(Package:|Version:|Architecture: amd64|Architecture: all|Filename:|Size:|SHA256:|Description:|^$)" \
+            > dists/stable/main/binary-amd64/Packages
+          gzip -c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
+          
+          # For arm64
+          dpkg-scanpackages pool/main/k/keymagic3 /dev/null \
+            | grep -E "(Package:|Version:|Architecture: arm64|Architecture: all|Filename:|Size:|SHA256:|Description:|^$)" \
+            > dists/stable/main/binary-arm64/Packages
+          gzip -c dists/stable/main/binary-arm64/Packages > dists/stable/main/binary-arm64/Packages.gz
+          
+          # Generate Release file
+          cd dists/stable
+          cat > Release << EOF
+          Origin: KeyMagic
+          Label: KeyMagic
+          Suite: stable
+          Codename: stable
+          Version: 1.0
+          Architectures: amd64 arm64
+          Components: main
+          Description: KeyMagic Input Method Repository
+          Date: $(date -R)
+          EOF
+          
+          # Add checksums
+          echo "SHA256:" >> Release
+          for file in main/binary-*/Packages*; do
+            SIZE=$(stat -c%s "$file")
+            SHA256=$(sha256sum "$file" | cut -d' ' -f1)
+            echo " $SHA256 $SIZE $file" >> Release
+          done
+          
+          # Sign Release file
+          cd ../..
+          echo "${{ secrets.GPG_PASSPHRASE }}" | \
+            gpg --batch --yes --pinentry-mode loopback \
+            --default-key "${{ secrets.GPG_KEY_ID }}" \
+            --clearsign -o dists/stable/InRelease dists/stable/Release
+          
+          echo "${{ secrets.GPG_PASSPHRASE }}" | \
+            gpg --batch --yes --pinentry-mode loopback \
+            --default-key "${{ secrets.GPG_KEY_ID }}" \
+            -abs -o dists/stable/Release.gpg dists/stable/Release
+      
+      - name: Update YUM/DNF repository
+        run: |
+          # Copy RPM files to appropriate directories
+          cp release-assets/*x86_64.rpm gh-pages/rpm/x86_64/ || true
+          cp release-assets/*aarch64.rpm gh-pages/rpm/aarch64/ || true
+          
+          # Generate repository metadata
+          cd gh-pages/rpm
+          
+          # For x86_64
+          createrepo_c --update x86_64/
+          
+          # For aarch64
+          createrepo_c --update aarch64/
+          
+          # Sign repository metadata
+          for arch in x86_64 aarch64; do
+            if [ -f "$arch/repodata/repomd.xml" ]; then
+              echo "${{ secrets.GPG_PASSPHRASE }}" | \
+                gpg --batch --yes --pinentry-mode loopback \
+                --default-key "${{ secrets.GPG_KEY_ID }}" \
+                --detach-sign --armor \
+                -o "$arch/repodata/repomd.xml.asc" \
+                "$arch/repodata/repomd.xml"
+            fi
+          done
+          
+          # Create .repo file
+          cat > keymagic.repo << 'EOF'
+          [keymagic]
+          name=KeyMagic Input Method
+          baseurl=https://thantthet.github.io/keymagic-3/rpm/$basearch
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://thantthet.github.io/keymagic-3/keymagic.gpg
+          EOF
+      
+      - name: Commit and push to gh-pages
+        run: |
+          cd gh-pages
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update package repository for ${{ steps.get_release.outputs.release_tag }}"
+            git push
+          fi
+      
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
