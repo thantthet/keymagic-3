@@ -19,8 +19,6 @@ jobs:
     
     permissions:
       contents: write
-      pages: write
-      id-token: write
     
     steps:
       - name: Checkout code
@@ -202,8 +200,3 @@ jobs:
             git commit -m "Update package repository for ${{ steps.get_release.outputs.release_tag }}"
             git push
           fi
-      
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
