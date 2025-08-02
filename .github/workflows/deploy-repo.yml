@@ -46,9 +46,12 @@ jobs:
       
       - name: Import GPG key
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
-          echo "${{ secrets.GPG_PUBLIC_KEY }}" > keymagic.gpg
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch --yes
+          # Trust the key
+          echo -e "5\ny\n" | gpg --command-fd 0 --batch --edit-key "${{ secrets.GPG_KEY_ID }}" trust
+          # Export public key
           gpg --armor --export "${{ secrets.GPG_KEY_ID }}" > keymagic-public.asc
+          cp keymagic-public.asc keymagic.gpg
       
       - name: Determine release tag
         id: get_release
@@ -96,15 +99,13 @@ jobs:
           # Generate Packages files
           cd gh-pages/deb
           
-          # For amd64
-          dpkg-scanpackages pool/main/k/keymagic3 /dev/null \
-            | grep -E "(Package:|Version:|Architecture: amd64|Architecture: all|Filename:|Size:|SHA256:|Description:|^$)" \
+          # For amd64 - scan only amd64 packages
+          dpkg-scanpackages --arch amd64 pool/main/k/keymagic3 /dev/null \
             > dists/stable/main/binary-amd64/Packages
           gzip -c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
           
-          # For arm64
-          dpkg-scanpackages pool/main/k/keymagic3 /dev/null \
-            | grep -E "(Package:|Version:|Architecture: arm64|Architecture: all|Filename:|Size:|SHA256:|Description:|^$)" \
+          # For arm64 - scan only arm64 packages
+          dpkg-scanpackages --arch arm64 pool/main/k/keymagic3 /dev/null \
             > dists/stable/main/binary-arm64/Packages
           gzip -c dists/stable/main/binary-arm64/Packages > dists/stable/main/binary-arm64/Packages.gz
           
@@ -132,13 +133,21 @@ jobs:
           
           # Sign Release file
           cd ../..
+          # Debug: List available keys
+          echo "Available GPG keys:"
+          gpg --list-secret-keys
+          
+          # Sign InRelease
           echo "${{ secrets.GPG_PASSPHRASE }}" | \
             gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 \
             --default-key "${{ secrets.GPG_KEY_ID }}" \
             --clearsign -o dists/stable/InRelease dists/stable/Release
           
+          # Sign Release.gpg
           echo "${{ secrets.GPG_PASSPHRASE }}" | \
             gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 \
             --default-key "${{ secrets.GPG_KEY_ID }}" \
             -abs -o dists/stable/Release.gpg dists/stable/Release
       
@@ -162,6 +171,7 @@ jobs:
             if [ -f "$arch/repodata/repomd.xml" ]; then
               echo "${{ secrets.GPG_PASSPHRASE }}" | \
                 gpg --batch --yes --pinentry-mode loopback \
+                --passphrase-fd 0 \
                 --default-key "${{ secrets.GPG_KEY_ID }}" \
                 --detach-sign --armor \
                 -o "$arch/repodata/repomd.xml.asc" \
