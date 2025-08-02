@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeyMagic Package Repository</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 2px solid #e1e4e8;
+            margin-bottom: 40px;
+        }
+        h1 {
+            color: #24292e;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #24292e;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        h3 {
+            color: #586069;
+            margin-top: 30px;
+        }
+        code {
+            background: #f6f8fa;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid #e1e4e8;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        .subtitle {
+            color: #586069;
+            font-size: 1.2em;
+        }
+        .warning {
+            background: #fffbdd;
+            border: 1px solid #f9c513;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .info {
+            background: #f1f8ff;
+            border: 1px solid #c8e1ff;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #0366d6;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .button:hover {
+            background: #0256c7;
+        }
+        .button.secondary {
+            background: #586069;
+        }
+        .button.secondary:hover {
+            background: #444d56;
+        }
+        .package-list {
+            list-style: none;
+            padding: 0;
+        }
+        .package-list li {
+            padding: 10px;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        .package-list a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        .package-list a:hover {
+            text-decoration: underline;
+        }
+        footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e4e8;
+            text-align: center;
+            color: #586069;
+        }
+        .copy-button {
+            float: right;
+            background: #f6f8fa;
+            border: 1px solid #d1d5da;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+            margin-top: -35px;
+            margin-right: 5px;
+        }
+        .copy-button:hover {
+            background: #e1e4e8;
+        }
+        .architecture-note {
+            background: #f6f8fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>KeyMagic Package Repository</h1>
+        <p class="subtitle">Official APT and YUM/DNF repository for KeyMagic Input Method</p>
+        <div class="buttons">
+            <a href="https://github.com/thantthet/keymagic-3" class="button">View on GitHub</a>
+            <a href="https://github.com/thantthet/keymagic-3/releases" class="button secondary">All Releases</a>
+        </div>
+    </header>
+
+    <div class="info">
+        <strong>Automatic Updates:</strong> By adding this repository, you'll receive automatic updates for KeyMagic through your system's package manager.
+    </div>
+
+    <h2>Installation Instructions</h2>
+
+    <h3>Debian/Ubuntu (APT)</h3>
+    <p>For Debian, Ubuntu, and derivatives (Linux Mint, Pop!_OS, etc.):</p>
+    <pre><code># Download and add the GPG key
+curl -fsSL https://thantthet.github.io/keymagic-3/keymagic.gpg | sudo gpg --dearmor -o /usr/share/keyrings/keymagic.gpg
+
+# Add the repository
+echo "deb [signed-by=/usr/share/keyrings/keymagic.gpg] https://thantthet.github.io/keymagic-3/deb stable main" | \
+  sudo tee /etc/apt/sources.list.d/keymagic.list
+
+# Update package list and install
+sudo apt update
+sudo apt install keymagic3</code></pre>
+    <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+
+    <div class="architecture-note">
+        <strong>Architecture Support:</strong> Both amd64 (Intel/AMD) and arm64 (ARM) architectures are supported. The correct package will be automatically selected for your system.
+    </div>
+
+    <h3>Fedora/RHEL/CentOS (DNF/YUM)</h3>
+    <p>For Fedora, RHEL, CentOS, Rocky Linux, AlmaLinux, and derivatives:</p>
+    <pre><code># Add the repository
+sudo curl -fsSL https://thantthet.github.io/keymagic-3/rpm/keymagic.repo \
+  -o /etc/yum.repos.d/keymagic.repo
+
+# Install KeyMagic
+sudo dnf install keymagic3
+
+# For older systems using yum instead of dnf:
+# sudo yum install keymagic3</code></pre>
+    <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+
+    <h2>Post-Installation</h2>
+    <div class="warning">
+        <strong>Important:</strong> After installation, you need to:
+        <ol>
+            <li>Restart IBus: <code>ibus restart</code></li>
+            <li>Or log out and log back in</li>
+            <li>Add KeyMagic in your system's input method settings</li>
+        </ol>
+    </div>
+
+    <h2>Package Management</h2>
+
+    <h3>Update KeyMagic</h3>
+    <pre><code># Debian/Ubuntu
+sudo apt update && sudo apt upgrade keymagic3
+
+# Fedora/RHEL
+sudo dnf upgrade keymagic3</code></pre>
+
+    <h3>Install Specific Version</h3>
+    <pre><code># Debian/Ubuntu - List available versions
+apt list -a keymagic3
+
+# Install specific version
+sudo apt install keymagic3=0.0.6
+
+# Fedora/RHEL - List available versions
+dnf list --showduplicates keymagic3
+
+# Install specific version
+sudo dnf install keymagic3-0.0.6-1</code></pre>
+
+    <h3>Remove KeyMagic</h3>
+    <pre><code># Debian/Ubuntu
+sudo apt remove keymagic3
+
+# Fedora/RHEL
+sudo dnf remove keymagic3</code></pre>
+
+    <h2>Manual Package Download</h2>
+    <p>If you prefer to download packages manually:</p>
+    <ul class="package-list">
+        <li><a href="deb/pool/main/k/keymagic3/">📦 Debian/Ubuntu packages (.deb)</a></li>
+        <li><a href="rpm/x86_64/">📦 Fedora/RHEL x86_64 packages (.rpm)</a></li>
+        <li><a href="rpm/aarch64/">📦 Fedora/RHEL aarch64 packages (.rpm)</a></li>
+    </ul>
+
+    <h2>Repository Information</h2>
+    <ul>
+        <li><strong>GPG Key:</strong> <a href="keymagic.gpg">Download public key</a></li>
+        <li><strong>Repository Config:</strong> <a href="rpm/keymagic.repo">keymagic.repo</a></li>
+        <li><strong>Architectures:</strong> amd64, arm64, x86_64, aarch64</li>
+        <li><strong>Distributions:</strong> Debian 10+, Ubuntu 20.04+, Fedora 35+, RHEL 8+</li>
+    </ul>
+
+    <h2>Troubleshooting</h2>
+    <h3>GPG Key Issues</h3>
+    <p>If you encounter GPG key errors, try:</p>
+    <pre><code># Re-download the key
+curl -fsSL https://thantthet.github.io/keymagic-3/keymagic.gpg | sudo gpg --dearmor -o /usr/share/keyrings/keymagic.gpg
+
+# For Fedora/RHEL, import the key manually
+sudo rpm --import https://thantthet.github.io/keymagic-3/keymagic.gpg</code></pre>
+
+    <h3>Repository Not Found</h3>
+    <p>Ensure your system can access HTTPS URLs and that the repository file has correct permissions:</p>
+    <pre><code># Debian/Ubuntu
+ls -la /etc/apt/sources.list.d/keymagic.list
+
+# Fedora/RHEL
+ls -la /etc/yum.repos.d/keymagic.repo</code></pre>
+
+    <footer>
+        <p>KeyMagic © 2024 | <a href="https://github.com/thantthet/keymagic-3">GitHub</a> | <a href="https://github.com/thantthet/keymagic-3/issues">Report Issues</a></p>
+    </footer>
+
+    <script>
+        function copyToClipboard(button) {
+            const pre = button.previousElementSibling;
+            const code = pre.querySelector('code');
+            const text = code.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+    </script>
+</body>
+</html>
