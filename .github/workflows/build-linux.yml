@@ -127,22 +127,28 @@ jobs:
       - name: Sign RPM packages
         if: inputs.sign
         run: |
+          # Create a temporary passphrase file
+          echo "${{ secrets.GPG_PASSPHRASE }}" > /tmp/rpm-passphrase.txt
+          chmod 600 /tmp/rpm-passphrase.txt
+          
           # Configure RPM macros for signing
           cat > ~/.rpmmacros << EOF
           %_signature gpg
           %_gpg_name ${{ secrets.GPG_KEY_ID }}
           %__gpg /usr/bin/gpg
-          %__gpg_sign_cmd %{__gpg} --batch --yes --no-armor --pinentry-mode loopback --passphrase-fd 0 --default-key %{_gpg_name} --detach-sign --output %{__signature_filename} %{__plaintext_filename}
+          %__gpg_sign_cmd %{__gpg} --batch --yes --no-armor --pinentry-mode loopback --passphrase-file /tmp/rpm-passphrase.txt --default-key %{_gpg_name} --detach-sign --output %{__signature_filename} %{__plaintext_filename}
           EOF
           
           # Sign all .rpm files
           for rpm_file in keymagic-ibus/dist/*.rpm; do
             if [ -f "$rpm_file" ]; then
               echo "Signing $rpm_file..."
-              echo "${{ secrets.GPG_PASSPHRASE }}" | \
-                rpmsign --addsign "$rpm_file"
+              rpmsign --addsign "$rpm_file"
             fi
           done
+          
+          # Clean up passphrase file
+          rm -f /tmp/rpm-passphrase.txt
         env:
           GPG_TTY: $(tty)
       
