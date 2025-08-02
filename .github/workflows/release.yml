@@ -140,17 +140,34 @@ jobs:
             4. Add KeyMagic in System Settings > Keyboard > Input Sources
             
             ### Linux
-            **Debian/Ubuntu:**
+            
+            **Quick Install (Recommended):**
+            ```bash
+            curl -fsSL https://thantthet.github.io/keymagic-3/install.sh | bash
+            ```
+            
+            This will automatically:
+            - Detect your Linux distribution
+            - Add the KeyMagic repository
+            - Install the latest version
+            - Keep KeyMagic updated through your package manager
+            
+            **Manual Installation:**
+            
+            *Debian/Ubuntu:*
             ```bash
             sudo dpkg -i keymagic3_${{ needs.prepare.outputs.version }}_*.deb
             sudo apt-get install -f  # Install any missing dependencies
             ```
             
-            **Fedora/RHEL:**
+            *Fedora/RHEL:*
             ```bash
             sudo rpm -i keymagic3-${{ needs.prepare.outputs.version }}-1.*.rpm
             ```
             
-            After installation, restart IBus or log out and log back in.
+            **Post-Installation:**
+            1. Restart IBus: `ibus restart`
+            2. Or log out and log back in
+            3. Add KeyMagic in your system's input method settings
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
