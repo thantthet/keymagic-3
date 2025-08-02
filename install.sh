@@ -2,8 +2,23 @@
 
 # KeyMagic Linux Installer Script
 # Usage: curl -fsSL https://thantthet.github.io/keymagic-3/install.sh | bash
+# Or: curl -fsSL https://thantthet.github.io/keymagic-3/install.sh | bash -s -- -y
 
 set -e
+
+# Parse command line arguments
+ASSUME_YES=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -y|--yes|--assume-yes)
+            ASSUME_YES=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -175,12 +190,20 @@ main() {
     print_info "Package manager: $PKG_MANAGER"
     echo ""
     
-    # Confirm installation
-    read -p "Do you want to install KeyMagic? [Y/n] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
-        print_info "Installation cancelled."
-        exit 0
+    # Check if we should ask for confirmation
+    if [ "$ASSUME_YES" = true ]; then
+        print_info "Auto-confirming installation (-y flag detected)"
+    elif [ -t 0 ]; then
+        # Interactive mode - ask for confirmation
+        read -p "Do you want to install KeyMagic? [Y/n] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
+            print_info "Installation cancelled."
+            exit 0
+        fi
+    else
+        # Non-interactive mode (piped) - proceed without asking
+        print_info "Running in non-interactive mode. Proceeding with installation..."
     fi
     
     # Install based on package manager
