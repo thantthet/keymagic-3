@@ -5,10 +5,10 @@ Maintainer: Thant Thet Khin Zaw <contact@keymagic.net>
 Depends: libgtk-3-0, ibus (>= 1.5.0), libwebkit2gtk-4.1-0
 Recommends: fonts-myanmar
 Filename: pool/main/k/keymagic3/keymagic3_0.0.7_amd64.deb
-Size: 5002994
-MD5sum: 4f01f7a899345d8e87f76a57b2a0b5c7
-SHA1: 3e419a72cfe96bfb650f2a507bf77648c325282e
-SHA256: 5c5fe22e173211f72d5b38f3712d876295d528b25785fe2228cbf60eb3af3527
+Size: 5001456
+MD5sum: 5ea069045d4695a5b4f5906065d25f14
+SHA1: 408f61e47244138e9bd8a07de16c53c6874924dc
+SHA256: 026d63e05735c059b40dfea70c621ea40fc5b4433feb87e546afde4df2087948
 Section: utils
 Priority: optional
 Homepage: https://github.com/thantthet/keymagic-3
