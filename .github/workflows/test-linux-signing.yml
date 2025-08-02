@@ -1,0 +1,14 @@
+name: Test Linux Signing
+
+on:
+  push:
+    branches:
+      - test-linux-signing
+
+jobs:
+  call-build-linux:
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      version: '0.0.7'
+      sign: true
+    secrets: inherit
