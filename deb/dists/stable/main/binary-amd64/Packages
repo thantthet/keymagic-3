@@ -1,0 +1,21 @@
+Package: keymagic3
+Version: 0.0.7
+Architecture: amd64
+Maintainer: Thant Thet Khin Zaw <contact@keymagic.net>
+Depends: libgtk-3-0, ibus (>= 1.5.0), libwebkit2gtk-4.1-0
+Recommends: fonts-myanmar
+Filename: pool/main/k/keymagic3/keymagic3_0.0.7_amd64.deb
+Size: 5002994
+MD5sum: 4f01f7a899345d8e87f76a57b2a0b5c7
+SHA1: 3e419a72cfe96bfb650f2a507bf77648c325282e
+SHA256: 5c5fe22e173211f72d5b38f3712d876295d528b25785fe2228cbf60eb3af3527
+Section: utils
+Priority: optional
+Homepage: https://github.com/thantthet/keymagic-3
+Description: KeyMagic 3 - Smart keyboard input method
+ KeyMagic 3 is a powerful and flexible input method that allows users to type
+ in Myanmar and other complex scripts using standard keyboards.
+ .
+ This package includes the GUI configuration tool, IBus engine, and bundled
+ keyboard layouts.
+

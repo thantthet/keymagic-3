@@ -1,0 +1,6 @@
+[keymagic]
+name=KeyMagic Input Method
+baseurl=https://thantthet.github.io/keymagic-3/rpm/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://thantthet.github.io/keymagic-3/keymagic.gpg

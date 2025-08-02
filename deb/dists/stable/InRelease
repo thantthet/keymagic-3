@@ -1,0 +1,34 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: KeyMagic
+Label: KeyMagic
+Suite: stable
+Codename: stable
+Version: 1.0
+Architectures: amd64 arm64
+Components: main
+Description: KeyMagic Input Method Repository
+Date: Sat, 02 Aug 2025 05:50:55 +0000
+SHA256:
+ 197a58bdd0a601da194d5bdf14c9c99ae142187799acac2461602447ccca07a2 805 main/binary-amd64/Packages
+ 4995d5832df0b8aa9fab58b9945332dc472b535e12f0f76779cd17dff61ac1fb 561 main/binary-amd64/Packages.gz
+ 7848ebd3332e0fd8b1e77b58169551279ef37a3b0db6c8450cae977cbcd054fd 805 main/binary-arm64/Packages
+ 5847f904e268608bd83e2ce4ab8aa98cd5e40930ab51fbd4ddb544a589161a31 562 main/binary-arm64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQJIBAEBCgAyFiEEN23zD6xLf0Vo10dbYyp4peMdp2cFAmiNpz8UHHNpZ25lckBr
+ZXltYWdpYy5uZXQACgkQYyp4peMdp2cFjQ//R9PnOiqstgB0fL81sqYNS/NQbAqT
+p6D9QOOSaDg0SRBxxkIXONxW1IU9HGdRRfqabGMnNUVUzlNMlgWoUg95b31cw+Kg
+m2XXMnyFe1SKh8qF3B1KTM+Y2qAAZHNiX6x7x/KPE6Wy7yT89IWVENe65gqDec3H
+95K6c/1yEwi9M0F/iqLXHShSk0NHWzNaWGZiBjUtDRipeSBa7gHtpZpAzWWLo5Zi
+73opZsvYPNZq0kSG9pmA/fVVY7clk63lbFX6y6TvQf14Y0/7n0vfOA/HIUG5qjTI
+ranjXawyJrxq04qNdsDdCji2NTBMWJS2Ihf1zY4rc3ZSPFceBu4TLDE385wvY7H+
+bsm+vuJX0qkMlq5mhhgxj2OfQqobjuHB3+qe3n+iQ1wxDEXZTe2PhFGrCQy0vFQL
+fwe+zFuWnHWaEdzSO2akhfgb88qQ/CWODMy11kket1dPK3pbJSLnxPlO7//4JYTm
+TLV2l5RLINeUPkde803uGOikX+lMTWrqAF+26C0/OLtgcXR4G8Q3ocmzUaojBIu7
+7ig/LGLLtpnaKwk/PrwxTZDkUA9qi2SebWwsScDKsHs8qhzDFgO4tQOrKgjChI1a
+gPEo8nNyTJTRO7ZlK1Ck8VZL/otSdQT6OvN87Aswr9C8fM5qm/DDfLkf+UfkdktI
+hWYsEXw5zE/O55c=
+=g2uf
+-----END PGP SIGNATURE-----

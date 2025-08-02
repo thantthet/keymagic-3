@@ -1,0 +1,14 @@
+Origin: KeyMagic
+Label: KeyMagic
+Suite: stable
+Codename: stable
+Version: 1.0
+Architectures: amd64 arm64
+Components: main
+Description: KeyMagic Input Method Repository
+Date: Sat, 02 Aug 2025 05:50:55 +0000
+SHA256:
+ 197a58bdd0a601da194d5bdf14c9c99ae142187799acac2461602447ccca07a2 805 main/binary-amd64/Packages
+ 4995d5832df0b8aa9fab58b9945332dc472b535e12f0f76779cd17dff61ac1fb 561 main/binary-amd64/Packages.gz
+ 7848ebd3332e0fd8b1e77b58169551279ef37a3b0db6c8450cae977cbcd054fd 805 main/binary-arm64/Packages
+ 5847f904e268608bd83e2ce4ab8aa98cd5e40930ab51fbd4ddb544a589161a31 562 main/binary-arm64/Packages.gz
