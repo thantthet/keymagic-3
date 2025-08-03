@@ -80,7 +80,7 @@
   },
   "releaseNotes": {
     "0.0.7": {
-      "en": "## What's New in Version 0.0.7\r\n\r\n### 🎉 KeyMagic for All Major Desktops!\r\n\r\nKeyMagic 3 is now available for **macOS** and **Linux** for the first time, alongside major updates for Windows.\r\n\r\n### ✨ Key Features\r\n\r\n**All Platforms:**\r\n• Unified settings window across Windows, macOS, and Linux\r\n• Built-in KMS to KM2 keyboard converter\r\n\r\n**macOS (New!):**\r\n• Full hotkey support for keyboard switching\r\n• Menu bar integration\r\n• On-screen switch notifications\r\n\r\n**Linux (New!):**\r\n• IBus framework integration\r\n• Hotkey and menu-based keyboard switching\r\n• Direct settings access from IBus menu\r\n\r\n**Windows Updates:**\r\n• Universal installer for x64 and ARM64\r\n• Smart tray icon (appears only when active)\r\n• Keyboard layout preview on hover\r\n• Improved hotkey reliability\r\n"
+      "en": "## What's New in Version 0.0.7\r\n\r\n### 🎉 KeyMagic for All Major Desktops!\r\n\r\nKeyMagic 3 is now available for **macOS** and **Linux** for the first time, alongside major updates for Windows.\r\n\r\n### ✨ Key Features\r\n\r\n**All Platforms:**\r\n- Unified settings window across Windows, macOS, and Linux\r\n- Built-in KMS to KM2 keyboard converter\r\n\r\n**macOS (New!):**\r\n- Full hotkey support for keyboard switching\r\n- Menu bar integration\r\n- On-screen switch notifications\r\n\r\n**Linux (New!):**\r\n- IBus framework integration\r\n- Hotkey and menu-based keyboard switching\r\n- Direct settings access from IBus menu\r\n\r\n**Windows Updates:**\r\n- Universal installer for x64 and ARM64\r\n- Smart tray icon (appears only when active)\r\n- Keyboard layout preview on hover\r\n- Improved hotkey reliability\r\n"
     }
   }
 }
