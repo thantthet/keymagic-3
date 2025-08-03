@@ -174,15 +174,39 @@ def generate_updates_json():
                         "sha256": sha256
                     }
         else:
-            platforms[platform][arch] = {
-                "version": version,
-                "releaseDate": release_date,
-                "minimumSystemVersion": min_version,
-                "url": download_url,
-                "signature": "",  # TODO: Add signature support
-                "size": file_size,
-                "sha256": sha256
-            }
+            if platform == 'linux':
+                # For Linux, we need to handle the nested packages structure
+                if arch not in platforms[platform]:
+                    platforms[platform][arch] = {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "",
+                        "packages": {}
+                    }
+                
+                # Determine package type from filename
+                package_type = None
+                if filename.endswith('.deb'):
+                    package_type = 'deb'
+                elif filename.endswith('.rpm'):
+                    package_type = 'rpm'
+                
+                if package_type:
+                    platforms[platform][arch]["packages"][package_type] = {
+                        "url": download_url,
+                        "size": file_size,
+                        "sha256": sha256
+                    }
+            else:
+                platforms[platform][arch] = {
+                    "version": version,
+                    "releaseDate": release_date,
+                    "minimumSystemVersion": min_version,
+                    "url": download_url,
+                    "signature": "",  # TODO: Add signature support
+                    "size": file_size,
+                    "sha256": sha256
+                }
     
     # Create the full JSON structure
     updates_data = {
@@ -255,10 +279,35 @@ def generate_updates_json():
                         "version": version,
                         "releaseDate": release_date,
                         "minimumSystemVersion": "",
-                        "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/keymagic3-{version}-amd64.deb",
-                        "signature": "",
-                        "size": 0,
-                        "sha256": ""
+                        "packages": {
+                            "deb": {
+                                "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/keymagic3_{version}_amd64.deb",
+                                "size": 0,
+                                "sha256": ""
+                            },
+                            "rpm": {
+                                "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/keymagic3-{version}-1.x86_64.rpm",
+                                "size": 0,
+                                "sha256": ""
+                            }
+                        }
+                    },
+                    "aarch64": {
+                        "version": version,
+                        "releaseDate": release_date,
+                        "minimumSystemVersion": "",
+                        "packages": {
+                            "deb": {
+                                "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/keymagic3_{version}_arm64.deb",
+                                "size": 0,
+                                "sha256": ""
+                            },
+                            "rpm": {
+                                "url": f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/keymagic3-{version}-1.aarch64.rpm",
+                                "size": 0,
+                                "sha256": ""
+                            }
+                        }
                     }
                 }
     
@@ -273,8 +322,17 @@ def generate_updates_json():
         if platform_data:
             print(f"\n{platform_name.capitalize()}:")
             for arch, info in platform_data.items():
-                if info['size'] > 0:
-                    print(f"  {arch}: {info['size']:,} bytes, SHA256: {info['sha256'][:16] if info['sha256'] else 'N/A'}...")
+                if platform_name == 'linux' and 'packages' in info:
+                    # Linux has nested packages structure
+                    for pkg_type, pkg_info in info['packages'].items():
+                        if pkg_info.get('size', 0) > 0:
+                            sha_display = pkg_info['sha256'][:16] if pkg_info.get('sha256') else 'N/A'
+                            print(f"  {arch}/{pkg_type}: {pkg_info['size']:,} bytes, SHA256: {sha_display}...")
+                else:
+                    # Windows/macOS have direct structure
+                    if info.get('size', 0) > 0:
+                        sha_display = info['sha256'][:16] if info.get('sha256') else 'N/A'
+                        print(f"  {arch}: {info['size']:,} bytes, SHA256: {sha_display}...")
     
     return True
 
