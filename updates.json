@@ -46,19 +46,35 @@
         "version": "0.0.7",
         "releaseDate": "2025-08-01T18:55:16Z",
         "minimumSystemVersion": "",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3_0.0.7_arm64.deb",
-        "signature": "",
-        "size": 5211612,
-        "sha256": "e7948ef0c336c25ce8dfcdc4b1dc633491b7a28695c65b3a33ee137cd5cbaeb4"
+        "packages": {
+          "rpm": {
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3-0.0.7-1.aarch64.rpm",
+            "size": 5650926,
+            "sha256": "aa60928dbcb9d1d200b43888be429f6f0a9ef10b956163f150c0b621cf52f7b9"
+          },
+          "deb": {
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3_0.0.7_arm64.deb",
+            "size": 5214904,
+            "sha256": "01e32fec7d592a2c9b231246424446cce2c28c3df8f91ec8adae831b587c274f"
+          }
+        }
       },
       "x86_64": {
         "version": "0.0.7",
         "releaseDate": "2025-08-01T18:55:16Z",
         "minimumSystemVersion": "",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3_0.0.7_amd64.deb",
-        "signature": "",
-        "size": 5002994,
-        "sha256": "5c5fe22e173211f72d5b38f3712d876295d528b25785fe2228cbf60eb3af3527"
+        "packages": {
+          "rpm": {
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3-0.0.7-1.x86_64.rpm",
+            "size": 5444848,
+            "sha256": "283d8f6699e749799b8f49850ab8fe683a25b4adcd3a407f524883daf2c049b6"
+          },
+          "deb": {
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3_0.0.7_amd64.deb",
+            "size": 5001456,
+            "sha256": "026d63e05735c059b40dfea70c621ea40fc5b4433feb87e546afde4df2087948"
+          }
+        }
       }
     }
   },
