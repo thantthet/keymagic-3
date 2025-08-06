@@ -419,6 +419,15 @@ STDAPI CCompositionManager::OnCompositionTerminated(TfEditCookie ecWrite, ITfCom
     {
         m_pComposition->Release();
         m_pComposition = nullptr;
+        
+        // Reset the engine when composition is terminated
+        // This ensures the engine state is clean when composition ends unexpectedly
+        // (e.g., when user clicks away or switches to another application)
+        if (m_pTextService)
+        {
+            DEBUG_LOG(L"Resetting engine on composition termination");
+            m_pTextService->ResetEngine();
+        }
     }
     
     return S_OK;

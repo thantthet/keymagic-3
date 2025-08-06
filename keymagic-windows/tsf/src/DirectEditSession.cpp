@@ -387,6 +387,9 @@ HRESULT CDirectEditSession::ReadDocumentSuffix(TfEditCookie ec, int maxChars, st
         return E_FAIL;
     }
 
+    // Collapse to the start of selection to read text before selection start
+    pRangeStart->Collapse(ec, TF_ANCHOR_START);
+
     // Move start back by maxChars
     LONG shifted;
     pRangeStart->ShiftStart(ec, -maxChars, &shifted, nullptr);

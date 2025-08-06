@@ -277,7 +277,6 @@ STDAPI CKeyMagicTextService::OnUninitDocumentMgr(ITfDocumentMgr *pdim)
 STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMgr *pdimPrevFocus)
 {
     DEBUG_LOG_FUNC();
-    DEBUG_LOG(L"Focus changed");
     EnterCriticalSection(&m_cs);
 
     // Clean up previous sinks
@@ -297,6 +296,7 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
     // Get new context and set up sinks
     if (m_pDocMgrFocus)
     {
+        DEBUG_LOG(L"Focus changed");
         // Notify tray manager that we have focus
         NotifyTrayManagerFocusChange(TRUE);
 
@@ -390,8 +390,10 @@ STDAPI CKeyMagicTextService::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMg
     }
     else
     {
-        // Lost focus entirely, reset engine
-        ResetEngine();
+        DEBUG_LOG(L"Focus lost");
+        
+        // Keep engine state when losing focus - do not reset
+        // This preserves the composing text and engine state when switching windows
 
         // Notify tray manager that we lost focus
         NotifyTrayManagerFocusChange(FALSE);

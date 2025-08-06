@@ -196,14 +196,16 @@ HRESULT CCompositionEditSession::ProcessKey(TfEditCookie ec)
     }
     else
     {
-        // Engine has no composing text - clear any existing composition
-        DEBUG_LOG(L"Engine has no composing text, ending composition");
         if (m_pCompositionManager->IsComposing())
         {
+            // Engine has no composing text - clear any existing composition
+            DEBUG_LOG(L"Engine has no composing text, ending composition");
+
             if (output.is_processed) {
                 // If the engine processed the key, we should update the composition
                 m_pCompositionManager->UpdateComposition(m_pContext, ec, L"");
             }
+            
             m_pCompositionManager->EndComposition(ec);
         }
         
@@ -317,6 +319,9 @@ HRESULT CCompositionEditSession::ReadTextBeforeCursor(TfEditCookie ec, int maxCh
         pRange->Release();
         return E_FAIL;
     }
+
+    // Collapse to the start of selection to read text before selection start
+    pRangeStart->Collapse(ec, TF_ANCHOR_START);
 
     // Move start back by maxChars
     LONG shifted;
