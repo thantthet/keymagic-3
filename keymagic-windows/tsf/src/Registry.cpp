@@ -11,6 +11,8 @@
 #include <string>
 #include <shlobj.h>
 #include <fstream>
+#include <aclapi.h>
+#include <sddl.h>
 
 // List of categories to register the text service under
 static const GUID* g_SupportedCategories[] = {
@@ -88,6 +90,80 @@ BOOL SetRegValue(HKEY hKeyParent, LPCWSTR lpszKeyName, LPCWSTR lpszValueName, LP
     return (lResult == ERROR_SUCCESS);
 }
 
+// Helper function to set directory permissions for EVERYONE and ALL APPLICATION PACKAGES
+static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
+{
+    BOOL bResult = FALSE;
+    PACL pNewDacl = NULL;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    EXPLICIT_ACCESS ea[2] = {0};
+    PSID pEveryoneSID = NULL;
+    PSID pAllAppsSID = NULL;
+    SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+    SID_IDENTIFIER_AUTHORITY SIDAuthAppPackage = SECURITY_APP_PACKAGE_AUTHORITY;
+    
+    // Create SID for EVERYONE
+    if (!AllocateAndInitializeSid(&SIDAuthWorld, 1,
+                                  SECURITY_WORLD_RID,
+                                  0, 0, 0, 0, 0, 0, 0,
+                                  &pEveryoneSID))
+        goto Cleanup;
+    
+    // Create SID for ALL APPLICATION PACKAGES
+    if (!AllocateAndInitializeSid(&SIDAuthAppPackage, 2,
+                                  SECURITY_APP_PACKAGE_BASE_RID,
+                                  SECURITY_BUILTIN_PACKAGE_ANY_PACKAGE,
+                                  0, 0, 0, 0, 0, 0,
+                                  &pAllAppsSID))
+        goto Cleanup;
+    
+    // Set up EXPLICIT_ACCESS for EVERYONE
+    ea[0].grfAccessPermissions = GENERIC_READ;
+    ea[0].grfAccessMode = GRANT_ACCESS;
+    ea[0].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+    ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[0].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea[0].Trustee.ptstrName = (LPWSTR)pEveryoneSID;
+    
+    // Set up EXPLICIT_ACCESS for ALL APPLICATION PACKAGES
+    ea[1].grfAccessPermissions = GENERIC_READ;
+    ea[1].grfAccessMode = GRANT_ACCESS;
+    ea[1].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+    ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[1].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea[1].Trustee.ptstrName = (LPWSTR)pAllAppsSID;
+    
+    // Create a new ACL
+    if (SetEntriesInAcl(2, ea, NULL, &pNewDacl) != ERROR_SUCCESS)
+        goto Cleanup;
+    
+    // Initialize a security descriptor
+    pSD = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
+    if (pSD == NULL)
+        goto Cleanup;
+    
+    if (!InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION))
+        goto Cleanup;
+    
+    // Add the ACL to the security descriptor
+    if (!SetSecurityDescriptorDacl(pSD, TRUE, pNewDacl, FALSE))
+        goto Cleanup;
+    
+    // Set the security descriptor for the directory
+    if (SetFileSecurity(pszDirectory, DACL_SECURITY_INFORMATION, pSD))
+    {
+        bResult = TRUE;
+    }
+    
+Cleanup:
+    if (pEveryoneSID) FreeSid(pEveryoneSID);
+    if (pAllAppsSID) FreeSid(pAllAppsSID);
+    if (pNewDacl) LocalFree(pNewDacl);
+    if (pSD) LocalFree(pSD);
+    
+    return bResult;
+}
+
 // Helper function to check if we're loaded through an ARM64X forwarder
 static BOOL IsLoadedViaForwarder(LPCWSTR pszCurrentPath, LPWSTR pszForwarderPath, DWORD cchForwarderPath)
 {
@@ -147,6 +223,26 @@ static BOOL GetKeyboardIconPath(LPWSTR pszIconPath, DWORD cchIconPath)
         {
             return FALSE;
         }
+    }
+    
+    // Construct the KeyMagic directory path
+    WCHAR szKeyMagicDir[MAX_PATH];
+    StringCchPrintf(szKeyMagicDir, ARRAYSIZE(szKeyMagicDir), L"%s\\KeyMagic", szAppData);
+    
+    // Create the directory if it doesn't exist
+    if (GetFileAttributes(szKeyMagicDir) == INVALID_FILE_ATTRIBUTES)
+    {
+        if (CreateDirectory(szKeyMagicDir, NULL))
+        {
+            // Set permissions for EVERYONE and ALL APPLICATION PACKAGES
+            SetDirectoryPermissions(szKeyMagicDir);
+        }
+    }
+    else
+    {
+        // Directory exists, ensure it has correct permissions
+        // This is important for upgrades or if permissions were changed
+        SetDirectoryPermissions(szKeyMagicDir);
     }
     
     // Construct the icon file path (same as GUI: %LOCALAPPDATA%\KeyMagic\keymagic-keyboard.ico)
