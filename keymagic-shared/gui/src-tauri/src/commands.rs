@@ -851,3 +851,17 @@ pub struct BundledKeyboard {
     pub icon_data: Option<Vec<u8>>,
     pub bundled_path: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppInfo {
+    pub display_name: String,
+    pub identifier: String, // exe name on Windows, bundle ID on macOS
+    pub icon_base64: Option<String>,
+    pub is_running: bool,
+}
+
+#[tauri::command]
+pub fn get_running_apps() -> Result<Vec<AppInfo>, String> {
+    crate::app_enumerator::get_running_apps()
+        .map_err(|e| e.to_string())
+}

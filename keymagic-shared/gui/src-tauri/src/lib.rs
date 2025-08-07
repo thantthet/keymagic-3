@@ -3,6 +3,7 @@ mod core;
 mod hotkey;
 mod platform;
 mod updater;
+mod app_enumerator;
 
 #[cfg(target_os = "macos")]
 mod imk_installer;
@@ -171,6 +172,7 @@ pub fn run() {
             commands::convert_kms_to_km2,
             commands::validate_kms_file,
             commands::convert_kms_file,
+            commands::get_running_apps,
             #[cfg(target_os = "macos")]
             imk_installer::check_imk_status,
             #[cfg(target_os = "macos")]

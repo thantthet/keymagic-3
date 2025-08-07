@@ -856,6 +856,146 @@ body {
   text-align: center;
 }
 
+/* App Picker Styles */
+.app-picker-content {
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  margin: auto;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.app-picker-controls {
+  margin-bottom: 1rem;
+}
+
+.app-search-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.app-list-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.app-list {
+  padding: 0.5rem;
+}
+
+.app-item {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem;
+  margin-bottom: 0.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.app-item:hover {
+  background-color: var(--hover-bg);
+}
+
+.app-item.selected {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.app-item.selected .app-id {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.app-icon {
+  width: 28px;
+  height: 28px;
+  margin-right: 0.6rem;
+  object-fit: contain;
+}
+
+.app-icon.placeholder {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.app-info {
+  flex: 1;
+}
+
+.app-name {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.app-id {
+  font-size: 11px;
+  color: var(--secondary-text);
+  margin-top: 1px;
+}
+
+.app-list-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--secondary-text);
+}
+
+.manual-entry-section {
+  margin-top: 1rem;
+}
+
+.separator {
+  text-align: center;
+  color: var(--secondary-text);
+  margin: 1rem 0;
+  position: relative;
+}
+
+.separator::before,
+.separator::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 45%;
+  height: 1px;
+  background-color: var(--border-color);
+}
+
+.separator::before {
+  left: 0;
+}
+
+.separator::after {
+  right: 0;
+}
+
+.manual-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.manual-entry label {
+  white-space: nowrap;
+}
+
+.manual-entry input {
+  flex: 1;
+}
+
 /* Modal */
 .modal {
   display: none;

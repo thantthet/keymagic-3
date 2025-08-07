@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Select Application</title>
+    <script type="module" src="/app-picker.js" defer></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      
+      .picker-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      
+      .picker-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+      }
+      
+      .picker-header h2 {
+        margin: 0 0 5px 0;
+        font-size: 18px;
+      }
+      
+      .picker-header p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--secondary-text);
+      }
+      
+      .picker-controls {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      
+      .picker-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 15px 20px;
+        overflow: hidden;
+      }
+      
+      .app-list-container {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        margin-bottom: 15px;
+      }
+      
+      .manual-entry-section {
+        padding-top: 10px;
+        border-top: 1px solid var(--border-color);
+      }
+      
+      .picker-footer {
+        padding: 15px 20px;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      
+      /* Override some styles for compact window */
+      .app-search-input {
+        width: 100%;
+        padding: 8px;
+        font-size: 13px;
+      }
+      
+      .separator {
+        margin: 10px 0;
+      }
+      
+      .manual-entry label {
+        font-size: 13px;
+      }
+      
+      .loading-message {
+        text-align: center;
+        padding: 40px;
+        color: var(--secondary-text);
+      }
+      
+      .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0,0,0,.1);
+        border-radius: 50%;
+        border-top-color: var(--primary-color);
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="picker-container">
+      <div class="picker-header">
+        <h2>Select Application</h2>
+        <p id="mode-description">Choose an application to configure</p>
+      </div>
+      
+      <div class="picker-controls">
+        <input type="search" 
+               id="app-search" 
+               class="app-search-input"
+               placeholder="Search applications..." 
+               autocomplete="off">
+      </div>
+      
+      <div class="picker-body">
+        <div class="app-list-container">
+          <div id="app-list" class="app-list">
+            <div class="loading-message">
+              <div class="spinner"></div>
+              <p>Loading applications...</p>
+            </div>
+          </div>
+          <div class="app-list-empty" id="app-list-empty" style="display: none;">
+            <p>No running applications found.</p>
+            <p>Please start an application and refresh.</p>
+          </div>
+        </div>
+        
+        <div class="manual-entry-section">
+          <div class="separator">OR</div>
+          <div class="manual-entry">
+            <label for="manual-app-id">Enter manually:</label>
+            <input type="text" 
+                   id="manual-app-id" 
+                   class="form-control"
+                   placeholder="Enter application identifier"
+                   autocomplete="off">
+          </div>
+        </div>
+      </div>
+      
+      <div class="picker-footer">
+        <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="add-btn">Add Application</button>
+      </div>
+    </div>
+  </body>
+</html>

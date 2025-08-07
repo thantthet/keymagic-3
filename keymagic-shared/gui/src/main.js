@@ -461,17 +461,8 @@ function renderHostList(hosts) {
 }
 
 async function addHostToCompositionMode() {
-  const hostName = await showHostInputDialog();
-  if (!hostName) return;
-  
-  try {
-    await invoke('add_composition_mode_host', { hostName });
-    await loadCompositionModeHosts();
-    showSuccess(`Added "${hostName}" to composition mode`);
-  } catch (error) {
-    console.error('Failed to add host:', error);
-    showError('Failed to add host to composition mode');
-  }
+  // Open app picker window
+  await openAppPickerWindow('composition');
 }
 
 async function removeHostFromCompositionMode(hostName) {
@@ -581,17 +572,8 @@ function renderDirectModeHostList(hosts) {
 }
 
 async function addHostToDirectMode() {
-  const hostName = await showDirectModeHostInputDialog();
-  if (!hostName) return;
-  
-  try {
-    await invoke('add_direct_mode_host', { hostName });
-    await loadDirectModeHosts();
-    showSuccess(`Added "${hostName}" to direct mode`);
-  } catch (error) {
-    console.error('Failed to add host:', error);
-    showError('Failed to add host to direct mode');
-  }
+  // Open app picker window
+  await openAppPickerWindow('direct');
 }
 
 async function removeHostFromDirectMode(hostName) {
@@ -1956,6 +1938,49 @@ async function saveFileDialog(defaultFileName) {
   });
   
   return filePath;
+}
+
+// App Picker Window Function
+async function openAppPickerWindow(mode) {
+  const { WebviewWindow } = window.__TAURI__.webviewWindow;
+  
+  // Create unique window label
+  const windowLabel = `app-picker-${Date.now()}`;
+  
+  try {
+    const pickerWindow = new WebviewWindow(windowLabel, {
+      url: `app-picker.html?mode=${mode}`,
+      title: 'Select Application',
+      width: 480,
+      height: 550,
+      center: true,
+      resizable: true,
+      alwaysOnTop: false,
+      decorations: true,
+      transparent: false,
+      maximizable: false,
+      minimizable: true,
+      minWidth: 400,
+      minHeight: 450,
+    });
+    
+    // Listen for app-added event from picker window
+    const { once } = window.__TAURI__.event;
+    once('app-added', async (event) => {
+      // Reload the appropriate host list
+      if (event.payload.mode === 'composition') {
+        await loadCompositionModeHosts();
+        showSuccess(`Added "${event.payload.appId}" to composition mode`);
+      } else if (event.payload.mode === 'direct') {
+        await loadDirectModeHosts();
+        showSuccess(`Added "${event.payload.appId}" to direct mode`);
+      }
+    });
+    
+  } catch (error) {
+    console.error('Failed to open app picker window:', error);
+    showError('Failed to open application picker');
+  }
 }
 
 window.addEventListener('DOMContentLoaded', init);
