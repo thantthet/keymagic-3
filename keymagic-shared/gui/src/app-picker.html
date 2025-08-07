@@ -49,19 +49,20 @@
         flex-direction: column;
         padding: 15px 20px;
         overflow: hidden;
+        min-height: 0;
       }
       
       .app-list-container {
-        flex: 1;
+        flex: 1 1 auto;
         overflow-y: auto;
         border: 1px solid var(--border-color);
         border-radius: 4px;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
       }
       
       .manual-entry-section {
-        padding-top: 10px;
-        border-top: 1px solid var(--border-color);
+        flex: 0 0 auto;
+        padding-top: 5px;
       }
       
       .picker-footer {
@@ -144,8 +145,8 @@
             <label for="manual-app-id">Enter manually:</label>
             <input type="text" 
                    id="manual-app-id" 
-                   class="form-control"
-                   placeholder="Enter application identifier"
+                   class="app-search-input"
+                   placeholder="Enter bundle ID (e.g., com.apple.Safari)"
                    autocomplete="off">
           </div>
         </div>
