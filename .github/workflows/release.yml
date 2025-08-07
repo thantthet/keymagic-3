@@ -102,25 +102,25 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
-          name: KeyMagic v${{ needs.prepare.outputs.version }}
+          name: KeyMagic 3 v${{ needs.prepare.outputs.version }}
           draft: ${{ github.event.inputs.draft || false }}
           prerelease: false
           files: release-assets/*
           body: |
-            # KeyMagic v${{ needs.prepare.outputs.version }}
-            
-            ## What's New
+            ## What's New 🎉
             - [Add release notes here]
             
-            ## Downloads
-            
-            ### Windows
-            - **Installer**: `KeyMagic3-Setup-${{ needs.prepare.outputs.version }}.exe` - Universal installer for x64 and ARM64
-            
-            ### macOS
-            - **DMG**: `KeyMagic3-${{ needs.prepare.outputs.version }}.dmg` - Universal app for Intel and Apple Silicon
-            
-            ### Linux
+            **Windows**
+            <a href="https://github.com/thantthet/keymagic-3/releases/download/v${{ needs.prepare.outputs.version }}/KeyMagic3-Setup-${{ needs.prepare.outputs.version }}.exe">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/5f/Windows_logo_-_2012.svg" width=34 alt="download for windows"/>
+            </a>
+
+            **macOS**
+            <a href="https://github.com/thantthet/keymagic-3/releases/download/v${{ needs.prepare.outputs.version }}/KeyMagic3-${{ needs.prepare.outputs.version }}.dmg">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/Apple_logo_grey.svg" width=34 alt="download for macos"/>
+            </a>
+
+            **Linux**
             - **Debian (amd64)**: `keymagic3_${{ needs.prepare.outputs.version }}_amd64.deb`
             - **Debian (arm64)**: `keymagic3_${{ needs.prepare.outputs.version }}_arm64.deb`
             - **RPM (x86_64)**: `keymagic3-${{ needs.prepare.outputs.version }}-1.x86_64.rpm`
@@ -128,18 +128,18 @@ jobs:
             
             ## Installation Instructions
             
-            ### Windows
+            #### Windows
             1. Download and run the installer
             2. Follow the installation wizard
             3. KeyMagic will be available in your system tray
             
-            ### macOS
+            #### macOS
             1. Download and open the DMG file
             2. Drag KeyMagic to your Applications folder
             3. Launch KeyMagic from Applications
             4. Add KeyMagic in System Settings > Keyboard > Input Sources
             
-            ### Linux
+            #### Linux
             
             **Quick Install (Recommended):**
             ```bash
