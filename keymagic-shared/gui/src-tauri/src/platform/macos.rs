@@ -71,7 +71,6 @@ impl MacOSBackend {
                     "com.tencent.xinWeChat".to_string(),
                     "com.tinyspeck.slackmacgap".to_string(),
                     "com.apple.Safari".to_string(),
-                    "com.google.Chrome".to_string(),
                     "us.zoom.xos".to_string(),
                     "com.apple.dt.Xcode".to_string(),
                     "com.apple.AppStore".to_string(),
