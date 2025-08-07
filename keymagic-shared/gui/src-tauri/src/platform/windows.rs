@@ -220,6 +220,7 @@ impl WindowsBackend {
             composition_mode: CompositionModeConfig {
                 enabled_hosts: vec![
                     "ms-teams.exe".to_string(),
+                    "excel.exe".to_string(),
                 ],
             },
             direct_mode: DirectModeConfig {

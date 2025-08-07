@@ -1470,7 +1470,8 @@ bool CKeyMagicTextService::ShouldUseCompositionEditSession()
         
         // Use default list of processes that should use composition mode
         std::vector<std::wstring> defaultProcesses = {
-            L"ms-teams.exe"
+            L"ms-teams.exe",
+            L"excel.exe"
         };
         
         // Check if current process is in the default list
