@@ -119,7 +119,7 @@ else
         --volicon "$PROJECT_ROOT/resources/icons/KeyMagic.icns" \
         --background "$BACKGROUND_IMAGE" \
         --window-pos 200 120 \
-        --window-size 600 400 \
+        --window-size 600 450 \
         --icon-size 100 \
         --icon "KeyMagic3.app" 150 200 \
         --hide-extension "KeyMagic3.app" \
