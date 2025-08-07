@@ -147,28 +147,6 @@ After installation:
 3. Configure hotkeys for switching between keyboards
 4. The TSF IME will be automatically registered with Windows
 
-## Development Status
-
-- ✅ Phase 1: KMS to KM2 Converter (Complete)
-- ✅ Phase 2: Core Engine Development (Complete)
-- ✅ Phase 3: Linux Integration (Complete)
-  - IBus engine implementation
-  - Cross-platform GUI foundation
-- ✅ Phase 4: macOS Integration (Complete)
-  - Input Method Kit implementation
-  - Hotkey support
-  - Keyboard switching notifications
-- ✅ Phase 5: Windows Integration (Complete)
-  - ✅ Phase 5.1: Foundation Setup
-  - ✅ Phase 5.2: Core TSF Functionality
-  - ✅ Phase 5.3: GUI Configuration Manager
-  - ✅ Phase 5.4: System Integration
-  - ✅ Phase 5.5: Installer and Deployment
-- ✅ Cross-Platform GUI Migration (Complete)
-  - Unified Tauri-based GUI for all platforms
-  - Platform-specific features and adaptations
-- ⏳ Phase 6: Advanced Features & Optimization (In Progress)
-
 ## Features
 
 ### Core Engine
