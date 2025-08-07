@@ -16,13 +16,13 @@ INSTALL_DIR = $(HOME)/Library/Input Methods
 BUILD_CONFIG ?= release
 ifeq ($(BUILD_CONFIG),debug)
     RUST_TARGET_DIR = ../target/debug
-    GUI_BUILD_DIR = ../target/debug/bundle/macos
+    GUI_BUILD_DIR = ../target/universal-apple-darwin/debug/bundle/macos
     SWIFT_FLAGS = -Onone -DDEBUG
     CARGO_FLAGS = 
     TAURI_FLAGS = --debug
 else
     RUST_TARGET_DIR = ../target/release
-    GUI_BUILD_DIR = ../target/release/bundle/macos
+    GUI_BUILD_DIR = ../target/universal-apple-darwin/release/bundle/macos
     SWIFT_FLAGS = -O
     CARGO_FLAGS = --release
     TAURI_FLAGS = 
@@ -31,23 +31,27 @@ endif
 # Default target
 all: build-core build-swift build-gui
 
-# Build core Rust library
+# Build core Rust library for both architectures
 build-core:
-	@echo "Building keymagic-core library ($(BUILD_CONFIG))..."
-	cd .. && cargo build -p keymagic-core $(CARGO_FLAGS)
+	@echo "Building keymagic-core library for x86_64 ($(BUILD_CONFIG))..."
+	cd .. && cargo build -p keymagic-core $(CARGO_FLAGS) --target x86_64-apple-darwin
+	@echo "Building keymagic-core library for aarch64 ($(BUILD_CONFIG))..."
+	cd .. && cargo build -p keymagic-core $(CARGO_FLAGS) --target aarch64-apple-darwin
 
-# Build Swift app bundle with C bridge
+# Build Swift app bundle with C bridge (universal binary)
 build-swift: build-core
-	@echo "Building Swift app bundle ($(BUILD_CONFIG))..."
+	@echo "Building Swift app bundle as universal binary ($(BUILD_CONFIG))..."
 	@mkdir -p $(BUILD_DIR)
 	
-	# Compile Swift sources directly with keymagic-core (force static linking)
+	# Build for x86_64
+	@echo "Building Swift for x86_64..."
 	swiftc \
 		$(SWIFT_FLAGS) \
-		-o $(BUILD_DIR)/KeyMagic3 \
+		-target x86_64-apple-macosx10.15 \
+		-o $(BUILD_DIR)/KeyMagic3-x86_64 \
 		-module-name KeyMagic3 \
 		-import-objc-header src/swift/KeyMagic-Bridging-Header.h \
-		$(RUST_TARGET_DIR)/$(CORE_LIB) \
+		../target/x86_64-apple-darwin/$(BUILD_CONFIG)/$(CORE_LIB) \
 		-lc++ \
 		-framework InputMethodKit \
 		-framework Carbon \
@@ -58,6 +62,35 @@ build-swift: build-core
 		src/swift/KMInputController.swift \
 		src/swift/KeycodeMapping.swift \
 		src/swift/KMConfiguration.swift
+	
+	# Build for arm64
+	@echo "Building Swift for arm64..."
+	swiftc \
+		$(SWIFT_FLAGS) \
+		-target arm64-apple-macosx11.0 \
+		-o $(BUILD_DIR)/KeyMagic3-arm64 \
+		-module-name KeyMagic3 \
+		-import-objc-header src/swift/KeyMagic-Bridging-Header.h \
+		../target/aarch64-apple-darwin/$(BUILD_CONFIG)/$(CORE_LIB) \
+		-lc++ \
+		-framework InputMethodKit \
+		-framework Carbon \
+		-framework Foundation \
+		-framework AppKit \
+		src/swift/main.swift \
+		src/swift/MacHotkey.swift \
+		src/swift/KMInputController.swift \
+		src/swift/KeycodeMapping.swift \
+		src/swift/KMConfiguration.swift
+	
+	# Create universal binary
+	@echo "Creating universal binary..."
+	lipo -create -output $(BUILD_DIR)/KeyMagic3 \
+		$(BUILD_DIR)/KeyMagic3-x86_64 \
+		$(BUILD_DIR)/KeyMagic3-arm64
+	
+	# Clean up architecture-specific binaries
+	@rm -f $(BUILD_DIR)/KeyMagic3-x86_64 $(BUILD_DIR)/KeyMagic3-arm64
 	
 	# Create app bundle structure
 	@mkdir -p "$(BUILD_DIR)/$(IMK_APP_NAME)/Contents/MacOS"
@@ -80,7 +113,7 @@ build-swift: build-core
 # Build GUI application bundle
 build-gui: build-core build-swift
 	@echo "Building KeyMagic GUI application ($(BUILD_CONFIG))..."
-	cd ../keymagic-shared/gui && cargo tauri build $(TAURI_FLAGS) --bundles app
+	cd ../keymagic-shared/gui && cargo tauri build $(TAURI_FLAGS) --target universal-apple-darwin --bundles app
 	
 	# Copy the built app to our build directory
 	@mkdir -p $(BUILD_DIR)
