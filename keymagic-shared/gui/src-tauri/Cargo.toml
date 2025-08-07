@@ -1,6 +1,6 @@
 [package]
 name = "keymagic-gui"
-version = "0.0.7"
+version = "0.0.8"
 description = "KeyMagic Cross-Platform GUI"
 authors = ["KeyMagic Team"]
 license = "GPL-3.0"
