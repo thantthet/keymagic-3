@@ -6,9 +6,9 @@ Version: 1.0
 Architectures: amd64 arm64
 Components: main
 Description: KeyMagic Input Method Repository
-Date: Sat, 02 Aug 2025 08:11:21 +0000
+Date: Thu, 07 Aug 2025 19:37:54 +0000
 SHA256:
- 4033e972b182c0f930d0a39fa7beb360ee4d6e51f289827d51750250c3832edf 805 main/binary-amd64/Packages
- 676716bb9d778f3362d932688f4653f3ec42111e91dd0e81b2a371da85d2f66c 564 main/binary-amd64/Packages.gz
- f5e8406206a5af3dfe1947f4f49caf79abe99529cfc45b81770d3806c9436fb0 805 main/binary-arm64/Packages
- 1a044e189999e975a9646ca0cb62a3ab3f4bddfd33f328aab825ad20e2478b9a 564 main/binary-arm64/Packages.gz
+ 3cf82d16616f1a9273bf879c0e480818c686f46e8a84eb12d575d1d81eedc6b9 805 main/binary-amd64/Packages
+ f4518b9368feaebfdaa37b35c5e7fbf81c158986edf0515ddee75a8ff46afce2 563 main/binary-amd64/Packages.gz
+ e3bdec0186007f6c4a071fd575ddd727b336a153169a557d1d288882955c148b 805 main/binary-arm64/Packages
+ 50f23125b3efe7a1ca6dadf20cb2f05852f8fecee0af4d1e1b6d68a054fcc3ec 564 main/binary-arm64/Packages.gz
