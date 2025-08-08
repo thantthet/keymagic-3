@@ -208,6 +208,36 @@
               </div>
             </section>
             
+            <section class="settings-section" id="imk-management-section" style="display: none;">
+              <h2>Input Method Management</h2>
+              <div class="setting-item">
+                <div class="imk-management-settings">
+                  <p class="setting-description">Manage the KeyMagic Input Method Kit (IMK) component that enables typing in macOS applications.</p>
+                  
+                  <div class="imk-status-card">
+                    <div class="imk-status-content">
+                      <div class="imk-status-info">
+                        <h3>KeyMagic Input Method</h3>
+                        <p class="imk-status-text" id="imk-status-text">Checking status...</p>
+                      </div>
+                      <div class="imk-actions">
+                        <button class="btn btn-secondary" id="reinstall-imk-btn" onclick="reinstallIMK()" style="display: none;">
+                          Reinstall Input Method
+                        </button>
+                        <button class="btn btn-danger" id="uninstall-imk-btn" onclick="uninstallIMK()" style="display: none;">
+                          Uninstall Input Method
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="info-box" style="margin-top: 16px;">
+                    <p><strong>Note:</strong> The Input Method component is required for KeyMagic to work in macOS applications. You only need to uninstall it if you want to completely remove KeyMagic from your system. Uninstalling will disable KeyMagic typing functionality until it's reinstalled.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+            
             <section class="settings-section">
               <h2>Updates</h2>
               <div class="setting-item">

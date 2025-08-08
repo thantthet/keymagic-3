@@ -67,6 +67,7 @@ window.switchPage = function(pageName) {
   if (pageName === 'settings') {
     if (platformInfo.os === 'macos') {
       loadDirectModeHosts();
+      loadIMKStatus();
     } else {
       loadCompositionModeHosts();
     }
@@ -1505,7 +1506,160 @@ function updatePlatformSpecificUI() {
       previewWindowSection.style.display = 'none';
     }
   }
+  
+  // Show/hide IMK management section for macOS
+  const imkSection = document.getElementById('imk-management-section');
+  if (imkSection) {
+    if (platformInfo.os === 'macos') {
+      imkSection.style.display = 'block';
+      // Load IMK status when settings page is shown
+      if (document.getElementById('settings-page').classList.contains('active')) {
+        loadIMKStatus();
+      }
+    } else {
+      imkSection.style.display = 'none';
+    }
+  }
 }
+
+// IMK Management Functions (macOS)
+async function loadIMKStatus() {
+  if (!platformInfo || platformInfo.os !== 'macos') return;
+  
+  const statusText = document.getElementById('imk-status-text');
+  const reinstallBtn = document.getElementById('reinstall-imk-btn');
+  const uninstallBtn = document.getElementById('uninstall-imk-btn');
+  
+  if (!statusText) return;
+  
+  try {
+    const imkInfo = await invoke('check_imk_status');
+    
+    if (imkInfo.installed) {
+      if (imkInfo.needs_update) {
+        statusText.innerHTML = `<span style="color: var(--warning-color);">Version ${imkInfo.version || 'unknown'} installed (update available)</span>`;
+        if (reinstallBtn) {
+          reinstallBtn.textContent = 'Update Input Method';
+          reinstallBtn.style.display = 'inline-block';
+        }
+      } else {
+        statusText.innerHTML = `<span style="color: var(--success-color);">Version ${imkInfo.version || 'unknown'} installed${imkInfo.enabled_in_system ? ' and enabled' : ''}</span>`;
+        if (reinstallBtn) {
+          reinstallBtn.textContent = 'Reinstall Input Method';
+          reinstallBtn.style.display = 'inline-block';
+        }
+      }
+      if (uninstallBtn) {
+        uninstallBtn.style.display = 'inline-block';
+      }
+    } else {
+      statusText.innerHTML = '<span style="color: var(--error-color);">Not installed</span>';
+      if (reinstallBtn) {
+        reinstallBtn.textContent = 'Install Input Method';
+        reinstallBtn.style.display = 'inline-block';
+      }
+      if (uninstallBtn) {
+        uninstallBtn.style.display = 'none';
+      }
+    }
+  } catch (error) {
+    console.error('Failed to check IMK status:', error);
+    statusText.innerHTML = '<span style="color: var(--error-color);">Failed to check status</span>';
+  }
+}
+
+window.reinstallIMK = async function() {
+  const reinstallBtn = document.getElementById('reinstall-imk-btn');
+  const statusText = document.getElementById('imk-status-text');
+  
+  if (reinstallBtn) {
+    reinstallBtn.disabled = true;
+    reinstallBtn.textContent = 'Installing...';
+  }
+  
+  try {
+    const result = await invoke('install_imk_bundle');
+    
+    if (result.success) {
+      if (result.already_enabled === false) {
+        // Show button to open system settings
+        const message = result.message + '<br><br><button class="btn btn-primary" onclick="openInputSourcesSettings(); hideModal();">Open System Settings</button>';
+        showModal(
+          'Success',
+          message,
+          '<button class="btn btn-secondary" onclick="hideModal()">Close</button>'
+        );
+      } else {
+        showSuccess(result.message.replace(/<[^>]*>/g, ''));
+      }
+    } else {
+      showError(result.message);
+    }
+    
+    // Reload status
+    await loadIMKStatus();
+  } catch (error) {
+    showError('Failed to install IMK: ' + error);
+  } finally {
+    if (reinstallBtn) {
+      reinstallBtn.disabled = false;
+    }
+  }
+}
+
+window.uninstallIMK = async function() {
+  // Confirm before uninstalling
+  const confirmed = await showConfirmDialog(
+    'Uninstall Input Method?',
+    'This will remove the KeyMagic Input Method component. You won\'t be able to type using KeyMagic until it\'s reinstalled. Are you sure you want to continue?'
+  );
+  
+  if (!confirmed) return;
+  
+  const uninstallBtn = document.getElementById('uninstall-imk-btn');
+  const statusText = document.getElementById('imk-status-text');
+  
+  if (uninstallBtn) {
+    uninstallBtn.disabled = true;
+    uninstallBtn.textContent = 'Uninstalling...';
+  }
+  
+  try {
+    const result = await invoke('uninstall_imk_bundle');
+    
+    if (result.success) {
+      if (result.requires_logout) {
+        showModal(
+          'Uninstall Complete', 
+          `<p>${result.message}</p>`,
+          '<button class="btn btn-primary" onclick="hideModal()">Close</button>'
+        );
+      } else {
+        showSuccess(result.message);
+      }
+    } else {
+      showError(result.message);
+    }
+    
+    // Reload status
+    await loadIMKStatus();
+  } catch (error) {
+    showError('Failed to uninstall IMK: ' + error);
+  } finally {
+    if (uninstallBtn) {
+      uninstallBtn.disabled = false;
+    }
+  }
+}
+
+window.openInputSourcesSettings = async function() {
+  try {
+    await invoke('open_input_sources_settings');
+  } catch (error) {
+    console.error('Failed to open input sources settings:', error);
+  }
+}
+
 
 // Initialize
 async function init() {

@@ -67,7 +67,6 @@ fn read_bundle_version(bundle_path: &Path) -> Option<String> {
 #[tauri::command]
 pub fn check_imk_status(app: AppHandle) -> Result<IMKInfo, String> {
     let user_imk_path = get_user_imk_path();
-    let embedded_imk_path = get_embedded_imk_path(&app)?;
     
     if !user_imk_path.exists() {
         return Ok(IMKInfo {
@@ -80,12 +79,23 @@ pub fn check_imk_status(app: AppHandle) -> Result<IMKInfo, String> {
     }
     
     let installed_version = read_bundle_version(&user_imk_path);
-    let embedded_version = read_bundle_version(&embedded_imk_path)
-        .ok_or_else(|| "Failed to read embedded IMK version".to_string())?;
     
-    let needs_update = match &installed_version {
-        Some(installed) => compare_versions(installed, &embedded_version) < 0,
-        None => true, // If we can't read version, assume update is needed
+    // Check if embedded bundle exists and if update is needed
+    let needs_update = if let Ok(embedded_imk_path) = get_embedded_imk_path(&app) {
+        if embedded_imk_path.exists() {
+            if let Some(embedded_version) = read_bundle_version(&embedded_imk_path) {
+                match &installed_version {
+                    Some(installed) => compare_versions(installed, &embedded_version) < 0,
+                    None => true, // If we can't read installed version, assume update is needed
+                }
+            } else {
+                false // Can't read embedded version, assume no update needed
+            }
+        } else {
+            false // No embedded bundle, so no update available
+        }
+    } else {
+        false // Can't resolve embedded path, assume no update
     };
     
     let enabled_in_system = is_keymagic_enabled();
@@ -169,6 +179,21 @@ pub fn open_input_sources_settings() -> Result<(), String> {
 pub async fn install_imk_bundle(app: AppHandle) -> Result<InstallResult, String> {
     let user_imk_path = get_user_imk_path();
     let embedded_imk_path = get_embedded_imk_path(&app)?;
+    
+    // Check if embedded bundle exists
+    if !embedded_imk_path.exists() {
+        // For development: if the installed version exists, just report success
+        if user_imk_path.exists() {
+            return Ok(InstallResult {
+                success: true,
+                message: "KeyMagic input method is already installed. No embedded bundle found for update.".to_string(),
+                requires_logout: false,
+                already_enabled: is_keymagic_enabled(),
+            });
+        } else {
+            return Err("No embedded IMK bundle found in the application. Please ensure the app is properly built with the IMK bundle.".to_string());
+        }
+    }
     
     // Create Input Methods directory if it doesn't exist
     let input_methods_dir = user_imk_path.parent().unwrap();
