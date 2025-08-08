@@ -201,8 +201,28 @@ impl WindowsBackend {
             .context("Failed to create Keyboards key")?;
         
         // Create Settings subkey
-        hkcu.create_subkey(SETTINGS_KEY)
+        let (settings_key, _) = hkcu.create_subkey(SETTINGS_KEY)
             .context("Failed to create Settings key")?;
+        
+        // Save the keyboards directory path to registry for TSF to use
+        // This avoids path redirection issues in low-integrity processes
+        let keyboards_dir = dirs::data_local_dir()
+            .or_else(|| std::env::var("LOCALAPPDATA").ok().map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from("C:\\Users\\Default\\AppData\\Local"))
+            .join("KeyMagic")
+            .join("Keyboards");
+        
+        // Create the keyboards directory if it doesn't exist
+        if !keyboards_dir.exists() {
+            std::fs::create_dir_all(&keyboards_dir)
+                .context("Failed to create keyboards directory")?;
+        }
+        
+        // Save the path to registry
+        settings_key.set_value("KeyboardsPath", &keyboards_dir.to_string_lossy().to_string())
+            .context("Failed to save keyboards path to registry")?;
+        
+        log::info!("Keyboards directory path saved to registry: {}", keyboards_dir.display());
         
         // Apply permissions for low integrity access (for SearchHost.exe and similar)
         // This allows very low integrity processes to read our registry keys
@@ -388,6 +408,12 @@ impl Platform for WindowsBackend {
         if let Some(ref active) = config.keyboards.active {
             settings_key.set_value(DEFAULT_KEYBOARD_VALUE, active)?;
         }
+        
+        // Update keyboards directory path for TSF to use
+        // This ensures TSF always has the correct path even if it changes
+        let keyboards_dir = self.get_keyboards_dir();
+        settings_key.set_value("KeyboardsPath", &keyboards_dir.to_string_lossy().to_string())
+            .context("Failed to update keyboards path in registry")?;
         
         // Open or create the Keyboards key
         let (keyboards_key, _) = hkcu
