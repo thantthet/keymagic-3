@@ -5,7 +5,6 @@ Priority: optional
 Architecture: @ARCH@
 Maintainer: Thant Thet Khin Zaw <contact@keymagic.net>
 Depends: libgtk-3-0, ibus (>= 1.5.0), libwebkit2gtk-4.1-0
-Recommends: fonts-myanmar
 Homepage: https://github.com/thantthet/keymagic-3
 Description: KeyMagic 3 - Smart keyboard input method
  KeyMagic 3 is a powerful and flexible input method that allows users to type
