@@ -46,6 +46,10 @@
         "version": "0.0.8",
         "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3_0.0.8_arm64.deb",
+        "signature": "",
+        "size": 5281892,
+        "sha256": "24d085cd6c83077175bbecd9b6f05a069d9ddf74a5f1ef4ea2dab784ca59d5b9",
         "packages": {
           "rpm": {
             "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3-0.0.8-1.aarch64.rpm",
@@ -63,6 +67,10 @@
         "version": "0.0.8",
         "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3_0.0.8_amd64.deb",
+        "signature": "",
+        "size": 5070180,
+        "sha256": "c7cde0c3adfa8cfbd61db3c8623be51a584f90a948ab2c2d0bb96e29aa509530",
         "packages": {
           "rpm": {
             "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3-0.0.8-1.x86_64.rpm",
