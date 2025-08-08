@@ -90,17 +90,34 @@ BOOL SetRegValue(HKEY hKeyParent, LPCWSTR lpszKeyName, LPCWSTR lpszValueName, LP
     return (lResult == ERROR_SUCCESS);
 }
 
-// Helper function to set directory permissions for EVERYONE and ALL APPLICATION PACKAGES
+// Helper function to set directory permissions for EVERYONE, ALL APPLICATION PACKAGES, and Low Integrity
+// This preserves existing permissions while adding new ones
 static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
 {
     BOOL bResult = FALSE;
+    PACL pOldDacl = NULL;
     PACL pNewDacl = NULL;
     PSECURITY_DESCRIPTOR pSD = NULL;
-    EXPLICIT_ACCESS ea[2] = {0};
+    EXPLICIT_ACCESS ea[4] = {0};
     PSID pEveryoneSID = NULL;
     PSID pAllAppsSID = NULL;
+    PSID pLowIntegritySID = NULL;
+    PSID pUntrustedSID = NULL;
     SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
     SID_IDENTIFIER_AUTHORITY SIDAuthAppPackage = SECURITY_APP_PACKAGE_AUTHORITY;
+    SID_IDENTIFIER_AUTHORITY SIDAuthMandatory = SECURITY_MANDATORY_LABEL_AUTHORITY;
+    DWORD dwRes = 0;
+    
+    // Get the existing DACL
+    dwRes = GetNamedSecurityInfo(pszDirectory, SE_FILE_OBJECT,
+                                 DACL_SECURITY_INFORMATION,
+                                 NULL, NULL, &pOldDacl, NULL, &pSD);
+    
+    if (dwRes != ERROR_SUCCESS)
+    {
+        // If we can't get existing permissions, still try to set new ones
+        pOldDacl = NULL;
+    }
     
     // Create SID for EVERYONE
     if (!AllocateAndInitializeSid(&SIDAuthWorld, 1,
@@ -117,8 +134,22 @@ static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
                                   &pAllAppsSID))
         goto Cleanup;
     
+    // Create SID for Low Integrity Level (S-1-16-4096)
+    if (!AllocateAndInitializeSid(&SIDAuthMandatory, 1,
+                                  SECURITY_MANDATORY_LOW_RID,
+                                  0, 0, 0, 0, 0, 0, 0,
+                                  &pLowIntegritySID))
+        goto Cleanup;
+    
+    // Create SID for Untrusted Integrity Level (S-1-16-0)
+    if (!AllocateAndInitializeSid(&SIDAuthMandatory, 1,
+                                  SECURITY_MANDATORY_UNTRUSTED_RID,
+                                  0, 0, 0, 0, 0, 0, 0,
+                                  &pUntrustedSID))
+        goto Cleanup;
+    
     // Set up EXPLICIT_ACCESS for EVERYONE
-    ea[0].grfAccessPermissions = GENERIC_READ;
+    ea[0].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
     ea[0].grfAccessMode = GRANT_ACCESS;
     ea[0].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
     ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
@@ -126,31 +157,40 @@ static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
     ea[0].Trustee.ptstrName = (LPWSTR)pEveryoneSID;
     
     // Set up EXPLICIT_ACCESS for ALL APPLICATION PACKAGES
-    ea[1].grfAccessPermissions = GENERIC_READ;
+    ea[1].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
     ea[1].grfAccessMode = GRANT_ACCESS;
     ea[1].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
     ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
     ea[1].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
     ea[1].Trustee.ptstrName = (LPWSTR)pAllAppsSID;
     
-    // Create a new ACL
-    if (SetEntriesInAcl(2, ea, NULL, &pNewDacl) != ERROR_SUCCESS)
+    // Set up EXPLICIT_ACCESS for Low Integrity
+    ea[2].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+    ea[2].grfAccessMode = GRANT_ACCESS;
+    ea[2].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+    ea[2].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[2].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+    ea[2].Trustee.ptstrName = (LPWSTR)pLowIntegritySID;
+    
+    // Set up EXPLICIT_ACCESS for Untrusted Integrity
+    ea[3].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+    ea[3].grfAccessMode = GRANT_ACCESS;
+    ea[3].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+    ea[3].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[3].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+    ea[3].Trustee.ptstrName = (LPWSTR)pUntrustedSID;
+    
+    // Add the new entries to the existing DACL (preserving existing permissions)
+    dwRes = SetEntriesInAcl(4, ea, pOldDacl, &pNewDacl);
+    if (dwRes != ERROR_SUCCESS)
         goto Cleanup;
     
-    // Initialize a security descriptor
-    pSD = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
-    if (pSD == NULL)
-        goto Cleanup;
+    // Set the new DACL for the directory
+    dwRes = SetNamedSecurityInfo((LPWSTR)pszDirectory, SE_FILE_OBJECT,
+                                 DACL_SECURITY_INFORMATION,
+                                 NULL, NULL, pNewDacl, NULL);
     
-    if (!InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION))
-        goto Cleanup;
-    
-    // Add the ACL to the security descriptor
-    if (!SetSecurityDescriptorDacl(pSD, TRUE, pNewDacl, FALSE))
-        goto Cleanup;
-    
-    // Set the security descriptor for the directory
-    if (SetFileSecurity(pszDirectory, DACL_SECURITY_INFORMATION, pSD))
+    if (dwRes == ERROR_SUCCESS)
     {
         bResult = TRUE;
     }
@@ -158,6 +198,8 @@ static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
 Cleanup:
     if (pEveryoneSID) FreeSid(pEveryoneSID);
     if (pAllAppsSID) FreeSid(pAllAppsSID);
+    if (pLowIntegritySID) FreeSid(pLowIntegritySID);
+    if (pUntrustedSID) FreeSid(pUntrustedSID);
     if (pNewDacl) LocalFree(pNewDacl);
     if (pSD) LocalFree(pSD);
     
