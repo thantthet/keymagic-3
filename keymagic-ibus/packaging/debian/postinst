@@ -13,6 +13,11 @@ case "$1" in
         fi
         # IBus component registration
         if [ -f /usr/share/ibus/component/keymagic3.xml ]; then
+            # Update IBus cache
+            if command -v ibus write-cache >/dev/null 2>&1; then
+                ibus write-cache || true
+            fi
+            
             echo "KeyMagic 3 IBus component has been installed."
             echo ""
             echo "To use KeyMagic 3 with IBus:"
@@ -31,18 +36,6 @@ case "$1" in
         # Update desktop database
         if command -v update-desktop-database >/dev/null 2>&1; then
             update-desktop-database /usr/share/applications || true
-        fi
-
-        # Launch KeyMagic3 GUI if we're in a graphical session
-        if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
-            # Check if we're running as root (during package installation)
-            if [ "$SUDO_USER" ]; then
-                # Launch as the sudo user, not root
-                su -c "nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 &" "$SUDO_USER" || true
-            elif [ "$USER" != "root" ]; then
-                # Launch directly if not root
-                nohup /usr/bin/keymagic3-gui >/dev/null 2>&1 & 
-            fi
         fi
         ;;
 
