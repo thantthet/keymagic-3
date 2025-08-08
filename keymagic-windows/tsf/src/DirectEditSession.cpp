@@ -308,23 +308,22 @@ void CDirectEditSession::SendBackspaces(int count, ULONG_PTR dwExtraInfo, DWORD*
     if (count <= 0)
         return;
         
-    std::vector<INPUT> inputs;
-    inputs.reserve(count * 2);
-    
     for (int i = 0; i < count; i++) {
         INPUT input = {0};
+        
+        // Key down
         input.type = INPUT_KEYBOARD;
+        input.ki.wScan = 255;
         input.ki.wVk = VK_BACK;
         input.ki.dwExtraInfo = dwExtraInfo;
-        inputs.push_back(input);
+        SendInput(1, &input, sizeof(INPUT));
         
         // Key up
+        input.ki.wScan = 0;
         input.ki.dwFlags = KEYEVENTF_KEYUP;
-        inputs.push_back(input);
-    }
+        SendInput(1, &input, sizeof(INPUT));
     
-    if (!inputs.empty()) {
-        SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+        // Update timing after all backspaces are sent
         DWORD currentTime = GetTickCount();
         if (pLastSendTime) {
             *pLastSendTime = currentTime;
