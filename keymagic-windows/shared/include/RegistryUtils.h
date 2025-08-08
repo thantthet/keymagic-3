@@ -127,14 +127,23 @@ inline bool ReadKeyMagicSetting(const std::wstring& valueName, T& value) {
 // Get keyboards directory path from settings
 inline std::wstring GetKeyboardsPath() {
     std::wstring keyboardsPath;
-    ReadKeyMagicSetting(L"KeyboardsPath", keyboardsPath);
     
-    // Use default if not found
-    if (keyboardsPath.empty()) {
-        wchar_t localAppData[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
-            keyboardsPath = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
-        }
+    // First, try to read from registry (this is set by the GUI configurator)
+    // This avoids path redirection issues in low-integrity processes
+    if (ReadKeyMagicSetting(L"KeyboardsPath", keyboardsPath) && !keyboardsPath.empty()) {
+        return keyboardsPath;
+    }
+    
+    // Fallback: Try to construct default path
+    // Note: For low-integrity processes like SearchHost.exe, SHGetFolderPath may return
+    // a different path (e.g., AppData\Local\Packages\...\AC for packaged apps)
+    // This is why we prefer the registry value set by the GUI
+    wchar_t localAppData[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+        keyboardsPath = std::wstring(localAppData) + L"\\KeyMagic\\Keyboards";
+    } else {
+        // Last resort fallback
+        keyboardsPath = L"C:\\ProgramData\\KeyMagic\\Keyboards";
     }
     
     return keyboardsPath;
