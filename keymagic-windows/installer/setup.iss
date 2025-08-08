@@ -61,8 +61,8 @@ Source: "..\tray-manager\build-arm64\bin\Release\keymagic-tray.exe"; DestDir: "{
 ; TSF DLLs - Install as KeyMagicTSF.dll on both platforms
 ; x64: Rename KeyMagicTSF_x64.dll to KeyMagicTSF.dll
 Source: "..\tsf\build-x64\Release\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; DestName: "KeyMagicTSF.dll"; Check: IsX64; Flags: ignoreversion
-; ARM64: Native ARM64X DLL (already named KeyMagicTSF.dll)
-Source: "..\tsf\build-arm64x\KeyMagicTSF.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Check: IsARM64; Flags: ignoreversion
+; ARM64: Native ARM64X DLL from target\release (already named KeyMagicTSF.dll)
+Source: "..\target\release\KeyMagicTSF.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Check: IsARM64; Flags: ignoreversion
 
 ; Resources (common)
 Source: "..\..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs

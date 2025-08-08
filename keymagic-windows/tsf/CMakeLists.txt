@@ -31,10 +31,13 @@ set(SOURCES
 add_library(KeyMagicTSF SHARED ${SOURCES})
 
 # Set output name based on architecture for ARM64X support
-if(CMAKE_GENERATOR_PLATFORM STREQUAL "x64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "X64")
-    set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_x64")
-elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
-    set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_arm64")
+# This will be overridden if BUILD_AS_ARM64X is defined
+if(NOT DEFINED BUILD_AS_ARM64X)
+    if(CMAKE_GENERATOR_PLATFORM STREQUAL "x64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "X64")
+        set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_x64")
+    elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
+        set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_arm64")
+    endif()
 endif()
 
 # Include directories
@@ -73,18 +76,21 @@ endif()
 
 # Link to Rust keymagic-core static library based on configuration
 # Using relative paths from the CMake source directory
-if(RUST_TARGET_DIR)
-    # Cross-compilation - use target-specific directory
-    target_link_libraries(KeyMagicTSF PRIVATE
-        debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/debug/keymagic_core.lib"
-        optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/release/keymagic_core.lib"
-    )
-else()
-    # Native compilation - use default directory
-    target_link_libraries(KeyMagicTSF PRIVATE
-        debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug/keymagic_core.lib"
-        optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/release/keymagic_core.lib"
-    )
+# For ARM64X builds, this is handled by arm64x.cmake
+if(NOT DEFINED BUILD_AS_ARM64X)
+    if(RUST_TARGET_DIR)
+        # Cross-compilation - use target-specific directory
+        target_link_libraries(KeyMagicTSF PRIVATE
+            debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/debug/keymagic_core.lib"
+            optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/release/keymagic_core.lib"
+        )
+    else()
+        # Native compilation - use default directory
+        target_link_libraries(KeyMagicTSF PRIVATE
+            debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug/keymagic_core.lib"
+            optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/release/keymagic_core.lib"
+        )
+    endif()
 endif()
 
 # Set static runtime
@@ -116,4 +122,26 @@ else()
             $<TARGET_FILE:KeyMagicTSF>
             "$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_BINARY_DIR}/../../target/debug/,${CMAKE_CURRENT_BINARY_DIR}/../../target/release/>"
     )
+endif()
+
+# ARM64X Build Support
+if(DEFINED BUILD_AS_ARM64X)
+    message(STATUS "Building for ARM64X: ${BUILD_AS_ARM64X}")
+    
+    # Set the target list for ARM64X
+    set(ARM64X_TARGETS KeyMagicTSF)
+    
+    # Adjust output name for ARM64X configurations
+    if("${BUILD_AS_ARM64X}" STREQUAL "ARM64")
+        set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF_arm64")
+    elseif("${BUILD_AS_ARM64X}" STREQUAL "ARM64EC")
+        # For ARM64EC, output the final ARM64X DLL
+        set_target_properties(KeyMagicTSF PROPERTIES OUTPUT_NAME "KeyMagicTSF")
+    endif()
+    
+    # Include the ARM64X build logic
+    include("${CMAKE_CURRENT_SOURCE_DIR}/arm64x.cmake")
+    
+    # Configure Rust for ARM64X (uses static libraries)
+    configure_rust_for_arm64x(KeyMagicTSF)
 endif()

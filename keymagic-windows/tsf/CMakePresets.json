@@ -1,0 +1,192 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "installDir": "${sourceDir}/install-${presetName}",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe"
+      },
+      "generator": "Visual Studio 17 2022"
+    },
+    {
+      "name": "arm64-debug",
+      "displayName": "ARM64 Debug",
+      "inherits": "windows-base",
+      "hidden": true,
+      "architecture": {
+        "value": "arm64",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "arm64-release",
+      "displayName": "ARM64 Release",
+      "inherits": "windows-base",
+      "hidden": true,
+      "architecture": {
+        "value": "arm64",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "arm64ec-debug",
+      "displayName": "ARM64EC Debug",
+      "inherits": "windows-base",
+      "hidden": true,
+      "architecture": {
+        "value": "arm64ec",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "arm64ec-release",
+      "displayName": "ARM64EC Release",
+      "inherits": "windows-base",
+      "hidden": true,
+      "architecture": {
+        "value": "arm64ec",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-debug",
+      "displayName": "x64 Debug",
+      "inherits": "windows-base",
+      "hidden": false,
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x64-release",
+      "displayName": "x64 Release",
+      "inherits": "windows-base",
+      "hidden": false,
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "arm64-debug-standard",
+      "displayName": "ARM64 Debug (Standard)",
+      "inherits": "arm64-debug",
+      "hidden": false
+    },
+    {
+      "name": "arm64-release-standard",
+      "displayName": "ARM64 Release (Standard)",
+      "inherits": "arm64-release",
+      "hidden": false
+    },
+    {
+      "name": "arm64-debug-x",
+      "displayName": "ARM64 Debug (ARM64X)",
+      "inherits": "arm64-debug",
+      "cacheVariables": {
+        "BUILD_AS_ARM64X": "ARM64",
+        "RUST_CRATE_TYPE": "staticlib"
+      }
+    },
+    {
+      "name": "arm64-release-x",
+      "displayName": "ARM64 Release (ARM64X)",
+      "inherits": "arm64-release",
+      "cacheVariables": {
+        "BUILD_AS_ARM64X": "ARM64",
+        "RUST_CRATE_TYPE": "staticlib"
+      }
+    },
+    {
+      "name": "arm64ec-debug-x",
+      "displayName": "ARM64EC Debug (ARM64X)",
+      "inherits": "arm64ec-debug",
+      "cacheVariables": {
+        "BUILD_AS_ARM64X": "ARM64EC",
+        "RUST_CRATE_TYPE": "staticlib"
+      }
+    },
+    {
+      "name": "arm64ec-release-x",
+      "displayName": "ARM64EC Release (ARM64X)",
+      "inherits": "arm64ec-release",
+      "cacheVariables": {
+        "BUILD_AS_ARM64X": "ARM64EC",
+        "RUST_CRATE_TYPE": "staticlib"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "arm64-debug-x-build",
+      "displayName": "ARM64 Debug (ARM64X)",
+      "configurePreset": "arm64-debug-x",
+      "configuration": "Debug"
+    },
+    {
+      "name": "arm64-release-x-build",
+      "displayName": "ARM64 Release (ARM64X)",
+      "configurePreset": "arm64-release-x",
+      "configuration": "Release"
+    },
+    {
+      "name": "arm64ec-debug-x-build",
+      "displayName": "ARM64EC Debug (ARM64X)",
+      "configurePreset": "arm64ec-debug-x",
+      "configuration": "Debug"
+    },
+    {
+      "name": "arm64ec-release-x-build",
+      "displayName": "ARM64EC Release (ARM64X)",
+      "configurePreset": "arm64ec-release-x",
+      "configuration": "Release"
+    },
+    {
+      "name": "x64-debug-build",
+      "displayName": "x64 Debug",
+      "configurePreset": "x64-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "x64-release-build",
+      "displayName": "x64 Release",
+      "configurePreset": "x64-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "arm64-debug-standard-build",
+      "displayName": "ARM64 Debug (Standard)",
+      "configurePreset": "arm64-debug-standard",
+      "configuration": "Debug"
+    },
+    {
+      "name": "arm64-release-standard-build",
+      "displayName": "ARM64 Release (Standard)",
+      "configurePreset": "arm64-release-standard",
+      "configuration": "Release"
+    }
+  ]
+}

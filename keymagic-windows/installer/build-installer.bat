@@ -97,10 +97,11 @@ if not exist "tray-manager\build-arm64\bin\Release\keymagic-tray.exe" (
 )
 echo [OK] All ARM64 components found
 
-REM Check ARM64X native DLL
+REM Check ARM64X native DLL (now in target directory)
 echo Checking ARM64X native DLL...
-if not exist "tsf\build-arm64x\KeyMagicTSF.dll" (
-    echo [ERROR] ARM64X native DLL not found
+if not exist "target\release\KeyMagicTSF.dll" (
+    echo [ERROR] ARM64X native DLL not found in target\release\
+    echo Please run: make-arm64x.bat build Release
     exit /b 1
 )
 echo [OK] ARM64X native DLL found

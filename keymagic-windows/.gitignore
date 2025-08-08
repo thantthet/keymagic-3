@@ -4,3 +4,10 @@ tsf/build
 tsf/build-*/
 test-build/
 *.obj
+
+# ARM64X build artifacts
+tsf/repros/
+tsf/repros-debug/
+tsf/repros-release/
+tsf/build-arm64-*-x/
+tsf/build-arm64ec-*-x/

@@ -456,7 +456,8 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
 
     *pfEaten = FALSE;
 
-    DEBUG_LOG_KEY(L"OnTestKeyDown", wParam, lParam, 0);
+    char character = MapVirtualKeyToChar(wParam, lParam);
+    DEBUG_LOG_KEY(L"OnTestKeyDown", wParam, lParam, character);
 
     // Check if this is our own SendInput by examining the extra info
     ULONG_PTR extraInfo = GetMessageExtraInfo();

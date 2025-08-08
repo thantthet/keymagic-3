@@ -57,8 +57,12 @@ set "IS_ARM64=0"
 goto :check_dll
 
 :check_dll
-:: Check if the ARM64X DLL exists
-if not exist "tsf\build-arm64x\KeyMagicTSF.dll" (
+:: Check if the ARM64X DLL exists in target directory
+if exist "target\release\KeyMagicTSF.dll" (
+    set "ARM64X_DLL=target\release\KeyMagicTSF.dll"
+) else if exist "target\debug\KeyMagicTSF.dll" (
+    set "ARM64X_DLL=target\debug\KeyMagicTSF.dll"
+) else (
     echo [ERROR] KeyMagicTSF.dll not found!
     echo Run make-arm64x.bat first to build the native ARM64X DLL.
     exit /b 1
@@ -82,7 +86,7 @@ mkdir "%TEMP_DIR%" 2>nul
 
 :: Copy the ARM64X DLL to temp location
 echo Copying DLL to temporary location...
-copy /Y "tsf\build-arm64x\KeyMagicTSF.dll" "%TEMP_DIR%\" >nul
+copy /Y "%ARM64X_DLL%" "%TEMP_DIR%\" >nul
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to copy DLL to temporary directory
     rmdir /s /q "%TEMP_DIR%" 2>nul
@@ -241,9 +245,13 @@ echo.
 :: Check build artifacts
 echo Build Status:
 echo -------------
-if exist "tsf\build-arm64x\KeyMagicTSF.dll" (
-    for %%F in ("tsf\build-arm64x\KeyMagicTSF.dll") do (
-        echo [OK] Native ARM64X DLL built (%%~zF bytes^)
+if exist "target\release\KeyMagicTSF.dll" (
+    for %%F in ("target\release\KeyMagicTSF.dll") do (
+        echo [OK] Native ARM64X DLL built - Release (%%~zF bytes^)
+    )
+) else if exist "target\debug\KeyMagicTSF.dll" (
+    for %%F in ("target\debug\KeyMagicTSF.dll") do (
+        echo [OK] Native ARM64X DLL built - Debug (%%~zF bytes^)
     )
 ) else (
     echo [--] Native ARM64X DLL not built
