@@ -3,84 +3,84 @@
   "platforms": {
     "windows": {
       "x86_64": {
-        "version": "0.0.7",
-        "releaseDate": "2025-08-01T18:55:16Z",
+        "version": "0.0.8",
+        "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/KeyMagic3-Setup-0.0.7.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/KeyMagic3-Setup-0.0.8.exe",
         "signature": "",
-        "size": 6348939,
-        "sha256": "a8617d0c84df04459cf558726d1a5f989e552ba2079f900b401f2ef4bcfc130c"
+        "size": 6466355,
+        "sha256": "10072117361a58f553a1f19422af889f4685d83080b08a79cef0d9c8507f006f"
       },
       "aarch64": {
-        "version": "0.0.7",
-        "releaseDate": "2025-08-01T18:55:16Z",
+        "version": "0.0.8",
+        "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/KeyMagic3-Setup-0.0.7.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/KeyMagic3-Setup-0.0.8.exe",
         "signature": "",
-        "size": 6348939,
-        "sha256": "a8617d0c84df04459cf558726d1a5f989e552ba2079f900b401f2ef4bcfc130c"
+        "size": 6466355,
+        "sha256": "10072117361a58f553a1f19422af889f4685d83080b08a79cef0d9c8507f006f"
       }
     },
     "macos": {
       "x86_64": {
-        "version": "0.0.7",
-        "releaseDate": "2025-08-01T18:55:16Z",
+        "version": "0.0.8",
+        "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "10.15",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/KeyMagic3-0.0.7.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/KeyMagic3-0.0.8.dmg",
         "signature": "",
-        "size": 6060111,
-        "sha256": "9aa349a0a8e6563ec748b3a81e5e9e45004d7e396f3dec72938aad296e329d01"
+        "size": 10885470,
+        "sha256": "bc0fdc22180eed50e48014924fb4d1cb941a62487824caf33ac726c7f6f900a5"
       },
       "aarch64": {
-        "version": "0.0.7",
-        "releaseDate": "2025-08-01T18:55:16Z",
+        "version": "0.0.8",
+        "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "11.0",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/KeyMagic3-0.0.7.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/KeyMagic3-0.0.8.dmg",
         "signature": "",
-        "size": 6060111,
-        "sha256": "9aa349a0a8e6563ec748b3a81e5e9e45004d7e396f3dec72938aad296e329d01"
+        "size": 10885470,
+        "sha256": "bc0fdc22180eed50e48014924fb4d1cb941a62487824caf33ac726c7f6f900a5"
       }
     },
     "linux": {
       "aarch64": {
-        "version": "0.0.7",
-        "releaseDate": "2025-08-01T18:55:16Z",
+        "version": "0.0.8",
+        "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "",
         "packages": {
           "rpm": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3-0.0.7-1.aarch64.rpm",
-            "size": 5650926,
-            "sha256": "aa60928dbcb9d1d200b43888be429f6f0a9ef10b956163f150c0b621cf52f7b9"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3-0.0.8-1.aarch64.rpm",
+            "size": 5693930,
+            "sha256": "2bb3fc6ea5013784652d4d812f3405d4cc8b9b9adb77a986df22729f2367e83c"
           },
           "deb": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3_0.0.7_arm64.deb",
-            "size": 5214904,
-            "sha256": "01e32fec7d592a2c9b231246424446cce2c28c3df8f91ec8adae831b587c274f"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3_0.0.8_arm64.deb",
+            "size": 5281892,
+            "sha256": "24d085cd6c83077175bbecd9b6f05a069d9ddf74a5f1ef4ea2dab784ca59d5b9"
           }
         }
       },
       "x86_64": {
-        "version": "0.0.7",
-        "releaseDate": "2025-08-01T18:55:16Z",
+        "version": "0.0.8",
+        "releaseDate": "2025-08-07T19:37:18Z",
         "minimumSystemVersion": "",
         "packages": {
           "rpm": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3-0.0.7-1.x86_64.rpm",
-            "size": 5444848,
-            "sha256": "283d8f6699e749799b8f49850ab8fe683a25b4adcd3a407f524883daf2c049b6"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3-0.0.8-1.x86_64.rpm",
+            "size": 5491992,
+            "sha256": "5c7a7da9cfbb15fc3ac541697fdc63fa670f134dce30385a79943632ea69a5cc"
           },
           "deb": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.7/keymagic3_0.0.7_amd64.deb",
-            "size": 5001456,
-            "sha256": "026d63e05735c059b40dfea70c621ea40fc5b4433feb87e546afde4df2087948"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.8/keymagic3_0.0.8_amd64.deb",
+            "size": 5070180,
+            "sha256": "c7cde0c3adfa8cfbd61db3c8623be51a584f90a948ab2c2d0bb96e29aa509530"
           }
         }
       }
     }
   },
   "releaseNotes": {
-    "0.0.7": {
-      "en": "## What's New in Version 0.0.7\r\n\r\n### 🎉 KeyMagic for All Major Desktops!\r\n\r\nKeyMagic 3 is now available for **macOS** and **Linux** for the first time, alongside major updates for Windows.\r\n\r\n### ✨ Key Features\r\n\r\n**All Platforms:**\r\n- Unified settings window across Windows, macOS, and Linux\r\n- Built-in KMS to KM2 keyboard converter\r\n\r\n**macOS (New!):**\r\n- Full hotkey support for keyboard switching\r\n- Menu bar integration\r\n- On-screen switch notifications\r\n\r\n**Linux (New!):**\r\n- IBus framework integration\r\n- Hotkey and menu-based keyboard switching\r\n- Direct settings access from IBus menu\r\n\r\n**Windows Updates:**\r\n- Universal installer for x64 and ARM64\r\n- Smart tray icon (appears only when active)\r\n- Keyboard layout preview on hover\r\n- Improved hotkey reliability\r\n"
+    "0.0.8": {
+      "en": "## What's New in v0.0.8\r\n\r\n### All Platforms\r\n- **Visual App Picker**: New visual application selector with icons for easy composition mode configuration\r\n- **Stability**: Various bug fixes for smoother operation\r\n\r\n### Windows\r\n- Added Excel to default composition mode\r\n- Improved text selection handling\r\n\r\n### macOS  \r\n- Removed Chrome from default composition mode\r\n- Enhanced installer with refreshed design\r\n- Better Intel and Apple Silicon support\r\n\r\n### Linux\r\n- No changes in this release\r\n"
     }
   }
 }
