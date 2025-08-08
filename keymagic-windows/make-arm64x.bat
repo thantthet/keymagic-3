@@ -1,6 +1,6 @@
 @echo off
-:: make-arm64x.bat - Build ARM64X forwarder DLL for KeyMagic TSF
-:: This script builds both x64 and ARM64 versions, then creates an ARM64X forwarder DLL
+:: make-arm64x.bat - Build native ARM64X DLL for KeyMagic TSF
+:: This script builds both ARM64EC and ARM64 versions, then links them into a single ARM64X DLL
 
 setlocal enabledelayedexpansion
 
@@ -18,56 +18,45 @@ if /i not "%CONFIG%"=="Debug" if /i not "%CONFIG%"=="Release" (
 )
 
 echo ========================================
-echo Building ARM64X Forwarder for KeyMagic
+echo Building Native ARM64X DLL for KeyMagic
 echo Configuration: %CONFIG%
 echo ========================================
 echo.
 
 :: Step 1: Build Rust libraries for both architectures
-echo [1/6] Building Rust libraries...
+echo [1/5] Building Rust libraries...
 echo.
 
-echo Building Rust for x64...
+:: Build for ARM64EC target (Rust supports this as tier 2 target)
+:: Note: Due to linking issues with cdylib on ARM64EC, we build as staticlib
+echo Building Rust for ARM64EC (as static library)...
 if /i "%CONFIG%"=="Release" (
-    cargo build -p keymagic-core --release --target x86_64-pc-windows-msvc || exit /b 1
+    cargo rustc -p keymagic-core --release --target arm64ec-pc-windows-msvc --crate-type staticlib || (
+        echo.
+        echo [INFO] ARM64EC target may not be installed. Trying to add it...
+        rustup target add arm64ec-pc-windows-msvc
+        cargo rustc -p keymagic-core --release --target arm64ec-pc-windows-msvc --crate-type staticlib || exit /b 1
+    )
 ) else (
-    cargo build -p keymagic-core --target x86_64-pc-windows-msvc || exit /b 1
+    cargo rustc -p keymagic-core --target arm64ec-pc-windows-msvc --crate-type staticlib || (
+        echo.
+        echo [INFO] ARM64EC target may not be installed. Trying to add it...
+        rustup target add arm64ec-pc-windows-msvc
+        cargo rustc -p keymagic-core --target arm64ec-pc-windows-msvc --crate-type staticlib || exit /b 1
+    )
 )
 
-echo Building Rust for ARM64...
+echo Building Rust for ARM64 (as static library)...
 if /i "%CONFIG%"=="Release" (
-    cargo build -p keymagic-core --release --target aarch64-pc-windows-msvc || exit /b 1
+    cargo rustc -p keymagic-core --release --target aarch64-pc-windows-msvc --crate-type staticlib || exit /b 1
 ) else (
-    cargo build -p keymagic-core --target aarch64-pc-windows-msvc || exit /b 1
+    cargo rustc -p keymagic-core --target aarch64-pc-windows-msvc --crate-type staticlib || exit /b 1
 )
 
-:: Step 2: Build TSF DLL for x64
+:: Step 2: Set up Visual Studio environment
 echo.
-echo [2/6] Building TSF for x64...
+echo [2/5] Setting up Visual Studio environment...
 cd tsf
-if not exist "build-x64" mkdir "build-x64"
-cd "build-x64"
-cmake -G "Visual Studio 17 2022" -A x64 .. || exit /b 1
-cmake --build . --config %CONFIG% || exit /b 1
-cd ..\..
-
-:: Step 3: Build TSF DLL for ARM64
-echo.
-echo [3/6] Building TSF for ARM64...
-cd tsf
-if not exist "build-arm64" mkdir "build-arm64"
-cd "build-arm64"
-cmake -G "Visual Studio 17 2022" -A ARM64 .. || exit /b 1
-cmake --build . --config %CONFIG% || exit /b 1
-cd ..\..
-
-:: Step 4: Create empty object files for forwarder
-echo.
-echo [4/6] Creating empty object files...
-cd tsf
-
-:: Set up Visual Studio environment for ARM64 cross-compilation
-echo Setting up Visual Studio environment for ARM64X build...
 
 :: Determine VS path and architecture-specific script
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
@@ -104,33 +93,124 @@ if %errorlevel% neq 0 (
 
 :: Create build directory for ARM64X
 if not exist "build-arm64x" mkdir "build-arm64x"
+if not exist "build-arm64x\arm64" mkdir "build-arm64x\arm64"
+if not exist "build-arm64x\arm64ec" mkdir "build-arm64x\arm64ec"
 
-:: Compile empty objects
-cl /c /Fobuild-arm64x\empty_arm64.obj src\empty.cpp || exit /b 1
-cl /c /arm64EC /Fobuild-arm64x\empty_x64.obj src\empty.cpp || exit /b 1
-
-:: Step 5: Create import libraries from DEF files
+:: Step 3: Compile all source files for ARM64
 echo.
-echo [5/6] Creating import libraries...
+echo [3/5] Building ARM64 native objects...
 
-link /lib /machine:arm64ec /def:src\KeyMagicTSF_x64.def /out:build-arm64x\KeyMagicTSF_x64.lib || exit /b 1
-link /lib /machine:arm64 /def:src\KeyMagicTSF_arm64.def /out:build-arm64x\KeyMagicTSF_arm64.lib || exit /b 1
+:: Set compiler flags for ARM64
+set "ARM64_FLAGS=/c /MT /O2 /DUNICODE /D_UNICODE /std:c++17"
+if /i "%CONFIG%"=="Debug" set "ARM64_FLAGS=/c /MTd /Od /Zi /DUNICODE /D_UNICODE /std:c++17"
 
-:: Step 6: Link the ARM64X forwarder DLL
+:: Include paths
+set "INCLUDES=/I include /I ..\shared\include"
+
+:: Compile each source file for ARM64
+for %%f in (
+    DllMain.cpp
+    ClassFactory.cpp
+    KeyMagicTextService.cpp
+    DirectEditSession.cpp
+    CompositionEditSession.cpp
+    Composition.cpp
+    DisplayAttribute.cpp
+    Globals.cpp
+    Registry.cpp
+    ProcessDetector.cpp
+    KeyProcessingUtils.cpp
+    LanguageUtils.cpp
+    HUD.cpp
+    TrayClient.cpp
+) do (
+    echo Compiling %%f for ARM64...
+    cl %ARM64_FLAGS% %INCLUDES% /Fobuild-arm64x\arm64\%%~nf.obj src\%%f || exit /b 1
+)
+
+:: Compile resource file for ARM64
+echo Compiling resources for ARM64...
+rc /fo build-arm64x\arm64\KeyMagicTSF.res src\KeyMagicTSF.rc || exit /b 1
+
+:: Step 4: Compile all source files for ARM64EC
 echo.
-echo [6/6] Creating ARM64X forwarder DLL...
+echo [4/5] Building ARM64EC objects...
 
-link /dll /noentry /machine:arm64x ^
-    /defArm64Native:src\KeyMagicTSF_arm64.def /def:src\KeyMagicTSF_x64.def ^
-    build-arm64x\empty_arm64.obj build-arm64x\empty_x64.obj ^
+:: Set compiler flags for ARM64EC
+set "ARM64EC_FLAGS=/c /arm64EC /MT /O2 /DUNICODE /D_UNICODE /std:c++17"
+if /i "%CONFIG%"=="Debug" set "ARM64EC_FLAGS=/c /arm64EC /MTd /Od /Zi /DUNICODE /D_UNICODE /std:c++17"
+
+:: Compile each source file for ARM64EC
+for %%f in (
+    DllMain.cpp
+    ClassFactory.cpp
+    KeyMagicTextService.cpp
+    DirectEditSession.cpp
+    CompositionEditSession.cpp
+    Composition.cpp
+    DisplayAttribute.cpp
+    Globals.cpp
+    Registry.cpp
+    ProcessDetector.cpp
+    KeyProcessingUtils.cpp
+    LanguageUtils.cpp
+    HUD.cpp
+    TrayClient.cpp
+) do (
+    echo Compiling %%f for ARM64EC...
+    cl %ARM64EC_FLAGS% %INCLUDES% /Fobuild-arm64x\arm64ec\%%~nf.obj src\%%f || exit /b 1
+)
+
+:: Compile resource file for ARM64EC
+echo Compiling resources for ARM64EC...
+rc /fo build-arm64x\arm64ec\KeyMagicTSF.res src\KeyMagicTSF.rc || exit /b 1
+
+:: Step 5: Link the native ARM64X DLL
+echo.
+echo [5/5] Linking native ARM64X DLL...
+
+:: Set Rust library paths (static libraries on Windows use .lib)
+if /i "%CONFIG%"=="Release" (
+    set "RUST_ARM64_LIB=..\..\target\aarch64-pc-windows-msvc\release\keymagic_core.lib"
+    set "RUST_ARM64EC_LIB=..\..\target\arm64ec-pc-windows-msvc\release\keymagic_core.lib"
+) else (
+    set "RUST_ARM64_LIB=..\..\target\aarch64-pc-windows-msvc\debug\keymagic_core.lib"
+    set "RUST_ARM64EC_LIB=..\..\target\arm64ec-pc-windows-msvc\debug\keymagic_core.lib"
+)
+
+:: System libraries
+set "SYS_LIBS=uuid.lib ole32.lib oleaut32.lib advapi32.lib user32.lib kernel32.lib ws2_32.lib userenv.lib ntdll.lib gdi32.lib shlwapi.lib psapi.lib shell32.lib"
+
+:: Link ARM64 objects first
+echo Linking ARM64 native code...
+link /dll /machine:arm64 /def:src\KeyMagicTSF.def ^
+    /out:build-arm64x\KeyMagicTSF_arm64.dll ^
+    build-arm64x\arm64\*.obj ^
+    build-arm64x\arm64\KeyMagicTSF.res ^
+    %RUST_ARM64_LIB% ^
+    %SYS_LIBS% || exit /b 1
+
+:: Link ARM64EC objects
+echo Linking ARM64EC code...
+link /dll /machine:arm64ec /def:src\KeyMagicTSF.def ^
+    /out:build-arm64x\KeyMagicTSF_arm64ec.dll ^
+    build-arm64x\arm64ec\*.obj ^
+    build-arm64x\arm64ec\KeyMagicTSF.res ^
+    %RUST_ARM64EC_LIB% ^
+    %SYS_LIBS% || exit /b 1
+
+:: Create the final ARM64X DLL by merging both architectures
+echo Creating native ARM64X DLL...
+link /dll /machine:arm64x ^
+    /defArm64Native:src\KeyMagicTSF.def ^
+    /def:src\KeyMagicTSF.def ^
+    build-arm64x\arm64\*.obj ^
+    build-arm64x\arm64ec\*.obj ^
+    build-arm64x\arm64\KeyMagicTSF.res ^
     /out:build-arm64x\KeyMagicTSF.dll ^
-    build-arm64x\KeyMagicTSF_arm64.lib build-arm64x\KeyMagicTSF_x64.lib || exit /b 1
-
-:: Copy the architecture-specific DLLs to the ARM64X directory
-echo.
-echo Copying architecture-specific DLLs...
-copy /Y "build-x64\%CONFIG%\KeyMagicTSF_x64.dll" "build-arm64x\" >nul
-copy /Y "build-arm64\%CONFIG%\KeyMagicTSF_arm64.dll" "build-arm64x\" >nul
+    %RUST_ARM64_LIB% ^
+    %RUST_ARM64EC_LIB% ^
+    %SYS_LIBS% || exit /b 1
 
 :: Copy to target directory
 echo.
@@ -143,26 +223,25 @@ if /i "%CONFIG%"=="Release" (
 
 if not exist "%TARGET_DIR%" mkdir "%TARGET_DIR%"
 copy /Y "build-arm64x\KeyMagicTSF.dll" "%TARGET_DIR%\" >nul
-copy /Y "build-arm64x\KeyMagicTSF_x64.dll" "%TARGET_DIR%\" >nul
-copy /Y "build-arm64x\KeyMagicTSF_arm64.dll" "%TARGET_DIR%\" >nul
 
 cd ..
 
 echo.
 echo ========================================
-echo [SUCCESS] ARM64X build complete!
+echo [SUCCESS] Native ARM64X build complete!
 echo ========================================
 echo.
-echo Output files in tsf\build-arm64x:
-echo   - KeyMagicTSF.dll (ARM64X forwarder)
-echo   - KeyMagicTSF_x64.dll (x64 implementation)
-echo   - KeyMagicTSF_arm64.dll (ARM64 implementation)
+echo Output file: tsf\build-arm64x\KeyMagicTSF.dll
 echo.
-echo Files also copied to: %TARGET_DIR%
+echo This is a native ARM64X DLL that contains both:
+echo   - ARM64 native code (for ARM64 processes)
+echo   - ARM64EC code (for x64/AMD64 processes on ARM64)
+echo.
+echo File also copied to: %TARGET_DIR%
 echo.
 echo To register the TSF:
 echo   1. Run as Administrator
-echo   2. regsvr32 tsf\build-arm64x\KeyMagicTSF.dll
+echo   2. regsvr32 %TARGET_DIR%\KeyMagicTSF.dll
 echo.
 
 exit /b 0
