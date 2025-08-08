@@ -1463,6 +1463,45 @@ async function loadPlatformInfo() {
 }
 
 function updatePlatformSpecificUI() {
+  // Hide tabs that have no content for the current platform
+  const inputMethodTab = document.querySelector('.settings-tab[data-tab="input-method"]');
+  const advancedTab = document.querySelector('.settings-tab[data-tab="advanced"]');
+  
+  // Check if tabs should be visible based on platform
+  let showInputMethodTab = false;
+  let showAdvancedTab = false;
+  
+  if (platformInfo.os === 'windows') {
+    showInputMethodTab = platformInfo.features.language_profiles;
+    showAdvancedTab = true; // Has composition mode and preview window
+  } else if (platformInfo.os === 'macos') {
+    showInputMethodTab = true; // Has IMK management
+    showAdvancedTab = true; // Has direct mode
+  } else {
+    // Linux or other platforms
+    showInputMethodTab = false;
+    showAdvancedTab = false;
+  }
+  
+  // Hide/show tabs based on platform
+  if (inputMethodTab) {
+    inputMethodTab.style.display = showInputMethodTab ? 'block' : 'none';
+  }
+  if (advancedTab) {
+    advancedTab.style.display = showAdvancedTab ? 'block' : 'none';
+  }
+  
+  // If only General tab is visible, hide the tab bar entirely for cleaner look
+  const settingsTabs = document.querySelector('.settings-tabs');
+  const visibleTabs = document.querySelectorAll('.settings-tab:not([style*="display: none"])');
+  if (settingsTabs && visibleTabs.length <= 1) {
+    settingsTabs.style.display = 'none';
+    // Make sure General panel is visible when tabs are hidden
+    const generalPanel = document.querySelector('.settings-tab-panel[data-panel="general"]');
+    if (generalPanel) {
+      generalPanel.classList.add('active');
+    }
+  }
   
   // Hide language profiles section if not supported
   const languageSection = document.querySelector('.settings-section:has(#language-search)');
