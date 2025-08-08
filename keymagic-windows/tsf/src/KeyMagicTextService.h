@@ -15,7 +15,7 @@ class CKeyMagicTextService;
 class CCompositionManager;
 class TrayClient;
 
-class CKeyMagicTextService : public ITfTextInputProcessor,
+class CKeyMagicTextService : public ITfTextInputProcessorEx,
                             public ITfThreadMgrEventSink,
                             public ITfKeyEventSink,
                             public ITfTextEditSink,
@@ -31,8 +31,9 @@ public:
     STDMETHODIMP_(ULONG) AddRef();
     STDMETHODIMP_(ULONG) Release();
 
-    // ITfTextInputProcessor
+    // ITfTextInputProcessorEx
     STDMETHODIMP Activate(ITfThreadMgr *ptim, TfClientId tid);
+    STDMETHODIMP ActivateEx(ITfThreadMgr *ptim, TfClientId tid, DWORD dwFlags);
     STDMETHODIMP Deactivate();
 
     // ITfThreadMgrEventSink

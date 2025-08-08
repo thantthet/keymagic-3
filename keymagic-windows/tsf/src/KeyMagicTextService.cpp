@@ -118,9 +118,9 @@ STDAPI CKeyMagicTextService::QueryInterface(REFIID riid, void **ppvObject)
 
     *ppvObject = nullptr;
 
-    if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfTextInputProcessor))
+    if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfTextInputProcessor) || IsEqualIID(riid, IID_ITfTextInputProcessorEx))
     {
-        *ppvObject = static_cast<ITfTextInputProcessor*>(this);
+        *ppvObject = static_cast<ITfTextInputProcessorEx*>(this);
     }
     else if (IsEqualIID(riid, IID_ITfThreadMgrEventSink))
     {
@@ -167,10 +167,20 @@ STDAPI_(ULONG) CKeyMagicTextService::Release()
     return cRef;
 }
 
-// ITfTextInputProcessor
+// ITfTextInputProcessorEx
 STDAPI CKeyMagicTextService::Activate(ITfThreadMgr *ptim, TfClientId tid)
 {
+    // Call ActivateEx with default flags (0)
+    return ActivateEx(ptim, tid, 0);
+}
+
+STDAPI CKeyMagicTextService::ActivateEx(ITfThreadMgr *ptim, TfClientId tid, DWORD dwFlags)
+{
     DEBUG_LOG_FUNC();
+    
+    // Log the activation flags
+    DEBUG_LOG(L"ActivateEx called with dwFlags: 0x" + std::to_wstring(dwFlags));
+    
     EnterCriticalSection(&m_cs);
     
     // Log host process path when service is activated
