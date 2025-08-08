@@ -1442,7 +1442,7 @@ void CKeyMagicTextService::ReloadRegistrySettings()
     m_useCompositionEditSession = ShouldUseCompositionEditSession();
     
     // Apply settings
-    UpdateSettings(defaultKeyboard.empty() ? nullptr : defaultKeyboard.c_str());
+    UpdateSettings(defaultKeyboard);
 }
 
 // Composition edit session determination
