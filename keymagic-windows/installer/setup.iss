@@ -58,13 +58,11 @@ Source: "..\..\target\aarch64-pc-windows-msvc\release\keymagic-gui.exe"; DestDir
 Source: "..\tray-manager\build-x64\bin\Release\keymagic-tray.exe"; DestDir: "{app}"; Check: IsX64; Flags: ignoreversion
 Source: "..\tray-manager\build-arm64\bin\Release\keymagic-tray.exe"; DestDir: "{app}"; Check: IsARM64; Flags: ignoreversion
 
-; TSF DLLs - x64 (single DLL in versioned subdirectory)
-Source: "..\tsf\build-x64\Release\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Check: IsX64; Flags: ignoreversion
-
-; TSF DLLs - ARM64 (ARM64X forwarder and implementation DLLs in versioned subdirectory)
+; TSF DLLs - Install as KeyMagicTSF.dll on both platforms
+; x64: Rename KeyMagicTSF_x64.dll to KeyMagicTSF.dll
+Source: "..\tsf\build-x64\Release\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; DestName: "KeyMagicTSF.dll"; Check: IsX64; Flags: ignoreversion
+; ARM64: Native ARM64X DLL (already named KeyMagicTSF.dll)
 Source: "..\tsf\build-arm64x\KeyMagicTSF.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Check: IsARM64; Flags: ignoreversion
-Source: "..\tsf\build-arm64x\KeyMagicTSF_arm64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Check: IsARM64; Flags: ignoreversion
-Source: "..\tsf\build-arm64x\KeyMagicTSF_x64.dll"; DestDir: "{app}\TSF\{#MyAppVersionSuffix}"; Check: IsARM64; Flags: ignoreversion
 
 ; Resources (common)
 Source: "..\..\resources\icons\*"; DestDir: "{app}\resources\icons"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -109,11 +107,8 @@ Root: HKCR; Subkey: "KeyMagicKeyboard\shell\open\command"; ValueType: string; Va
 ; Download and install WebView2 if needed
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 Runtime..."; Flags: waituntilterminated; Check: ShouldInstallWebView2; BeforeInstall: DownloadWebView2
 
-; Register TSF DLL (cleanup of old versions is handled automatically)
-; For x64, register the single DLL
-Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF_x64.dll"""; StatusMsg: "Registering Text Services Framework..."; Check: IsX64; Flags: runhidden; BeforeInstall: CleanupOldTSF
-; For ARM64, register the ARM64X forwarder DLL
-Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; StatusMsg: "Registering Text Services Framework..."; Check: IsARM64; Flags: runhidden; BeforeInstall: CleanupOldTSF
+; Register TSF DLL (same filename on both platforms now)
+Filename: "regsvr32.exe"; Parameters: "/s ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; StatusMsg: "Registering Text Services Framework..."; Flags: runhidden; BeforeInstall: CleanupOldTSF
 
 ; Always launch tray manager after installation
 Filename: "{app}\keymagic-tray.exe"; StatusMsg: "Starting KeyMagic Tray Manager..."; Flags: nowait runhidden
@@ -122,11 +117,8 @@ Filename: "{app}\keymagic-tray.exe"; StatusMsg: "Starting KeyMagic Tray Manager.
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Unregister TSF DLL before uninstall
-; For x64, unregister the single DLL
-Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF_x64.dll"""; Check: IsX64; RunOnceId: "UnregTSF"; Flags: runhidden
-; For ARM64, unregister the ARM64X forwarder DLL
-Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; Check: IsARM64; RunOnceId: "UnregTSF"; Flags: runhidden
+; Unregister TSF DLL before uninstall (same filename on both platforms now)
+Filename: "regsvr32.exe"; Parameters: "/s /u ""{app}\TSF\{#MyAppVersionSuffix}\KeyMagicTSF.dll"""; RunOnceId: "UnregTSF"; Flags: runhidden
 
 // Include common functions and procedures
 #include "common.iss"

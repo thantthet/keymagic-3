@@ -51,12 +51,12 @@ if %errorlevel% neq 0 (
 )
 cd ..
 
-REM Build ARM64X forwarder
+REM Build ARM64X native DLL
 echo.
-echo [3/6] Building ARM64X forwarder TSF DLL...
+echo [3/6] Building ARM64X native TSF DLL...
 call make-arm64x.bat Release
 if %errorlevel% neq 0 (
-    echo [ERROR] Failed to build ARM64X forwarder TSF DLL
+    echo [ERROR] Failed to build ARM64X native TSF DLL
     exit /b 1
 )
 
@@ -97,21 +97,13 @@ if not exist "tray-manager\build-arm64\bin\Release\keymagic-tray.exe" (
 )
 echo [OK] All ARM64 components found
 
-REM Check ARM64X forwarder
-echo Checking ARM64X forwarder...
+REM Check ARM64X native DLL
+echo Checking ARM64X native DLL...
 if not exist "tsf\build-arm64x\KeyMagicTSF.dll" (
-    echo [ERROR] ARM64X forwarder DLL not found
+    echo [ERROR] ARM64X native DLL not found
     exit /b 1
 )
-if not exist "tsf\build-arm64x\KeyMagicTSF_arm64.dll" (
-    echo [ERROR] ARM64X ARM64 implementation DLL not found
-    exit /b 1
-)
-if not exist "tsf\build-arm64x\KeyMagicTSF_x64.dll" (
-    echo [ERROR] ARM64X x64 implementation DLL not found
-    exit /b 1
-)
-echo [OK] ARM64X forwarder components found
+echo [OK] ARM64X native DLL found
 
 REM Navigate to installer directory
 echo.
