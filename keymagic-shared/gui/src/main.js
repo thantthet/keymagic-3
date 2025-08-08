@@ -65,11 +65,22 @@ window.switchPage = function(pageName) {
   
   // Load composition/direct mode settings for settings page
   if (pageName === 'settings') {
-    if (platformInfo.os === 'macos') {
-      loadDirectModeHosts();
-      loadIMKStatus();
-    } else {
-      loadCompositionModeHosts();
+    // Load data based on the active tab
+    const activeTab = document.querySelector('.settings-tab.active');
+    if (activeTab) {
+      const activePanel = activeTab.dataset.tab;
+      
+      if (activePanel === 'input-method' && platformInfo) {
+        if (platformInfo.os === 'macos') {
+          loadIMKStatus();
+        }
+      } else if (activePanel === 'advanced' && platformInfo) {
+        if (platformInfo.os === 'macos') {
+          loadDirectModeHosts();
+        } else {
+          loadCompositionModeHosts();
+        }
+      }
     }
   }
 }
@@ -1661,6 +1672,38 @@ window.openInputSourcesSettings = async function() {
 }
 
 
+// Settings Tab Management
+function initSettingsTabs() {
+  const tabs = document.querySelectorAll('.settings-tab');
+  const panels = document.querySelectorAll('.settings-tab-panel');
+  
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetPanel = tab.dataset.tab;
+      
+      // Update active tab
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      
+      // Update active panel
+      panels.forEach(panel => {
+        if (panel.dataset.panel === targetPanel) {
+          panel.classList.add('active');
+        } else {
+          panel.classList.remove('active');
+        }
+      });
+      
+      // Load data for the active tab if needed
+      if (targetPanel === 'input-method' && platformInfo) {
+        if (platformInfo.os === 'macos') {
+          loadIMKStatus();
+        }
+      }
+    });
+  });
+}
+
 // Initialize
 async function init() {
   // Initialize DOM elements
@@ -1676,6 +1719,9 @@ async function init() {
   
   // Set up event listeners
   setupEventListeners();
+  
+  // Initialize settings tabs
+  initSettingsTabs();
   
   // Initialize converter
   initializeConverter();

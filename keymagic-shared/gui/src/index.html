@@ -80,9 +80,41 @@
             <h1>Settings</h1>
           </div>
           
+          <!-- Settings Tabs -->
+          <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="general">General</button>
+            <button class="settings-tab" data-tab="input-method">Input Method</button>
+            <button class="settings-tab" data-tab="advanced">Advanced</button>
+          </div>
+          
           <div class="settings-content">
-            <section class="settings-section">
-              <h2>KeyMagic Language Settings</h2>
+            <!-- General Tab -->
+            <div class="settings-tab-panel active" data-panel="general">
+              <section class="settings-section">
+                <h2>Updates</h2>
+                <div class="setting-item">
+                  <div class="update-settings">
+                    <div class="update-card">
+                      <div class="update-card-content">
+                        <div class="update-version-info">
+                          <h3>KeyMagic 3</h3>
+                          <p class="current-version">Version <span id="current-version">Loading...</span></p>
+                        </div>
+                        <button class="btn btn-primary" onclick="checkForUpdates()">Check for Updates</button>
+                      </div>
+                      <div class="update-status-container" id="update-status-container" style="display: none;">
+                        <div class="update-status" id="update-status"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            
+            <!-- Input Method Tab -->
+            <div class="settings-tab-panel" data-panel="input-method">
+              <section class="settings-section">
+                <h2>KeyMagic Language Settings</h2>
               <div class="setting-item">
                 <div class="language-settings">
                   <p class="setting-description" id="language-settings-description">Manage which languages KeyMagic appears under in Windows language settings.</p>
@@ -141,9 +173,42 @@
                   </div>
                 </div>
               </div>
-            </section>
+              </section>
+              
+              <section class="settings-section" id="imk-management-section" style="display: none;">
+                <h2>Input Method Management</h2>
+                <div class="setting-item">
+                  <div class="imk-management-settings">
+                    <p class="setting-description">Manage the KeyMagic Input Method Kit (IMK) component that enables typing in macOS applications.</p>
+                    
+                    <div class="imk-status-card">
+                      <div class="imk-status-content">
+                        <div class="imk-status-info">
+                          <h3>KeyMagic Input Method</h3>
+                          <p class="imk-status-text" id="imk-status-text">Checking status...</p>
+                        </div>
+                        <div class="imk-actions">
+                          <button class="btn btn-secondary" id="reinstall-imk-btn" onclick="reinstallIMK()" style="display: none;">
+                            Reinstall Input Method
+                          </button>
+                          <button class="btn btn-danger" id="uninstall-imk-btn" onclick="uninstallIMK()" style="display: none;">
+                            Uninstall Input Method
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="info-box" style="margin-top: 16px;">
+                      <p><strong>Note:</strong> The Input Method component is required for KeyMagic to work in macOS applications. You only need to uninstall it if you want to completely remove KeyMagic from your system. Uninstalling will disable KeyMagic typing functionality until it's reinstalled.</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
             
-            <section class="settings-section" id="preview-window-section" style="display: none;">
+            <!-- Advanced Tab -->
+            <div class="settings-tab-panel" data-panel="advanced">
+              <section class="settings-section" id="preview-window-section" style="display: none;">
               <h2>Keyboard Preview</h2>
               <div class="setting-item">
                 <div class="preview-window-settings">
@@ -207,57 +272,7 @@
                 </div>
               </div>
             </section>
-            
-            <section class="settings-section" id="imk-management-section" style="display: none;">
-              <h2>Input Method Management</h2>
-              <div class="setting-item">
-                <div class="imk-management-settings">
-                  <p class="setting-description">Manage the KeyMagic Input Method Kit (IMK) component that enables typing in macOS applications.</p>
-                  
-                  <div class="imk-status-card">
-                    <div class="imk-status-content">
-                      <div class="imk-status-info">
-                        <h3>KeyMagic Input Method</h3>
-                        <p class="imk-status-text" id="imk-status-text">Checking status...</p>
-                      </div>
-                      <div class="imk-actions">
-                        <button class="btn btn-secondary" id="reinstall-imk-btn" onclick="reinstallIMK()" style="display: none;">
-                          Reinstall Input Method
-                        </button>
-                        <button class="btn btn-danger" id="uninstall-imk-btn" onclick="uninstallIMK()" style="display: none;">
-                          Uninstall Input Method
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="info-box" style="margin-top: 16px;">
-                    <p><strong>Note:</strong> The Input Method component is required for KeyMagic to work in macOS applications. You only need to uninstall it if you want to completely remove KeyMagic from your system. Uninstalling will disable KeyMagic typing functionality until it's reinstalled.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-            
-            <section class="settings-section">
-              <h2>Updates</h2>
-              <div class="setting-item">
-                <div class="update-settings">
-                  <div class="update-card">
-                    <div class="update-card-content">
-                      <div class="update-version-info">
-                        <h3>KeyMagic 3</h3>
-                        <p class="current-version">Version <span id="current-version">Loading...</span></p>
-                      </div>
-                      <button class="btn btn-primary" onclick="checkForUpdates()">Check for Updates</button>
-                    </div>
-                    <div class="update-status-container" id="update-status-container" style="display: none;">
-                      <div class="update-status" id="update-status"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-            
+            </div>
           </div>
         </div>
         
