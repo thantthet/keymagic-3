@@ -198,7 +198,7 @@ async function installIMK() {
                 <strong>${result.success ? 'Success!' : 'Error'}</strong><br>
                 ${formattedMessage}
                 ${result.requires_logout ? '<br><br><strong>Please log out and log back in for changes to take full effect.</strong>' : ''}
-                ${result.success ? '<br><br><button id="open-settings-btn" class="btn btn-primary">Open System Settings</button>' : ''}
+                ${result.success && !result.already_enabled ? '<br><br><button id="open-settings-btn" class="btn btn-primary">Open System Settings</button>' : ''}
             </div>
         `;
         

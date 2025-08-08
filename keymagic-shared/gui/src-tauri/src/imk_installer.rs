@@ -9,6 +9,7 @@ pub struct InstallResult {
     pub success: bool,
     pub message: String,
     pub requires_logout: bool,
+    pub already_enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,6 +18,7 @@ pub struct IMKInfo {
     pub path: Option<String>,
     pub version: Option<String>,
     pub needs_update: bool,
+    pub enabled_in_system: bool,
 }
 
 /// Get the path to the IMK bundle in the user's Input Methods directory
@@ -73,6 +75,7 @@ pub fn check_imk_status(app: AppHandle) -> Result<IMKInfo, String> {
             path: None,
             version: None,
             needs_update: false,
+            enabled_in_system: false,
         });
     }
     
@@ -85,11 +88,14 @@ pub fn check_imk_status(app: AppHandle) -> Result<IMKInfo, String> {
         None => true, // If we can't read version, assume update is needed
     };
     
+    let enabled_in_system = is_keymagic_enabled();
+    
     Ok(IMKInfo {
         installed: true,
         path: Some(user_imk_path.to_string_lossy().to_string()),
         version: installed_version,
         needs_update,
+        enabled_in_system,
     })
 }
 
@@ -116,6 +122,23 @@ fn compare_versions(v1: &str, v2: &str) -> i32 {
     }
     
     0
+}
+
+/// Check if KeyMagic is enabled in system input sources
+fn is_keymagic_enabled() -> bool {
+    // Check com.apple.inputsources (where custom input methods are tracked)
+    if let Ok(output) = Command::new("defaults")
+        .args(&["read", "com.apple.inputsources"])
+        .output()
+    {
+        if output.status.success() {
+            let content = String::from_utf8_lossy(&output.stdout);
+            // Check for KeyMagic3 bundle identifier
+            return content.contains("org.keymagic.inputmethod.KeyMagic3");
+        }
+    }
+    
+    false
 }
 
 /// Open System Settings to Input Sources panel
@@ -189,6 +212,7 @@ pub async fn install_imk_bundle(app: AppHandle) -> Result<InstallResult, String>
                 String::from_utf8_lossy(&output.stderr)
             ),
             requires_logout: false,
+            already_enabled: false,
         });
     }
     
@@ -197,10 +221,20 @@ pub async fn install_imk_bundle(app: AppHandle) -> Result<InstallResult, String>
         .args(&["-R", "755", user_imk_path.to_str().unwrap()])
         .output();
     
+    // Check if KeyMagic is already enabled in system
+    let already_enabled = is_keymagic_enabled();
+    
+    let message = if already_enabled {
+        "KeyMagic input method updated successfully! The update is complete and KeyMagic is ready to use.\n\nYou can continue using <strong>Control+Space</strong> to switch between input methods.".to_string()
+    } else {
+        "KeyMagic input method installed successfully! To complete the setup:\n\n1. Click <strong>Open System Settings</strong> below\n2. Click the <strong>+</strong> button in the Input Sources panel\n3. Type <strong>KeyMagic</strong> in the search bar\n4. Select <strong>KeyMagic3</strong> from the search results and click <strong>Add</strong>\n5. Use <strong>Control+Space</strong> to switch between input methods\n   (or click the input method icon in the menu bar)".to_string()
+    };
+    
     Ok(InstallResult {
         success: true,
-        message: "KeyMagic input method installed successfully! To complete the setup:\n\n1. Click <strong>Open System Settings</strong> below\n2. Click the <strong>+</strong> button in the Input Sources panel\n3. Type <strong>KeyMagic</strong> in the search bar\n4. Select <strong>KeyMagic3</strong> from the search results and click <strong>Add</strong>\n5. Use <strong>Control+Space</strong> to switch between input methods\n   (or click the input method icon in the menu bar)".to_string(),
+        message,
         requires_logout: false,
+        already_enabled,
     })
 }
 
@@ -215,6 +249,7 @@ pub async fn uninstall_imk_bundle() -> Result<InstallResult, String> {
             success: true,
             message: "KeyMagic input method is not installed.".to_string(),
             requires_logout: false,
+            already_enabled: false,
         });
     }
     
@@ -237,5 +272,6 @@ pub async fn uninstall_imk_bundle() -> Result<InstallResult, String> {
         success: true,
         message: "KeyMagic input method uninstalled successfully. You may need to log out and log back in for changes to take full effect.".to_string(),
         requires_logout: true,
+        already_enabled: false,
     })
 }
