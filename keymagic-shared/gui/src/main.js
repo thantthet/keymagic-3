@@ -73,6 +73,8 @@ window.switchPage = function(pageName) {
       if (activePanel === 'input-method' && platformInfo) {
         if (platformInfo.os === 'macos') {
           loadIMKStatus();
+        } else if (platformInfo.os === 'linux') {
+          loadIBusConfig();
         }
       } else if (activePanel === 'advanced' && platformInfo) {
         if (platformInfo.os === 'macos') {
@@ -1477,8 +1479,12 @@ function updatePlatformSpecificUI() {
   } else if (platformInfo.os === 'macos') {
     showInputMethodTab = true; // Has IMK management
     showAdvancedTab = true; // Has direct mode
+  } else if (platformInfo.os === 'linux') {
+    // Check if IBus is installed
+    showInputMethodTab = true; // Show for IBus configuration
+    showAdvancedTab = false;
   } else {
-    // Linux or other platforms
+    // Other platforms
     showInputMethodTab = false;
     showAdvancedTab = false;
   }
@@ -1568,6 +1574,20 @@ function updatePlatformSpecificUI() {
       }
     } else {
       imkSection.style.display = 'none';
+    }
+  }
+  
+  // Show/hide IBus settings section for Linux
+  const ibusSection = document.getElementById('ibus-settings-section');
+  if (ibusSection) {
+    if (platformInfo.os === 'linux') {
+      ibusSection.style.display = 'block';
+      // Load IBus config when settings page is shown
+      if (document.getElementById('settings-page').classList.contains('active')) {
+        loadIBusConfig();
+      }
+    } else {
+      ibusSection.style.display = 'none';
     }
   }
 }
@@ -1710,6 +1730,36 @@ window.openInputSourcesSettings = async function() {
   }
 }
 
+// IBus Configuration Functions (Linux)
+async function loadIBusConfig() {
+  if (!platformInfo || platformInfo.os !== 'linux') return;
+  
+  const symbolElement = document.getElementById('ibus-symbol');
+  if (!symbolElement) return;
+  
+  try {
+    const ibusConfig = await invoke('get_ibus_config');
+    
+    if (ibusConfig.config_exists) {
+      symbolElement.textContent = ibusConfig.symbol;
+      symbolElement.style.color = 'var(--text-primary)';
+    } else {
+      symbolElement.textContent = 'Not installed';
+      symbolElement.style.color = 'var(--error-color)';
+    }
+  } catch (error) {
+    console.error('Failed to load IBus config:', error);
+    symbolElement.textContent = 'Error loading config';
+    symbolElement.style.color = 'var(--error-color)';
+  }
+}
+
+// Toggle collapsible sections
+window.toggleCollapsible = function(header) {
+  const section = header.parentElement;
+  section.classList.toggle('collapsed');
+}
+
 
 // Settings Tab Management
 function initSettingsTabs() {
@@ -1737,6 +1787,8 @@ function initSettingsTabs() {
       if (targetPanel === 'input-method' && platformInfo) {
         if (platformInfo.os === 'macos') {
           loadIMKStatus();
+        } else if (platformInfo.os === 'linux') {
+          loadIBusConfig();
         }
       }
     });

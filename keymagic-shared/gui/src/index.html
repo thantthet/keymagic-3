@@ -175,6 +175,50 @@
               </div>
               </section>
               
+              <section class="settings-section" id="ibus-settings-section" style="display: none;">
+                <h2>IBus Configuration</h2>
+                <div class="setting-item">
+                  <div class="ibus-settings">
+                    <p class="setting-description">View and manage KeyMagic's IBus input method configuration.</p>
+                    
+                    <div class="ibus-info-card">
+                      <div class="ibus-info-content">
+                        <div class="ibus-info-item">
+                          <label>Display Symbol:</label>
+                          <span id="ibus-symbol" class="ibus-value">Loading...</span>
+                        </div>
+                        <div class="ibus-info-item">
+                          <label>Configuration File:</label>
+                          <span class="ibus-value mono">/usr/share/ibus/component/keymagic3.xml</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="info-box collapsible-section collapsed" style="margin-top: 16px;">
+                      <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M4.646 5.646a.5.5 0 01.708 0L8 8.293l2.646-2.647a.5.5 0 01.708.708l-3 3a.5.5 0 01-.708 0l-3-3a.5.5 0 010-.708z"/>
+                        </svg>
+                        <strong>How to change the symbol</strong>
+                      </div>
+                      <div class="collapsible-content">
+                        <p>To change the KeyMagic display symbol in IBus:</p>
+                        <ol>
+                          <li>Edit the configuration file with sudo:
+                            <pre><code>sudo nano /usr/share/ibus/component/keymagic3.xml</code></pre>
+                          </li>
+                          <li>Find the <code>&lt;symbol&gt;</code> tag and change its value</li>
+                          <li>Save the file and restart IBus:
+                            <pre><code>ibus restart</code></pre>
+                          </li>
+                        </ol>
+                        <p><strong>Note:</strong> This requires administrator privileges and will affect all users on the system.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              
               <section class="settings-section" id="imk-management-section" style="display: none;">
                 <h2>Input Method Management</h2>
                 <div class="setting-item">

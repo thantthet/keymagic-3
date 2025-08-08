@@ -8,6 +8,8 @@ mod app_enumerator;
 #[cfg(target_os = "macos")]
 mod imk_installer;
 
+#[cfg(target_os = "linux")]
+mod ibus_config;
 
 #[cfg(target_os = "windows")]
 mod keyboard_icon;
@@ -181,6 +183,10 @@ pub fn run() {
             imk_installer::uninstall_imk_bundle,
             #[cfg(target_os = "macos")]
             imk_installer::open_input_sources_settings,
+            #[cfg(target_os = "linux")]
+            ibus_config::get_ibus_config,
+            #[cfg(target_os = "linux")]
+            ibus_config::check_ibus_installed,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

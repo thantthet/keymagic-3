@@ -1263,6 +1263,60 @@ body {
   gap: 10px;
 }
 
+/* IBus Settings Styles */
+.ibus-info-card {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.ibus-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ibus-info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ibus-info-item label {
+  min-width: 140px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.ibus-value {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.ibus-value.mono {
+  font-family: 'Courier New', monospace;
+  background-color: var(--hover-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+pre {
+  background-color: var(--hover-bg);
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+pre code {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
 .update-actions {
   display: flex;
   gap: 10px;
