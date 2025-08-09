@@ -1,0 +1,273 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+x64/
+x86/
+ARM64/
+ARM64EC/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+*.cmake
+!CMakeLists.txt
+
+# Build artifacts
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.o
+*.ko
+*.elf
+
+# Test artifacts
+*.log
+*.trs
+test-results/
+coverage/
+*.gcov
+*.gcda
+*.gcno
+coverage.info
+coverage.filtered.info
+coverage_report/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+*.vcxproj.filters
+*.vcxproj.user
+*.VC.db
+*.VC.opendb
+ipch/
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+*.cachefile
+*.psess
+*.vsp
+*.vspx
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+cmake-build-*/
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+
+# Windows specific
+Desktop.ini
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux specific
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Documentation build
+docs/_build/
+docs/_static/
+docs/_templates/
+doxygen/
+html/
+latex/
+
+# Package manager directories
+node_modules/
+vendor/
+packages/
+
+# Python cache (if using Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+
+# Rust artifacts (if comparing with Rust version)
+target/
+Cargo.lock
+
+# Binary test data (except .km2 test files)
+*.bin
+!tests/data/*.km2
+
+# Core dumps
+core
+core.*
+vgcore.*
+
+# Valgrind
+valgrind-*.log
+*.memcheck
+
+# Address Sanitizer
+*.asan.log*
+
+# Profiling
+gmon.out
+*.prof
+*.profdata
+*.profraw
+callgrind.out.*
+perf.data
+perf.data.old
+
+# CTags/ETags
+tags
+TAGS
+.tags
+.TAGS
+
+# GNU Global
+GPATH
+GRTAGS
+GTAGS
+
+# Ninja build
+.ninja_deps
+.ninja_log
+build.ninja
+
+# Conan
+conan.lock
+conaninfo.txt
+conanbuildinfo.*
+graph_info.json
+
+# CPack
+_CPack_Packages/
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+*.dmg
+
+# Local configuration
+.env
+.env.local
+*.local
+
+# Editor backup files
+\#*\#
+.#*
+
+# Patch files
+*.patch
+*.diff
+
+# Archives
+*.7z
+*.jar
+*.rar
+*.tar
+*.war
+*.ear
+*.sar
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock

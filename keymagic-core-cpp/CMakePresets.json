@@ -1,0 +1,226 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_SHARED_LIBS": "OFF",
+                "BUILD_TESTING": "ON"
+            }
+        },
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "generator": "Visual Studio 17 2022",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_VERSION": "10.0"
+            }
+        },
+        {
+            "name": "windows-x64-debug",
+            "displayName": "Windows x64 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-x64-release",
+            "displayName": "Windows x64 Release",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            }
+        },
+        {
+            "name": "windows-arm64-debug",
+            "displayName": "Windows ARM64 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "ARM64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_GENERATOR_PLATFORM": "ARM64"
+            }
+        },
+        {
+            "name": "windows-arm64-release",
+            "displayName": "Windows ARM64 Release",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "ARM64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_GENERATOR_PLATFORM": "ARM64"
+            }
+        },
+        {
+            "name": "windows-arm64ec-debug",
+            "displayName": "Windows ARM64EC Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "ARM64EC",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_GENERATOR_PLATFORM": "ARM64EC"
+            }
+        },
+        {
+            "name": "windows-arm64ec-release",
+            "displayName": "Windows ARM64EC Release",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "ARM64EC",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_GENERATOR_PLATFORM": "ARM64EC"
+            }
+        },
+        {
+            "name": "linux-x64-debug",
+            "displayName": "Linux x64 Debug",
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++"
+            }
+        },
+        {
+            "name": "linux-x64-release",
+            "displayName": "Linux x64 Release",
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++"
+            }
+        },
+        {
+            "name": "macos-universal-debug",
+            "displayName": "macOS Universal Debug",
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64"
+            }
+        },
+        {
+            "name": "macos-universal-release",
+            "displayName": "macOS Universal Release",
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-x64-debug",
+            "configurePreset": "windows-x64-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-x64-release",
+            "configurePreset": "windows-x64-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-arm64-debug",
+            "configurePreset": "windows-arm64-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-arm64-release",
+            "configurePreset": "windows-arm64-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-arm64ec-debug",
+            "configurePreset": "windows-arm64ec-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-arm64ec-release",
+            "configurePreset": "windows-arm64ec-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "linux-x64-debug",
+            "configurePreset": "linux-x64-debug"
+        },
+        {
+            "name": "linux-x64-release",
+            "configurePreset": "linux-x64-release"
+        },
+        {
+            "name": "macos-universal-debug",
+            "configurePreset": "macos-universal-debug"
+        },
+        {
+            "name": "macos-universal-release",
+            "configurePreset": "macos-universal-release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "windows-x64",
+            "configurePreset": "windows-x64-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-arm64",
+            "configurePreset": "windows-arm64-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "linux-x64",
+            "configurePreset": "linux-x64-release"
+        },
+        {
+            "name": "macos-universal",
+            "configurePreset": "macos-universal-release"
+        }
+    ]
+}
