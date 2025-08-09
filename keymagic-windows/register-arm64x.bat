@@ -1,6 +1,9 @@
 @echo off
 :: register-arm64x.bat - Register/unregister native ARM64X DLL
-:: Works on both x64 and ARM64 Windows systems
+:: The ARM64X DLL works on both x64 and ARM64 Windows systems:
+::   - On ARM64 Windows: Uses native ARM64 code
+::   - On x64 Windows: Uses ARM64EC code (emulated)
+:: For architecture-specific builds, use make.bat instead
 
 setlocal
 
@@ -12,9 +15,19 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Parse command
+:: Parse command and configuration
 set "COMMAND=%~1"
 if "%COMMAND%"=="" set "COMMAND=register"
+
+set "CONFIG=%~2"
+if "%CONFIG%"=="" set "CONFIG=Release"
+
+:: Validate configuration
+if /i not "%CONFIG%"=="Debug" if /i not "%CONFIG%"=="Release" (
+    echo [ERROR] Invalid configuration: %CONFIG%
+    echo Must be Debug or Release
+    exit /b 1
+)
 
 :: Navigate to script directory
 cd /d "%~dp0"
@@ -25,12 +38,19 @@ if /i "%COMMAND%"=="status" goto :status
 
 echo [ERROR] Unknown command: %COMMAND%
 echo.
-echo Usage: register-arm64x.bat [register^|unregister^|status]
+echo Usage: register-arm64x.bat [register^|unregister^|status] [Debug^|Release]
+echo.
+echo Examples:
+echo   register-arm64x.bat register           # Register Release build
+echo   register-arm64x.bat register Debug     # Register Debug build
+echo   register-arm64x.bat register Release   # Register Release build
+echo   register-arm64x.bat unregister         # Unregister all
+echo   register-arm64x.bat status              # Check status
 exit /b 1
 
 :register
 echo ========================================
-echo Registering Native ARM64X DLL
+echo Registering Native ARM64X DLL (%CONFIG%)
 echo ========================================
 echo.
 
@@ -46,37 +66,53 @@ if defined PROCESSOR_ARCHITEW6432 goto :x64_system
 echo [ERROR] x86 systems are not supported
 exit /b 1
 
+:x64_system
+echo ========================================
+echo [INFO] x64 Windows Detected
+echo ========================================
+echo.
+echo This script is for registering native ARM64X builds on ARM64 Windows.
+echo.
+echo For x64 Windows, please use:
+echo   make.bat register x64 %CONFIG%
+echo.
+echo The ARM64X DLL can technically run on x64 Windows using ARM64EC emulation,
+echo but native x64 builds will provide better performance.
+echo.
+exit /b 0
+
 :arm64_system
 echo System: ARM64 Windows
 set "IS_ARM64=1"
 goto :check_dll
 
-:x64_system
-echo System: x64 Windows
-set "IS_ARM64=0"
-goto :check_dll
-
 :check_dll
-:: Check if the ARM64X DLL exists in target directory
-if exist "target\release\KeyMagicTSF.dll" (
-    set "ARM64X_DLL=target\release\KeyMagicTSF.dll"
-) else if exist "target\debug\KeyMagicTSF.dll" (
-    set "ARM64X_DLL=target\debug\KeyMagicTSF.dll"
+:: Check if the ARM64X DLL exists in target directory based on CONFIG
+if /i "%CONFIG%"=="Release" (
+    if exist "target\release\KeyMagicTSF.dll" (
+        set "ARM64X_DLL=target\release\KeyMagicTSF.dll"
+    ) else (
+        echo [ERROR] KeyMagicTSF.dll not found in target\release\!
+        echo Run make-arm64x.bat Release first to build the native ARM64X DLL.
+        exit /b 1
+    )
 ) else (
-    echo [ERROR] KeyMagicTSF.dll not found!
-    echo Run make-arm64x.bat first to build the native ARM64X DLL.
-    exit /b 1
+    if exist "target\debug\KeyMagicTSF.dll" (
+        set "ARM64X_DLL=target\debug\KeyMagicTSF.dll"
+    ) else (
+        echo [ERROR] KeyMagicTSF.dll not found in target\debug\!
+        echo Run make-arm64x.bat Debug first to build the native ARM64X DLL.
+        exit /b 1
+    )
 )
-
-:: For ARM64 systems, use the native ARM64X DLL directly
-if "%IS_ARM64%"=="1" goto :register_arm64x
-goto :register_x64
 
 :register_arm64x
 echo Registering native ARM64X DLL...
+echo Running on ARM64 Windows - will use native ARM64 code path
+echo.
 echo This DLL contains both:
 echo   - ARM64 code for native ARM64 processes
-echo   - ARM64EC code for x64 processes
+echo   - ARM64EC code for x64 processes (when ARM64 apps host x64 components)
 echo.
 
 :: Create temp directory with unique name
@@ -125,67 +161,6 @@ if %errorlevel% equ 0 (
 )
 exit /b 0
 
-:register_x64
-:: For x64 systems, check if we have a regular x64 build
-if exist "tsf\build-x64\Release\KeyMagicTSF_x64.dll" (
-    echo x64 system detected. Using x64-specific DLL...
-    set "DLL_PATH=tsf\build-x64\Release\KeyMagicTSF_x64.dll"
-) else if exist "tsf\build-x64\Debug\KeyMagicTSF_x64.dll" (
-    echo x64 system detected. Using x64-specific DLL (Debug)...
-    set "DLL_PATH=tsf\build-x64\Debug\KeyMagicTSF_x64.dll"
-) else if exist "target\release\KeyMagicTSF.dll" (
-    echo x64 system detected. Using standard DLL from target\release...
-    set "DLL_PATH=target\release\KeyMagicTSF.dll"
-) else if exist "target\debug\KeyMagicTSF.dll" (
-    echo x64 system detected. Using standard DLL from target\debug...
-    set "DLL_PATH=target\debug\KeyMagicTSF.dll"
-) else (
-    echo [ERROR] No compatible DLL found for x64 system!
-    echo Please build the x64 version first.
-    exit /b 1
-)
-
-:: Create temp directory with unique name
-set "RANDOM_NAME=KeyMagicTSF_x64_%RANDOM%_%RANDOM%"
-set "TEMP_DIR=%TEMP%\%RANDOM_NAME%"
-mkdir "%TEMP_DIR%" 2>nul
-
-:: Copy and register from temp location
-echo Copying DLL to temporary location...
-copy /Y "%DLL_PATH%" "%TEMP_DIR%\KeyMagicTSF.dll" >nul
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to copy DLL to temporary directory
-    rmdir /s /q "%TEMP_DIR%" 2>nul
-    exit /b 1
-)
-
-:: Set permissions for broad access (including sandboxed apps)
-echo Setting permissions for broad access...
-
-:: Grant access to EVERYONE (includes all users and processes)
-icacls "%TEMP_DIR%" /grant "Everyone:(OI)(CI)(RX)" >nul 2>&1
-icacls "%TEMP_DIR%\KeyMagicTSF.dll" /grant "Everyone:(RX)" >nul 2>&1
-
-:: Grant access to ALL APPLICATION PACKAGES for UWP/Store apps
-icacls "%TEMP_DIR%" /grant "ALL APPLICATION PACKAGES:(OI)(CI)(RX)" >nul 2>&1
-icacls "%TEMP_DIR%\KeyMagicTSF.dll" /grant "ALL APPLICATION PACKAGES:(RX)" >nul 2>&1
-
-:: Explicitly grant access to Low Integrity Level (for protected mode browsers)
-icacls "%TEMP_DIR%" /grant "*S-1-16-4096:(OI)(CI)(RX)" >nul 2>&1
-icacls "%TEMP_DIR%\KeyMagicTSF.dll" /grant "*S-1-16-4096:(RX)" >nul 2>&1
-
-echo Registering from: %TEMP_DIR%
-regsvr32 /s "%TEMP_DIR%\KeyMagicTSF.dll"
-if %errorlevel% equ 0 (
-    echo [SUCCESS] x64 DLL registered!
-    echo Location: %TEMP_DIR%\KeyMagicTSF.dll
-) else (
-    echo [ERROR] Registration failed!
-    rmdir /s /q "%TEMP_DIR%" 2>nul
-    exit /b 1
-)
-exit /b 0
-
 :unregister
 echo ========================================
 echo Unregistering KeyMagic TSF
@@ -205,8 +180,18 @@ for /d %%D in ("%TEMP%\KeyMagicTSF_ARM64X_*") do (
     rmdir /s /q "%%D" 2>nul
 )
 
-:: Clean up x64 temp directories
+:: Also clean up any legacy x64 temp directories (for backwards compatibility)
 for /d %%D in ("%TEMP%\KeyMagicTSF_x64_*") do (
+    if exist "%%D\KeyMagicTSF.dll" (
+        echo Unregistering legacy x64 from temp: %%D
+        regsvr32 /s /u "%%D\KeyMagicTSF.dll" 2>nul
+        if %errorlevel% equ 0 set "UNREGISTERED=1"
+    )
+    rmdir /s /q "%%D" 2>nul
+)
+
+:: Clean up any other KeyMagicTSF temp directories
+for /d %%D in ("%TEMP%\KeyMagicTSF_*") do (
     if exist "%%D\KeyMagicTSF.dll" (
         echo Unregistering from temp: %%D
         regsvr32 /s /u "%%D\KeyMagicTSF.dll" 2>nul
@@ -224,7 +209,7 @@ exit /b 0
 
 :status
 echo ========================================
-echo KeyMagic TSF Registration Status
+echo KeyMagic TSF Registration Status (%CONFIG%)
 echo ========================================
 echo.
 
@@ -233,45 +218,42 @@ echo System Information:
 echo -------------------
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
     echo Architecture: ARM64
-    echo ARM64X Support: Yes
+    echo ARM64X Support: Native
 ) else if /i "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
     echo Architecture: x64/AMD64
-    echo ARM64X Support: No (x64 system)
+    echo.
+    echo [INFO] This script is for ARM64 Windows systems.
+    echo For x64 Windows status, use: make.bat status x64 %CONFIG%
+    echo.
+    exit /b 0
 ) else (
     echo Architecture: %PROCESSOR_ARCHITECTURE%
+    echo [ERROR] Unsupported architecture
+    exit /b 1
 )
 echo.
 
 :: Check build artifacts
-echo Build Status:
-echo -------------
-if exist "target\release\KeyMagicTSF.dll" (
-    for %%F in ("target\release\KeyMagicTSF.dll") do (
-        echo [OK] Native ARM64X DLL built - Release (%%~zF bytes^)
-    )
-) else if exist "target\debug\KeyMagicTSF.dll" (
-    for %%F in ("target\debug\KeyMagicTSF.dll") do (
-        echo [OK] Native ARM64X DLL built - Debug (%%~zF bytes^)
+echo Build Status (%CONFIG%):
+echo ------------------------
+if /i "%CONFIG%"=="Release" (
+    if exist "target\release\KeyMagicTSF.dll" (
+        for %%F in ("target\release\KeyMagicTSF.dll") do (
+            echo [OK] Native ARM64X DLL built - Release (%%~zF bytes^)
+        )
+    ) else (
+        echo [--] Native ARM64X DLL not built (Release)
     )
 ) else (
-    echo [--] Native ARM64X DLL not built
+    if exist "target\debug\KeyMagicTSF.dll" (
+        for %%F in ("target\debug\KeyMagicTSF.dll") do (
+            echo [OK] Native ARM64X DLL built - Debug (%%~zF bytes^)
+        )
+    ) else (
+        echo [--] Native ARM64X DLL not built (Debug)
+    )
 )
 
-if exist "tsf\build-x64\Release\KeyMagicTSF_x64.dll" (
-    echo [OK] x64 DLL built (Release)
-) else if exist "tsf\build-x64\Debug\KeyMagicTSF_x64.dll" (
-    echo [OK] x64 DLL built (Debug)
-) else (
-    echo [--] x64 DLL not built
-)
-
-if exist "tsf\build-arm64\Release\KeyMagicTSF_arm64.dll" (
-    echo [OK] ARM64 DLL built (Release)
-) else if exist "tsf\build-arm64\Debug\KeyMagicTSF_arm64.dll" (
-    echo [OK] ARM64 DLL built (Debug)
-) else (
-    echo [--] ARM64 DLL not built
-)
 echo.
 
 :: Check registration
