@@ -415,7 +415,7 @@ KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info)
     }
     
     // Initialize info
-    info->key_code = 0;
+    info->key_code = KeyMagic_VK_Null;
     info->ctrl = 0;
     info->alt = 0;
     info->shift = 0;
@@ -475,94 +475,98 @@ KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info)
                 return 0;
             }
             
-            int vk_code = 0;
+            KeyMagicVirtualKey vk_code = KeyMagic_VK_Null;  // Will store VirtualKey enum value
             
             // Single character keys
             if (part.length() == 1) {
                 char ch = part[0];
                 if (ch >= 'A' && ch <= 'Z') {
-                    vk_code = 0x41 + (ch - 'A');  // VK_A to VK_Z
+                    vk_code = static_cast<KeyMagicVirtualKey>(static_cast<int>(keymagic::VirtualKey::KeyA) + (ch - 'A'));
                 } else if (ch >= '0' && ch <= '9') {
-                    vk_code = 0x30 + (ch - '0');  // VK_0 to VK_9
+                    vk_code = static_cast<KeyMagicVirtualKey>(static_cast<int>(keymagic::VirtualKey::Key0) + (ch - '0'));
                 } else {
-                    // Special single characters
+                    // Special single characters (matching Rust OEM key mappings)
                     switch (ch) {
-                        case '=': vk_code = 0xBB; break;  // VK_OEM_PLUS
-                        case '-': vk_code = 0xBD; break;  // VK_OEM_MINUS
-                        case ',': vk_code = 0xBC; break;  // VK_OEM_COMMA
-                        case '.': vk_code = 0xBE; break;  // VK_OEM_PERIOD
-                        case ';': vk_code = 0xBA; break;  // VK_OEM_1
-                        case '/': vk_code = 0xBF; break;  // VK_OEM_2
-                        case '`': vk_code = 0xC0; break;  // VK_OEM_3
-                        case '[': vk_code = 0xDB; break;  // VK_OEM_4
-                        case '\\': vk_code = 0xDC; break; // VK_OEM_5
-                        case ']': vk_code = 0xDD; break;  // VK_OEM_6
-                        case '\'': vk_code = 0xDE; break; // VK_OEM_7
+                        case '=': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemPlus); break;
+                        case '-': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemMinus); break;
+                        case ',': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemComma); break;
+                        case '.': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemPeriod); break;
+                        case ';': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem1); break;
+                        case '/': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem2); break;
+                        case '`': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem3); break;
+                        case '[': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem4); break;
+                        case '\\': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem5); break;
+                        case ']': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem6); break;
+                        case '\'': vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem7); break;
                     }
                 }
             } else {
                 // Multi-character key names
                 if (part == "SPACE") {
-                    vk_code = 0x20;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Space);
                 } else if (part == "ENTER" || part == "RETURN") {
-                    vk_code = 0x0D;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Return);
                 } else if (part == "TAB") {
-                    vk_code = 0x09;
-                } else if (part == "BACKSPACE" || part == "BACK" || part == "DELETE") {
-                    vk_code = 0x08;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Tab);
+                } else if (part == "BACKSPACE" || part == "BACK") {
+                    // Note: "DELETE" is not mapped to Back in Rust
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Back);
+                } else if (part == "DELETE") {
+                    // This should be VK_DELETE, not BACK (matching Rust behavior)
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Delete);
                 } else if (part == "ESCAPE" || part == "ESC") {
-                    vk_code = 0x1B;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Escape);
                 } else if (part == "CAPSLOCK" || part == "CAPS" || part == "CAPITAL") {
-                    vk_code = 0x14;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Capital);
                 } else if (part == "INSERT" || part == "INS") {
-                    vk_code = 0x2D;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Insert);
                 } else if (part == "DEL") {
-                    vk_code = 0x2E;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Delete);
                 } else if (part == "HOME") {
-                    vk_code = 0x24;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Home);
                 } else if (part == "END") {
-                    vk_code = 0x23;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::End);
                 } else if (part == "PAGEUP" || part == "PGUP" || part == "PRIOR") {
-                    vk_code = 0x21;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Prior);
                 } else if (part == "PAGEDOWN" || part == "PGDN" || part == "NEXT") {
-                    vk_code = 0x22;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Next);
                 } else if (part == "LEFT") {
-                    vk_code = 0x25;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Left);
                 } else if (part == "UP") {
-                    vk_code = 0x26;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Up);
                 } else if (part == "RIGHT") {
-                    vk_code = 0x27;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Right);
                 } else if (part == "DOWN") {
-                    vk_code = 0x28;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Down);
                 } else if (part == "PLUS") {
-                    vk_code = 0xBB;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemPlus);
                 } else if (part == "MINUS") {
-                    vk_code = 0xBD;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemMinus);
                 } else if (part == "COMMA") {
-                    vk_code = 0xBC;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemComma);
                 } else if (part == "PERIOD") {
-                    vk_code = 0xBE;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::OemPeriod);
                 } else if (part == "SEMICOLON") {
-                    vk_code = 0xBA;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem1);
                 } else if (part == "SLASH") {
-                    vk_code = 0xBF;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem2);
                 } else if (part == "GRAVE") {
-                    vk_code = 0xC0;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem3);
                 } else if (part == "LEFTBRACKET" || part == "LBRACKET") {
-                    vk_code = 0xDB;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem4);
                 } else if (part == "BACKSLASH") {
-                    vk_code = 0xDC;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem5);
                 } else if (part == "RIGHTBRACKET" || part == "RBRACKET") {
-                    vk_code = 0xDD;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem6);
                 } else if (part == "QUOTE" || part == "APOSTROPHE") {
-                    vk_code = 0xDE;
+                    vk_code = static_cast<KeyMagicVirtualKey>(keymagic::VirtualKey::Oem7);
                 } else if (part.substr(0, 1) == "F" && part.length() <= 3) {
-                    // Function keys F1-F24
+                    // Function keys F1-F12 (matching Rust - only supports F1-F12)
                     std::string fnum = part.substr(1);
                     try {
                         int num = std::stoi(fnum);
-                        if (num >= 1 && num <= 24) {
-                            vk_code = 0x70 + (num - 1);  // VK_F1 = 0x70
+                        if (num >= 1 && num <= 12) {
+                            vk_code = static_cast<KeyMagicVirtualKey>(static_cast<int>(keymagic::VirtualKey::F1) + (num - 1));
                         }
                     } catch (...) {
                         // Not a valid function key
@@ -571,12 +575,12 @@ KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info)
                     // Numpad keys
                     char numpad_ch = part[6];
                     if (numpad_ch >= '0' && numpad_ch <= '9') {
-                        vk_code = 0x60 + (numpad_ch - '0');  // VK_NUMPAD0 = 0x60
+                        vk_code = static_cast<KeyMagicVirtualKey>(static_cast<int>(keymagic::VirtualKey::Numpad0) + (numpad_ch - '0'));
                     }
                 }
             }
             
-            if (vk_code == 0) {
+            if (vk_code == KeyMagic_VK_Null) {
                 // Unknown key
                 return 0;
             }
@@ -587,7 +591,7 @@ KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info)
     }
     
     // Must have exactly one key
-    return (info->key_code != 0) ? 1 : 0;
+    return (info->key_code != KeyMagic_VK_Null) ? 1 : 0;
 }
 
 // KM2 file loading and metadata access

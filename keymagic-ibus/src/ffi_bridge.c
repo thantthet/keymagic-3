@@ -43,11 +43,9 @@
  * This module provides a C interface to the Rust keymagic-core library.
  * It handles type conversion between C and Rust FFI types and manages
  * memory allocation/deallocation across the FFI boundary.
+ * 
+ * The actual FFI function declarations are now in keymagic_core.h
  */
-
-/* External FFI functions from keymagic-core (Rust) */
-extern void* keymagic_engine_new();
-extern void keymagic_engine_free(void* engine);
 extern int keymagic_engine_load_keyboard(void* engine, const char* km2_path);
 extern int keymagic_engine_process_key(void* engine, int key_code, char character,
                                        int shift, int ctrl, int alt, int caps_lock,

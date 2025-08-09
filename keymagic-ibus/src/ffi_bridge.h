@@ -3,21 +3,21 @@
 
 #include <glib.h>
 
+/* Include the unified KeyMagic Core header */
+#include "../../keymagic-core/include/keymagic_core.h"
+
 G_BEGIN_DECLS
 
 /**
  * FFI Bridge to keymagic-core (Rust library)
  * 
- * This module provides a C interface to the Rust keymagic-core library,
- * handling the conversion between C types and Rust FFI types.
+ * This module provides a GLib-compatible interface to the Rust keymagic-core library,
+ * handling the conversion between GLib types and the core FFI types.
  */
 
-/* Opaque handle to Rust EngineHandle */
-typedef void* EngineHandle;
-
 /**
- * Key processing result from engine
- * Matches the ProcessKeyOutput structure from keymagic-core FFI
+ * GLib-compatible key processing result
+ * Wraps the ProcessKeyOutput structure with GLib types
  */
 typedef struct {
     gchar* text;                    /* Output text (may be NULL) */
@@ -28,17 +28,7 @@ typedef struct {
 } KeyProcessingResult;
 
 /**
- * Engine result codes
- */
-typedef enum {
-    KEYMAGIC_RESULT_SUCCESS = 0,
-    KEYMAGIC_RESULT_ERROR = 1,
-    KEYMAGIC_RESULT_INVALID_ENGINE = 2,
-    KEYMAGIC_RESULT_INVALID_KEYBOARD = 3
-} KeyMagicResult;
-
-/**
- * Load a keyboard layout from .km2 file
+ * Load a keyboard layout from .km2 file (GLib wrapper)
  * 
  * @param km2_file_path Path to .km2 keyboard file
  * @return Engine handle or NULL on failure
@@ -46,14 +36,15 @@ typedef enum {
 EngineHandle* keymagic_ffi_load_keyboard(const gchar* km2_file_path);
 
 /**
- * Free/destroy an engine handle
+ * Free/destroy an engine handle (GLib wrapper)
  * 
  * @param engine Engine handle to destroy
  */
 void keymagic_ffi_destroy_engine(EngineHandle* engine);
 
 /**
- * Process a key event
+ * Process a key event (GLib wrapper)
+ * Converts GDK keyvals to internal VirtualKey codes
  * 
  * @param engine Engine handle
  * @param keyval Key value (GDK keyval)
@@ -69,7 +60,7 @@ KeyMagicResult keymagic_ffi_process_key(EngineHandle* engine,
                                         KeyProcessingResult* result);
 
 /**
- * Reset engine state
+ * Reset engine state (GLib wrapper)
  * 
  * @param engine Engine handle
  * @return Result code
@@ -77,7 +68,7 @@ KeyMagicResult keymagic_ffi_process_key(EngineHandle* engine,
 KeyMagicResult keymagic_ffi_reset_engine(EngineHandle* engine);
 
 /**
- * Get current composing text from engine
+ * Get current composing text from engine (GLib wrapper)
  * 
  * @param engine Engine handle
  * @return Current composing text (caller must free) or NULL
@@ -85,7 +76,7 @@ KeyMagicResult keymagic_ffi_reset_engine(EngineHandle* engine);
 gchar* keymagic_ffi_get_composing_text(EngineHandle* engine);
 
 /**
- * Set composing text in engine (for sync purposes)
+ * Set composing text in engine (GLib wrapper)
  * 
  * @param engine Engine handle
  * @param text Text to set as composing text
