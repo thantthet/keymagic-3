@@ -247,11 +247,154 @@ TEST_F(PyidaungsuKeystrokeTest, DocumentationExamples_StackedConsonants) {
     EXPECT_EQ(result5.composingText, std::string("စက္ကူ"));
 }
 
-TEST_F(PyidaungsuKeystrokeTest, KeyboardInfo) {
-    // Test keyboard metadata
-    EXPECT_FALSE(engine.getKeyboardName().empty());
-    EXPECT_FALSE(engine.getKeyboardDescription().empty());
+TEST_F(PyidaungsuKeystrokeTest, KeyboardMetadata) {
+    // Test all keyboard metadata fields
     
-    std::cout << "Loaded keyboard: " << engine.getKeyboardName() << std::endl;
-    std::cout << "Description: " << engine.getKeyboardDescription() << std::endl;
+    // Basic metadata should be present
+    std::string name = engine.getKeyboardName();
+    std::string description = engine.getKeyboardDescription();
+    
+    EXPECT_FALSE(name.empty()) << "Keyboard name should not be empty";
+    EXPECT_FALSE(description.empty()) << "Keyboard description should not be empty";
+    
+    // Verify expected values for Pyidaungsu keyboard
+    EXPECT_EQ(name, "Pyidaungsu MM") << "Expected keyboard name 'Pyidaungsu MM'";
+    EXPECT_EQ(description, "Burmese Layout") << "Expected description 'Burmese Layout'";
+    
+    // Note: The internal Engine class doesn't have getKeyboardHotkey() 
+    // We can test it through KeyMagicEngine wrapper in a separate test
+    
+    // Access raw KM2 file for additional metadata
+    // Note: getKeyboard() is an internal method in Engine class
+    // For production code, this would not be exposed
+    const keymagic::KM2File* km2 = nullptr;
+    
+    // Create a separate Engine instance to access internal details
+    keymagic::Engine internalEngine;
+    auto keyboardPath = keymagic_test::KeyboardFinder::findKeyboardFile("Pyidaungsu MM.km2");
+    if (keyboardPath) {
+        internalEngine.loadKeyboardFromPath(keyboardPath->string());
+        km2 = internalEngine.getKeyboard();
+    }
+    
+    ASSERT_NE(km2, nullptr) << "KM2 file should be loaded";
+    
+    // Check version information
+    EXPECT_EQ(km2->getMajorVersion(), 1) << "Expected major version 1";
+    EXPECT_GE(km2->getMinorVersion(), 4) << "Expected minor version >= 4";
+    
+    // Verify info section exists (v1.4+)
+    EXPECT_TRUE(km2->hasInfoSection()) << "Info section should exist for v1.4+";
+    
+    // Check font family metadata
+    std::string fontFamily = km2->metadata.getFontFamily();
+    if (!fontFamily.empty()) {
+        std::cout << "Recommended font: " << fontFamily << std::endl;
+    }
+    
+    // Check for icon data
+    const auto* iconData = km2->metadata.getIcon();
+    if (iconData && !iconData->empty()) {
+        std::cout << "Icon data present: " << iconData->size() << " bytes" << std::endl;
+    }
+    
+    // Test layout options
+    const auto& layoutOptions = km2->getLayoutOptions();
+    
+    // Print layout options for debugging
+    std::cout << "\n=== Layout Options ===" << std::endl;
+    std::cout << "Track CAPSLOCK: " << (layoutOptions.getTrackCaps() ? "Yes" : "No") << std::endl;
+    std::cout << "Smart Backspace: " << (layoutOptions.getAutoBksp() ? "Yes" : "No") << std::endl;
+    std::cout << "Eat unused keys: " << (layoutOptions.getEat() ? "Yes" : "No") << std::endl;
+    std::cout << "US layout based: " << (layoutOptions.getPosBased() ? "Yes" : "No") << std::endl;
+    std::cout << "Treat Ctrl+Alt as AltGr: " << (layoutOptions.getRightAlt() ? "Yes" : "No") << std::endl;
+    
+    // Verify expected layout options for Pyidaungsu
+    // Based on actual KM2 file settings:
+    EXPECT_FALSE(layoutOptions.getTrackCaps()) << "Pyidaungsu does not track CAPSLOCK";
+    EXPECT_FALSE(layoutOptions.getAutoBksp()) << "Pyidaungsu does not use smart backspace";
+    EXPECT_FALSE(layoutOptions.getEat()) << "Pyidaungsu does not eat unused keys";
+    EXPECT_TRUE(layoutOptions.getPosBased()) << "Pyidaungsu is US layout based";
+    EXPECT_TRUE(layoutOptions.getRightAlt()) << "Pyidaungsu treats Ctrl+Alt as AltGr";
+    
+    // Display summary
+    std::cout << "\n=== Keyboard Summary ===" << std::endl;
+    std::cout << "Name: " << name << std::endl;
+    std::cout << "Description: " << description << std::endl;
+    std::cout << "Version: " << static_cast<int>(km2->getMajorVersion()) 
+              << "." << static_cast<int>(km2->getMinorVersion()) << std::endl;
+    std::cout << "Number of rules: " << km2->rules.size() << std::endl;
+    std::cout << "Number of strings: " << km2->strings.size() << std::endl;
+    std::cout << "=======================" << std::endl;
+}
+
+TEST_F(PyidaungsuKeystrokeTest, KeyboardLoadError) {
+    // Test loading a non-existent keyboard
+    keymagic::Engine errorEngine;
+    
+    auto result = errorEngine.loadKeyboardFromPath("non_existent_keyboard.km2");
+    EXPECT_NE(result, keymagic::Result::Success) << "Loading non-existent file should fail";
+    
+    // Engine should handle operations gracefully without a keyboard
+    EXPECT_TRUE(errorEngine.getKeyboardName().empty()) << "Name should be empty without keyboard";
+    EXPECT_TRUE(errorEngine.getKeyboardDescription().empty()) << "Description should be empty without keyboard";
+    EXPECT_FALSE(errorEngine.hasKeyboard()) << "hasKeyboard() should return false";
+    
+    // Processing keys without a keyboard should return None output
+    Input input('a', static_cast<char32_t>('a'), Modifiers());
+    auto output = errorEngine.processKey(input);
+    EXPECT_EQ(output.action, ActionType::None) << "Should return None action without keyboard";
+}
+
+TEST_F(PyidaungsuKeystrokeTest, KeyMagicEngineAPIMetadata) {
+    // Test the public KeyMagicEngine API (wrapper class)
+    // This tests the high-level API that external applications would use
+    
+    KeyMagicEngine publicEngine;
+    
+    // Load keyboard using public API
+    auto keyboardPath = keymagic_test::KeyboardFinder::findKeyboardFile("Pyidaungsu MM.km2");
+    ASSERT_TRUE(keyboardPath.has_value()) << "Could not find Pyidaungsu keyboard";
+    
+    Result loadResult = publicEngine.loadKeyboard(keyboardPath->string());
+    ASSERT_EQ(loadResult, Result::Success) << "Failed to load keyboard via public API";
+    
+    // Test hasKeyboard method
+    EXPECT_TRUE(publicEngine.hasKeyboard()) << "Public API hasKeyboard() should return true";
+    
+    // Test metadata retrieval via public API
+    std::string name = publicEngine.getKeyboardName();
+    std::string description = publicEngine.getKeyboardDescription();
+    
+    EXPECT_EQ(name, "Pyidaungsu MM") << "Public API should return correct keyboard name";
+    EXPECT_EQ(description, "Burmese Layout") << "Public API should return correct description";
+    
+    // Test version string
+    std::string version = KeyMagicEngine::getVersion();
+    EXPECT_FALSE(version.empty()) << "Version string should not be empty";
+    EXPECT_EQ(version, "1.0.0") << "Expected version 1.0.0";
+    
+    // Test composition management
+    publicEngine.setComposition("test");
+    EXPECT_EQ(publicEngine.getComposition(), "test") << "Composition should be set correctly";
+    
+    publicEngine.reset();
+    EXPECT_EQ(publicEngine.getComposition(), "") << "Composition should be empty after reset";
+    
+    // Test key processing via public API
+    Output output = publicEngine.processWindowsKey(
+        0,  // VK code
+        'k', // character
+        Modifiers(false, false, false) // no modifiers
+    );
+    
+    EXPECT_EQ(output.action, ActionType::Insert) << "Should insert character";
+    EXPECT_FALSE(output.text.empty()) << "Should produce output text";
+    
+    std::cout << "\n=== Public API Test Summary ===" << std::endl;
+    std::cout << "API Version: " << version << std::endl;
+    std::cout << "Keyboard: " << name << std::endl;
+    std::cout << "Description: " << description << std::endl;
+    std::cout << "Has Keyboard: " << (publicEngine.hasKeyboard() ? "Yes" : "No") << std::endl;
+    std::cout << "==============================" << std::endl;
 }
