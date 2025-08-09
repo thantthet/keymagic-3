@@ -979,7 +979,7 @@ HRESULT CKeyMagicTextService::ParseHotkeyString(const std::wstring& hotkeyStr, T
     }
     
     // Use keymagic-core's hotkey parsing
-    HotkeyInfo info;
+    KeyMagicHotkeyInfo info;
     if (keymagic_parse_hotkey(narrowStr.c_str(), &info) != 1)
     {
         return E_FAIL;

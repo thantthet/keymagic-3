@@ -133,7 +133,7 @@ inline std::wstring NormalizeHotkeyForDisplay(const std::wstring& hotkey)
         return L"";
     
     // Parse hotkey using FFI
-    HotkeyInfo info = {0};
+    KeyMagicHotkeyInfo info = {0};
     if (keymagic_parse_hotkey(utf8Hotkey.c_str(), &info) == 0)
     {
         // Failed to parse, return original
