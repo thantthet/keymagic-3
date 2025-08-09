@@ -83,7 +83,18 @@ LRESULT TrayManager::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARA
                     }
                     m_contextMenuActive = true;
                 }
-                m_trayIcon->HandleMessage(hWnd, message, wParam, lParam);
+                
+                // On Windows 10, WM_MOUSEMOVE events may be sent even when mouse is not over the tray icon
+                // So we filter them here to avoid showing preview window incorrectly
+                if (LOWORD(lParam) == WM_MOUSEMOVE) {
+                    // Only pass the mouse move event if the mouse is actually over the tray area
+                    if (IsMouseOverTrayArea()) {
+                        m_trayIcon->HandleMessage(hWnd, message, wParam, lParam);
+                    }
+                } else {
+                    // Pass all other messages directly
+                    m_trayIcon->HandleMessage(hWnd, message, wParam, lParam);
+                }
             }
             return 0;
             
