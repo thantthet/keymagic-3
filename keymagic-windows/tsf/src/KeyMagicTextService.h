@@ -71,6 +71,7 @@ private:
     BOOL LoadKeyboard(const std::wstring& km2Path);
     BOOL LoadKeyboardByID(const std::wstring& keyboardId);
     void ResetEngine();
+    bool IsWindows10();
     
     
     // Key translation
@@ -137,6 +138,7 @@ private:
     bool m_isProcessingKey;
     DWORD m_lastSendInputTime;
     DWORD m_lastTerminationSpaceTime;  // Timestamp when we send SPACE for composition termination
+    bool m_isWindows10;  // Flag to detect Windows 10 for signature filtering workaround
     
     // Event monitoring
     HANDLE m_hRegistryUpdateEvent;

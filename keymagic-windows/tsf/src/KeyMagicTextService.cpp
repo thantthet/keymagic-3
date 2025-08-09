@@ -21,6 +21,7 @@
 #include <tlhelp32.h>
 #include <functional>
 #include <shlobj.h>
+#include <VersionHelpers.h>
 
 CKeyMagicTextService::CKeyMagicTextService()
 {
@@ -53,6 +54,7 @@ CKeyMagicTextService::CKeyMagicTextService()
     
     m_isProcessingKey = false;
     m_lastTerminationSpaceTime = 0;
+    m_isWindows10 = IsWindows10();
     
     // Initialize event monitoring
     m_hRegistryUpdateEvent = nullptr;
@@ -456,13 +458,30 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
 
     *pfEaten = FALSE;
 
-    DEBUG_LOG_KEY(L"OnTestKeyDown", wParam, lParam, 0);
+    // Skip if vk is VK_PACKET
+    if (wParam == VK_PACKET)
+    {
+        DEBUG_LOG(L"VK_PACKET - skipping");
+        return S_OK;
+    }
+
+    char character = MapVirtualKeyToChar(wParam, lParam);
+    DEBUG_LOG_KEY(L"OnTestKeyDown", wParam, lParam, character);
 
     // Check if this is our own SendInput by examining the extra info
-    ULONG_PTR extraInfo = GetMessageExtraInfo();
-    if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+    // Skip this check on Windows 10 due to unreliable GetMessageExtraInfo behavior
+    if (!m_isWindows10)
     {
-        return S_OK;
+        ULONG_PTR extraInfo = GetMessageExtraInfo();
+        if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+        {
+            DEBUG_LOG(L"Skipping key event from our SendInput");
+            return S_OK;
+        }
+    }
+    else
+    {
+        DEBUG_LOG(L"Windows 10 detected - skipping signature check");
     }
     
     // Also check time-based filtering for VK_BACK as GetMessageExtraInfo is not reliable
@@ -489,6 +508,7 @@ STDAPI CKeyMagicTextService::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARA
         // Skip modifier and function keys
         if (keyInput.shouldSkip)
         {
+            DEBUG_LOG(L"Modifier or function key - skipping");
             *pfEaten = FALSE;
             return S_OK;
         }
@@ -545,6 +565,13 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         return E_INVALIDARG;
 
     *pfEaten = FALSE;
+
+    // Skip if vk is VK_PACKET
+    if (wParam == VK_PACKET)
+    {
+        DEBUG_LOG(L"VK_PACKET - skipping");
+        return S_OK;
+    }
     
     // Mark that we're processing a key to help OnEndEdit
     m_isProcessingKey = true;
@@ -592,16 +619,16 @@ STDAPI CKeyMagicTextService::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lP
         }
     }
     
-    // TSF is now always enabled when selected - no need to check m_tsfEnabled
-    // The service is only active when user selects it from language bar
-    
     // Skip other keys with our signature
-    if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+    // Skip this check on Windows 10 due to unreliable GetMessageExtraInfo behavior
+    if (!m_isWindows10)
     {
-        DEBUG_LOG(L"Skipping key event from our SendInput");
-        return S_OK;
+        if (extraInfo == KEYMAGIC_EXTRAINFO_SIGNATURE)
+        {
+            DEBUG_LOG(L"Skipping key event from our SendInput");
+            return S_OK;
+        }
     }
-    
     
     // Also check time-based filtering for VK_BACK as GetMessageExtraInfo is not reliable
     // Skip VK_BACK if we recently sent input (within 50ms)
@@ -1694,4 +1721,47 @@ void CKeyMagicTextService::NotifyTrayManagerKeyboardChange()
     }
     
     m_pTrayClient->NotifyKeyboardChanged(m_currentKeyboardId);
+}
+
+bool CKeyMagicTextService::IsWindows10()
+{
+    // Get the actual Windows version using RtlGetVersion
+    // We use RtlGetVersion because GetVersionEx and IsWindows10OrGreater
+    // may not return accurate results without a proper manifest
+    typedef LONG(WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+    
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    if (!hNtdll)
+    {
+        DEBUG_LOG(L"Failed to get ntdll.dll handle");
+        return false;
+    }
+    
+    RtlGetVersionPtr pRtlGetVersion = (RtlGetVersionPtr)GetProcAddress(hNtdll, "RtlGetVersion");
+    if (!pRtlGetVersion)
+    {
+        DEBUG_LOG(L"Failed to get RtlGetVersion function");
+        return false;
+    }
+    
+    RTL_OSVERSIONINFOW osvi;
+    ZeroMemory(&osvi, sizeof(RTL_OSVERSIONINFOW));
+    osvi.dwOSVersionInfoSize = sizeof(RTL_OSVERSIONINFOW);
+    
+    if (pRtlGetVersion(&osvi) != 0)
+    {
+        DEBUG_LOG(L"RtlGetVersion failed");
+        return false;
+    }
+    
+    // Windows 10 has major version 10 and build number < 22000
+    // Windows 11 has major version 10 and build number >= 22000
+    bool isWin10 = (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber < 22000);
+    
+    DEBUG_LOG(L"Windows version: " + std::to_wstring(osvi.dwMajorVersion) + L"." + 
+              std::to_wstring(osvi.dwMinorVersion) + L"." + 
+              std::to_wstring(osvi.dwBuildNumber) + 
+              (isWin10 ? L" (Windows 10)" : L" (Windows 11 or later)"));
+    
+    return isWin10;
 }
