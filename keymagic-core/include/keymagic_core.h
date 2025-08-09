@@ -76,15 +76,6 @@ typedef struct {
     int is_processed;                /* 0=false, 1=true - whether engine handled the key */
 } ProcessKeyOutput;
 
-/* Hotkey information structure */
-typedef struct {
-    KeyMagicVirtualKey key_code;  /* VirtualKey enum value (not platform VK code) */
-    int ctrl;                     /* 0 or 1 */
-    int alt;                      /* 0 or 1 */
-    int shift;                    /* 0 or 1 */
-    int meta;                     /* 0 or 1 (Windows/Command/Super key) */
-} HotkeyInfo;
-
 /* VirtualKey enum - Internal key codes (not Windows VK codes) */
 typedef enum {
     KeyMagic_VK_Null = 1,
@@ -212,6 +203,15 @@ typedef enum {
     KeyMagic_VK_Down = 107,
     KeyMagic_VK_Insert = 108
 } KeyMagicVirtualKey;
+
+/* Hotkey information structure */
+typedef struct {
+    KeyMagicVirtualKey key_code;  /* VirtualKey enum value (not platform VK code) */
+    int ctrl;                     /* 0 or 1 */
+    int alt;                      /* 0 or 1 */
+    int shift;                    /* 0 or 1 */
+    int meta;                     /* 0 or 1 (Windows/Command/Super key) */
+} KeyMagicHotkeyInfo;
 
 /* ============================================================================
  * Engine Management Functions
@@ -455,7 +455,7 @@ KEYMAGIC_API size_t keymagic_km2_get_icon_data(
  * @param info Output hotkey information structure
  * @return 1 on success, 0 on failure
  */
-KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info);
+KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, KeyMagicHotkeyInfo* info);
 
 /**
  * Convert VirtualKey enum value to display string

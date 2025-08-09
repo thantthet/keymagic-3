@@ -46,8 +46,10 @@
  * 
  * The actual FFI function declarations are now in keymagic_core.h
  */
+/* Note: These forward declarations match the unified header signatures.
+ * The key_code parameter is now KeyMagicVirtualKey enum type */
 extern int keymagic_engine_load_keyboard(void* engine, const char* km2_path);
-extern int keymagic_engine_process_key(void* engine, int key_code, char character,
+extern int keymagic_engine_process_key(void* engine, KeyMagicVirtualKey key_code, char character,
                                        int shift, int ctrl, int alt, int caps_lock,
                                        void* output);
 extern int keymagic_engine_reset(void* engine);
@@ -63,26 +65,13 @@ extern char* keymagic_km2_get_description(void* handle);
 extern char* keymagic_km2_get_hotkey(void* handle);
 extern void keymagic_free_string(char* str);
 
-/* ProcessKeyOutput structure from Rust FFI */
-typedef struct {
-    int action_type;
-    char* text;
-    int delete_count;
-    char* composing_text;
-    int is_processed;
-} RustProcessKeyOutput;
+/* Using ProcessKeyOutput from unified header (keymagic_core.h) */
+typedef ProcessKeyOutput RustProcessKeyOutput;
 
-/* HotkeyInfo structure from Rust FFI */
-typedef struct {
-    int key_code;       /* VirtualKey as int */
-    int ctrl;           /* 0 or 1 */
-    int alt;            /* 0 or 1 */
-    int shift;          /* 0 or 1 */
-    int meta;           /* 0 or 1 */
-} HotkeyInfo;
+/* Using KeyMagicHotkeyInfo from unified header (keymagic_core.h) */
 
 /* External hotkey parsing FFI function */
-extern int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info);
+extern int keymagic_parse_hotkey(const char* hotkey_str, KeyMagicHotkeyInfo* info);
 
 /**
  * Load keyboard from .km2 file
@@ -205,9 +194,9 @@ keymagic_ffi_process_key(EngineHandle* engine, guint keyval, guint keycode,
     /* Log parameters before calling Rust FFI */
     LOG_FFI_PARAMS(km_keycode, keyval, character, shift, ctrl, alt, caps_lock);
     
-    /* Call Rust FFI function with mapped keycode */
+    /* Call Rust FFI function with mapped keycode cast to KeyMagicVirtualKey enum */
     RustProcessKeyOutput rust_output = {0};
-    int rust_result = keymagic_engine_process_key(engine, km_keycode, character,
+    int rust_result = keymagic_engine_process_key(engine, (KeyMagicVirtualKey)km_keycode, character,
                                                   shift ? 1 : 0, ctrl ? 1 : 0, 
                                                   alt ? 1 : 0, caps_lock ? 1 : 0,
                                                   &rust_output);
@@ -433,11 +422,11 @@ keymagic_ffi_parse_hotkey(const gchar* hotkey_str, gint* key_code_out,
     g_return_val_if_fail(shift_out != NULL, FALSE);
     g_return_val_if_fail(meta_out != NULL, FALSE);
     
-    HotkeyInfo info = {0};
+    KeyMagicHotkeyInfo info = {0};
     int result = keymagic_parse_hotkey(hotkey_str, &info);
     
     if (result == 1) {
-        *key_code_out = info.key_code;
+        *key_code_out = (gint)info.key_code;
         *ctrl_out = (info.ctrl != 0);
         *alt_out = (info.alt != 0);
         *shift_out = (info.shift != 0);

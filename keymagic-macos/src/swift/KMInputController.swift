@@ -196,7 +196,7 @@ class KMInputController: IMKInputController {
         LOG_DEBUG("Processing key with engine...")
         let result = keymagic_engine_process_key(
             engine,
-            virtualKey.rawValue,
+            KeyMagicVirtualKey(rawValue: virtualKey.rawValue),
             character,
             shift,
             ctrl,

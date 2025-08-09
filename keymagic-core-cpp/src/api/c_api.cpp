@@ -139,16 +139,16 @@ void fillProcessKeyOutput(const keymagic::Output& output, ProcessKeyOutput* cOut
     // Map action type
     switch (output.action) {
         case keymagic::ActionType::None:
-            cOutput->action_type = 0;
+            cOutput->action_type = KeyMagicAction_None;
             break;
         case keymagic::ActionType::Insert:
-            cOutput->action_type = 1;
+            cOutput->action_type = KeyMagicAction_Insert;
             break;
         case keymagic::ActionType::BackspaceDelete:
-            cOutput->action_type = 2;
+            cOutput->action_type = KeyMagicAction_BackspaceDelete;
             break;
         case keymagic::ActionType::BackspaceDeleteAndInsert:
-            cOutput->action_type = 3;
+            cOutput->action_type = KeyMagicAction_BackspaceDeleteAndInsert;
             break;
     }
     
@@ -409,7 +409,7 @@ KEYMAGIC_API const char* keymagic_get_version(void) {
 }
 
 // Hotkey parsing
-KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info) {
+KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, KeyMagicHotkeyInfo* info) {
     if (!hotkey_str || !info) {
         return 0;
     }

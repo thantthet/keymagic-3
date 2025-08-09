@@ -27,9 +27,9 @@ struct MacHotkey {
     let hasMeta: Bool
     
     /// Initialize from HotkeyInfo and optional original string
-    init?(from info: HotkeyInfo, originalString: String? = nil) {
+    init?(from info: KeyMagicHotkeyInfo, originalString: String? = nil) {
         // Convert VirtualKey to macOS key equivalent
-        guard let keyEquiv = MacHotkey.virtualKeyToKeyEquivalent(info.key_code) else {
+        guard let keyEquiv = MacHotkey.virtualKeyToKeyEquivalent(Int32(info.key_code.rawValue)) else {
             return nil
         }
         
@@ -43,7 +43,7 @@ struct MacHotkey {
         self.keyEquivalent = keyEquiv
         self.modifierMask = modifiers
         self.originalString = originalString
-        self.virtualKeyCode = info.key_code
+        self.virtualKeyCode = Int32(info.key_code.rawValue)
         self.hasCtrl = info.ctrl != 0
         self.hasAlt = info.alt != 0
         self.hasShift = info.shift != 0
@@ -54,7 +54,7 @@ struct MacHotkey {
     static func parse(_ hotkeyString: String) -> MacHotkey? {
         LOG_DEBUG("Parsing hotkey: \(hotkeyString)")
         
-        var info = HotkeyInfo()
+        var info = KeyMagicHotkeyInfo()
         let result = hotkeyString.withCString { hotkeyStr in
             keymagic_parse_hotkey(hotkeyStr, &info)
         }
