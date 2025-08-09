@@ -78,11 +78,11 @@ typedef struct {
 
 /* Hotkey information structure */
 typedef struct {
-    int key_code;       /* VirtualKey enum value (not platform VK code) */
-    int ctrl;           /* 0 or 1 */
-    int alt;            /* 0 or 1 */
-    int shift;          /* 0 or 1 */
-    int meta;           /* 0 or 1 (Windows/Command/Super key) */
+    KeyMagicVirtualKey key_code;  /* VirtualKey enum value (not platform VK code) */
+    int ctrl;                     /* 0 or 1 */
+    int alt;                      /* 0 or 1 */
+    int shift;                    /* 0 or 1 */
+    int meta;                     /* 0 or 1 (Windows/Command/Super key) */
 } HotkeyInfo;
 
 /* VirtualKey enum - Internal key codes (not Windows VK codes) */
@@ -280,7 +280,7 @@ KEYMAGIC_API KeyMagicResult keymagic_engine_load_keyboard_from_memory(
  */
 KEYMAGIC_API KeyMagicResult keymagic_engine_process_key(
     EngineHandle* handle,
-    int key_code,
+    KeyMagicVirtualKey key_code,
     char character,
     int shift,
     int ctrl,
@@ -463,7 +463,7 @@ KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info)
  * @param key_code VirtualKey enum value
  * @return Display string (caller must free) or NULL if invalid
  */
-KEYMAGIC_API char* keymagic_virtual_key_to_string(int key_code);
+KEYMAGIC_API char* keymagic_virtual_key_to_string(KeyMagicVirtualKey key_code);
 
 /**
  * Get library version string

@@ -238,7 +238,7 @@ KEYMAGIC_API KeyMagicResult keymagic_engine_load_keyboard_from_memory(
 // Key processing
 KEYMAGIC_API KeyMagicResult keymagic_engine_process_key(
     EngineHandle* handle,
-    int key_code,
+    KeyMagicVirtualKey key_code,
     char character,
     int shift,
     int ctrl,
@@ -257,7 +257,7 @@ KEYMAGIC_API KeyMagicResult keymagic_engine_process_key(
     }
     
     keymagic::Input input;
-    input.keyCode = key_code;
+    input.keyCode = static_cast<int>(key_code);
     if (character != 0) {
         input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
     }
@@ -681,218 +681,132 @@ KEYMAGIC_API size_t keymagic_km2_get_icon_data(Km2FileHandle* handle, uint8_t* b
 }
 
 // Virtual key utilities
-KEYMAGIC_API char* keymagic_virtual_key_to_string(int key_code) {
+KEYMAGIC_API char* keymagic_virtual_key_to_string(KeyMagicVirtualKey key_code) {
     std::string result;
     
     switch (key_code) {
         // Control keys
-        case 0x08: result = "BACK"; break;
-        case 0x09: result = "TAB"; break;
-        case 0x0C: result = "CLEAR"; break;
-        case 0x0D: result = "RETURN"; break;
-        case 0x10: result = "SHIFT"; break;
-        case 0x11: result = "CONTROL"; break;
-        case 0x12: result = "MENU"; break;  // Alt key
-        case 0x13: result = "PAUSE"; break;
-        case 0x14: result = "CAPITAL"; break;  // Caps Lock
-        case 0x1B: result = "ESCAPE"; break;
-        case 0x20: result = "SPACE"; break;
+        case KeyMagic_VK_Back: result = "BACK"; break;
+        case KeyMagic_VK_Tab: result = "TAB"; break;
+        case KeyMagic_VK_Return: result = "RETURN"; break;
+        case KeyMagic_VK_Shift: result = "SHIFT"; break;
+        case KeyMagic_VK_Control: result = "CONTROL"; break;
+        case KeyMagic_VK_Menu: result = "MENU"; break;  // Alt key
+        case KeyMagic_VK_Pause: result = "PAUSE"; break;
+        case KeyMagic_VK_Capital: result = "CAPITAL"; break;  // Caps Lock
+        case KeyMagic_VK_Escape: result = "ESCAPE"; break;
+        case KeyMagic_VK_Space: result = "SPACE"; break;
         
         // Navigation keys
-        case 0x21: result = "PRIOR"; break;  // Page Up
-        case 0x22: result = "NEXT"; break;   // Page Down
-        case 0x23: result = "END"; break;
-        case 0x24: result = "HOME"; break;
-        case 0x25: result = "LEFT"; break;
-        case 0x26: result = "UP"; break;
-        case 0x27: result = "RIGHT"; break;
-        case 0x28: result = "DOWN"; break;
-        case 0x29: result = "SELECT"; break;
-        case 0x2A: result = "PRINT"; break;
-        case 0x2B: result = "EXECUTE"; break;
-        case 0x2C: result = "SNAPSHOT"; break;
-        case 0x2D: result = "INSERT"; break;
-        case 0x2E: result = "DELETE"; break;
-        case 0x2F: result = "HELP"; break;
+        case KeyMagic_VK_Prior: result = "PRIOR"; break;  // Page Up
+        case KeyMagic_VK_Next: result = "NEXT"; break;   // Page Down
+        case KeyMagic_VK_End: result = "END"; break;
+        case KeyMagic_VK_Home: result = "HOME"; break;
+        case KeyMagic_VK_Left: result = "LEFT"; break;
+        case KeyMagic_VK_Up: result = "UP"; break;
+        case KeyMagic_VK_Right: result = "RIGHT"; break;
+        case KeyMagic_VK_Down: result = "DOWN"; break;
+        case KeyMagic_VK_Insert: result = "INSERT"; break;
+        case KeyMagic_VK_Delete: result = "DELETE"; break;
         
         // Number keys
-        case 0x30: result = "0"; break;
-        case 0x31: result = "1"; break;
-        case 0x32: result = "2"; break;
-        case 0x33: result = "3"; break;
-        case 0x34: result = "4"; break;
-        case 0x35: result = "5"; break;
-        case 0x36: result = "6"; break;
-        case 0x37: result = "7"; break;
-        case 0x38: result = "8"; break;
-        case 0x39: result = "9"; break;
+        case KeyMagic_VK_Key0: result = "0"; break;
+        case KeyMagic_VK_Key1: result = "1"; break;
+        case KeyMagic_VK_Key2: result = "2"; break;
+        case KeyMagic_VK_Key3: result = "3"; break;
+        case KeyMagic_VK_Key4: result = "4"; break;
+        case KeyMagic_VK_Key5: result = "5"; break;
+        case KeyMagic_VK_Key6: result = "6"; break;
+        case KeyMagic_VK_Key7: result = "7"; break;
+        case KeyMagic_VK_Key8: result = "8"; break;
+        case KeyMagic_VK_Key9: result = "9"; break;
         
         // Letter keys
-        case 0x41: result = "A"; break;
-        case 0x42: result = "B"; break;
-        case 0x43: result = "C"; break;
-        case 0x44: result = "D"; break;
-        case 0x45: result = "E"; break;
-        case 0x46: result = "F"; break;
-        case 0x47: result = "G"; break;
-        case 0x48: result = "H"; break;
-        case 0x49: result = "I"; break;
-        case 0x4A: result = "J"; break;
-        case 0x4B: result = "K"; break;
-        case 0x4C: result = "L"; break;
-        case 0x4D: result = "M"; break;
-        case 0x4E: result = "N"; break;
-        case 0x4F: result = "O"; break;
-        case 0x50: result = "P"; break;
-        case 0x51: result = "Q"; break;
-        case 0x52: result = "R"; break;
-        case 0x53: result = "S"; break;
-        case 0x54: result = "T"; break;
-        case 0x55: result = "U"; break;
-        case 0x56: result = "V"; break;
-        case 0x57: result = "W"; break;
-        case 0x58: result = "X"; break;
-        case 0x59: result = "Y"; break;
-        case 0x5A: result = "Z"; break;
-        
-        // Windows keys
-        case 0x5B: result = "LWIN"; break;
-        case 0x5C: result = "RWIN"; break;
-        case 0x5D: result = "APPS"; break;
-        case 0x5F: result = "SLEEP"; break;
+        case KeyMagic_VK_KeyA: result = "A"; break;
+        case KeyMagic_VK_KeyB: result = "B"; break;
+        case KeyMagic_VK_KeyC: result = "C"; break;
+        case KeyMagic_VK_KeyD: result = "D"; break;
+        case KeyMagic_VK_KeyE: result = "E"; break;
+        case KeyMagic_VK_KeyF: result = "F"; break;
+        case KeyMagic_VK_KeyG: result = "G"; break;
+        case KeyMagic_VK_KeyH: result = "H"; break;
+        case KeyMagic_VK_KeyI: result = "I"; break;
+        case KeyMagic_VK_KeyJ: result = "J"; break;
+        case KeyMagic_VK_KeyK: result = "K"; break;
+        case KeyMagic_VK_KeyL: result = "L"; break;
+        case KeyMagic_VK_KeyM: result = "M"; break;
+        case KeyMagic_VK_KeyN: result = "N"; break;
+        case KeyMagic_VK_KeyO: result = "O"; break;
+        case KeyMagic_VK_KeyP: result = "P"; break;
+        case KeyMagic_VK_KeyQ: result = "Q"; break;
+        case KeyMagic_VK_KeyR: result = "R"; break;
+        case KeyMagic_VK_KeyS: result = "S"; break;
+        case KeyMagic_VK_KeyT: result = "T"; break;
+        case KeyMagic_VK_KeyU: result = "U"; break;
+        case KeyMagic_VK_KeyV: result = "V"; break;
+        case KeyMagic_VK_KeyW: result = "W"; break;
+        case KeyMagic_VK_KeyX: result = "X"; break;
+        case KeyMagic_VK_KeyY: result = "Y"; break;
+        case KeyMagic_VK_KeyZ: result = "Z"; break;
         
         // Numpad keys
-        case 0x60: result = "NUMPAD0"; break;
-        case 0x61: result = "NUMPAD1"; break;
-        case 0x62: result = "NUMPAD2"; break;
-        case 0x63: result = "NUMPAD3"; break;
-        case 0x64: result = "NUMPAD4"; break;
-        case 0x65: result = "NUMPAD5"; break;
-        case 0x66: result = "NUMPAD6"; break;
-        case 0x67: result = "NUMPAD7"; break;
-        case 0x68: result = "NUMPAD8"; break;
-        case 0x69: result = "NUMPAD9"; break;
-        case 0x6A: result = "MULTIPLY"; break;
-        case 0x6B: result = "ADD"; break;
-        case 0x6C: result = "SEPARATOR"; break;
-        case 0x6D: result = "SUBTRACT"; break;
-        case 0x6E: result = "DECIMAL"; break;
-        case 0x6F: result = "DIVIDE"; break;
+        case KeyMagic_VK_Numpad0: result = "NUMPAD0"; break;
+        case KeyMagic_VK_Numpad1: result = "NUMPAD1"; break;
+        case KeyMagic_VK_Numpad2: result = "NUMPAD2"; break;
+        case KeyMagic_VK_Numpad3: result = "NUMPAD3"; break;
+        case KeyMagic_VK_Numpad4: result = "NUMPAD4"; break;
+        case KeyMagic_VK_Numpad5: result = "NUMPAD5"; break;
+        case KeyMagic_VK_Numpad6: result = "NUMPAD6"; break;
+        case KeyMagic_VK_Numpad7: result = "NUMPAD7"; break;
+        case KeyMagic_VK_Numpad8: result = "NUMPAD8"; break;
+        case KeyMagic_VK_Numpad9: result = "NUMPAD9"; break;
+        case KeyMagic_VK_Multiply: result = "MULTIPLY"; break;
+        case KeyMagic_VK_Add: result = "ADD"; break;
+        case KeyMagic_VK_Separator: result = "SEPARATOR"; break;
+        case KeyMagic_VK_Subtract: result = "SUBTRACT"; break;
+        case KeyMagic_VK_Decimal: result = "DECIMAL"; break;
+        case KeyMagic_VK_Divide: result = "DIVIDE"; break;
         
         // Function keys
-        case 0x70: result = "F1"; break;
-        case 0x71: result = "F2"; break;
-        case 0x72: result = "F3"; break;
-        case 0x73: result = "F4"; break;
-        case 0x74: result = "F5"; break;
-        case 0x75: result = "F6"; break;
-        case 0x76: result = "F7"; break;
-        case 0x77: result = "F8"; break;
-        case 0x78: result = "F9"; break;
-        case 0x79: result = "F10"; break;
-        case 0x7A: result = "F11"; break;
-        case 0x7B: result = "F12"; break;
-        case 0x7C: result = "F13"; break;
-        case 0x7D: result = "F14"; break;
-        case 0x7E: result = "F15"; break;
-        case 0x7F: result = "F16"; break;
-        case 0x80: result = "F17"; break;
-        case 0x81: result = "F18"; break;
-        case 0x82: result = "F19"; break;
-        case 0x83: result = "F20"; break;
-        case 0x84: result = "F21"; break;
-        case 0x85: result = "F22"; break;
-        case 0x86: result = "F23"; break;
-        case 0x87: result = "F24"; break;
-        
-        // Lock keys
-        case 0x90: result = "NUMLOCK"; break;
-        case 0x91: result = "SCROLL"; break;
+        case KeyMagic_VK_F1: result = "F1"; break;
+        case KeyMagic_VK_F2: result = "F2"; break;
+        case KeyMagic_VK_F3: result = "F3"; break;
+        case KeyMagic_VK_F4: result = "F4"; break;
+        case KeyMagic_VK_F5: result = "F5"; break;
+        case KeyMagic_VK_F6: result = "F6"; break;
+        case KeyMagic_VK_F7: result = "F7"; break;
+        case KeyMagic_VK_F8: result = "F8"; break;
+        case KeyMagic_VK_F9: result = "F9"; break;
+        case KeyMagic_VK_F10: result = "F10"; break;
+        case KeyMagic_VK_F11: result = "F11"; break;
+        case KeyMagic_VK_F12: result = "F12"; break;
         
         // Modifier keys
-        case 0xA0: result = "LSHIFT"; break;
-        case 0xA1: result = "RSHIFT"; break;
-        case 0xA2: result = "LCONTROL"; break;
-        case 0xA3: result = "RCONTROL"; break;
-        case 0xA4: result = "LMENU"; break;  // Left Alt
-        case 0xA5: result = "RMENU"; break;  // Right Alt
-        
-        // Browser keys
-        case 0xA6: result = "BROWSER_BACK"; break;
-        case 0xA7: result = "BROWSER_FORWARD"; break;
-        case 0xA8: result = "BROWSER_REFRESH"; break;
-        case 0xA9: result = "BROWSER_STOP"; break;
-        case 0xAA: result = "BROWSER_SEARCH"; break;
-        case 0xAB: result = "BROWSER_FAVORITES"; break;
-        case 0xAC: result = "BROWSER_HOME"; break;
-        
-        // Volume keys
-        case 0xAD: result = "VOLUME_MUTE"; break;
-        case 0xAE: result = "VOLUME_DOWN"; break;
-        case 0xAF: result = "VOLUME_UP"; break;
-        
-        // Media keys
-        case 0xB0: result = "MEDIA_NEXT_TRACK"; break;
-        case 0xB1: result = "MEDIA_PREV_TRACK"; break;
-        case 0xB2: result = "MEDIA_STOP"; break;
-        case 0xB3: result = "MEDIA_PLAY_PAUSE"; break;
-        
-        // Launch keys
-        case 0xB4: result = "LAUNCH_MAIL"; break;
-        case 0xB5: result = "LAUNCH_MEDIA_SELECT"; break;
-        case 0xB6: result = "LAUNCH_APP1"; break;
-        case 0xB7: result = "LAUNCH_APP2"; break;
+        case KeyMagic_VK_LShift: result = "LSHIFT"; break;
+        case KeyMagic_VK_RShift: result = "RSHIFT"; break;
+        case KeyMagic_VK_LControl: result = "LCONTROL"; break;
+        case KeyMagic_VK_RControl: result = "RCONTROL"; break;
+        case KeyMagic_VK_LMenu: result = "LMENU"; break;  // Left Alt
+        case KeyMagic_VK_RMenu: result = "RMENU"; break;  // Right Alt
         
         // OEM keys
-        case 0xBA: result = "OEM_1"; break;      // ; :
-        case 0xBB: result = "OEM_PLUS"; break;   // = +
-        case 0xBC: result = "OEM_COMMA"; break;  // , <
-        case 0xBD: result = "OEM_MINUS"; break;  // - _
-        case 0xBE: result = "OEM_PERIOD"; break; // . >
-        case 0xBF: result = "OEM_2"; break;      // / ?
-        case 0xC0: result = "OEM_3"; break;      // ` ~
-        case 0xDB: result = "OEM_4"; break;      // [ {
-        case 0xDC: result = "OEM_5"; break;      // \ |
-        case 0xDD: result = "OEM_6"; break;      // ] }
-        case 0xDE: result = "OEM_7"; break;      // ' "
-        case 0xDF: result = "OEM_8"; break;
-        case 0xE2: result = "OEM_102"; break;    // < > on UK/Germany keyboards
-        
-        // Process key
-        case 0xE5: result = "PROCESSKEY"; break;
-        
-        // Packet key
-        case 0xE7: result = "PACKET"; break;
-        
-        // Attn key
-        case 0xF6: result = "ATTN"; break;
-        
-        // CrSel key
-        case 0xF7: result = "CRSEL"; break;
-        
-        // ExSel key
-        case 0xF8: result = "EXSEL"; break;
-        
-        // Erase EOF key
-        case 0xF9: result = "EREOF"; break;
-        
-        // Play key
-        case 0xFA: result = "PLAY"; break;
-        
-        // Zoom key
-        case 0xFB: result = "ZOOM"; break;
-        
-        // PA1 key
-        case 0xFD: result = "PA1"; break;
-        
-        // Clear key
-        case 0xFE: result = "OEM_CLEAR"; break;
+        case KeyMagic_VK_Oem1: result = "OEM_1"; break;      // ; :
+        case KeyMagic_VK_OemPlus: result = "OEM_PLUS"; break;   // = +
+        case KeyMagic_VK_OemComma: result = "OEM_COMMA"; break;  // , <
+        case KeyMagic_VK_OemMinus: result = "OEM_MINUS"; break;  // - _
+        case KeyMagic_VK_OemPeriod: result = "OEM_PERIOD"; break; // . >
+        case KeyMagic_VK_Oem2: result = "OEM_2"; break;      // / ?
+        case KeyMagic_VK_Oem3: result = "OEM_3"; break;      // ` ~
+        case KeyMagic_VK_Oem4: result = "OEM_4"; break;      // [ {
+        case KeyMagic_VK_Oem5: result = "OEM_5"; break;      // \ |
+        case KeyMagic_VK_Oem6: result = "OEM_6"; break;      // ] }
+        case KeyMagic_VK_Oem7: result = "OEM_7"; break;      // ' "
+        case KeyMagic_VK_Oem8: result = "OEM_8"; break;
+        case KeyMagic_VK_Oem102: result = "OEM_102"; break;    // < > on UK/Germany keyboards
         
         default: 
-            // For unknown keys, return hex code
-            std::stringstream ss;
-            ss << "VK_0x" << std::uppercase << std::hex << key_code;
-            result = ss.str();
+            // For unknown keys, return the numeric value
+            result = "VK_" + std::to_string(static_cast<int>(key_code));
             break;
     }
     
