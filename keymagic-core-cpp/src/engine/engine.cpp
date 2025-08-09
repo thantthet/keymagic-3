@@ -74,7 +74,9 @@ Output Engine::processKey(const Input& input) {
 }
 
 Output Engine::processKeyWithVK(int vkCode, char character, const Modifiers& modifiers) {
-    Input input(vkCode, static_cast<char32_t>(character), modifiers);
+    // Convert Windows VK code to internal VirtualKey
+    VirtualKey internalVK = VirtualKeyHelper::fromWindowsVK(vkCode);
+    Input input(internalVK, static_cast<char32_t>(character), modifiers);
     return processKey(input);
 }
 
@@ -834,7 +836,9 @@ Output KeyMagicEngine::processWindowsKey(int vkCode, char character, const Modif
 }
 
 Output KeyMagicEngine::testProcessWindowsKey(int vkCode, char character, const Modifiers& modifiers) {
-    Input input(vkCode, static_cast<char32_t>(character), modifiers);
+    // Convert Windows VK code to internal VirtualKey
+    VirtualKey internalVK = VirtualKeyHelper::fromWindowsVK(vkCode);
+    Input input(internalVK, static_cast<char32_t>(character), modifiers);
     return engine_->testProcessKey(input);
 }
 
