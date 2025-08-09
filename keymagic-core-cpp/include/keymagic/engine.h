@@ -24,9 +24,13 @@ struct ProcessedRule {
     std::vector<uint16_t> lhsOpcodes;  // Left-hand side opcodes
     std::vector<uint16_t> rhsOpcodes;  // Right-hand side opcodes
     
+    // Segmented patterns for proper reference handling
+    std::vector<RuleSegment> lhsSegments;  // LHS broken into logical segments
+    std::vector<RuleSegment> rhsSegments;  // RHS broken into logical segments
+    
     // Preprocessed pattern info for faster matching
     PatternType patternType;
-    std::string stringPattern;     // For string patterns
+    std::u16string stringPattern;     // For string patterns
     int stateId;                   // For state-based rules
     VirtualKey virtualKey;          // For VK-based rules
     std::vector<VirtualKey> keyCombo;  // For VK combinations
@@ -60,8 +64,8 @@ public:
     
     // State management
     void reset();
-    std::string getComposingText() const;
-    void setComposingText(const std::string& text);
+    std::u16string getComposingText() const;
+    void setComposingText(const std::u16string& text);
     
     // Keyboard information
     std::string getKeyboardName() const;
@@ -74,22 +78,30 @@ public:
     void undo();
     void clearHistory();
     
+    // DEBUG: Temporary access methods
+    const std::vector<ProcessedRule>& getRules() const { return rules_; }
+    const KM2File* getKeyboard() const { return keyboard_.get(); }
+    
 private:
     // Internal types
     struct StateSnapshot;
     
     // Core processing methods
     Output processKeyInternal(const Input& input, bool testMode);
-    bool matchRule(const ProcessedRule& rule, const MatchContext& context, const Input& input);
+    bool matchRule(const ProcessedRule& rule, MatchContext& context, const Input& input);
     Output applyRule(const ProcessedRule& rule, const MatchContext& context);
-    Output performRecursiveMatching(const std::string& text);
+    Output performRecursiveMatching(const std::u16string& text);
     
     // Rule preprocessing
     void preprocessRules();
     void sortRulesByPriority();
     RulePriority calculateRulePriority(const ProcessedRule& rule) const;
+    size_t calculateCharLength(const ProcessedRule& rule) const;
     void analyzePattern(ProcessedRule& rule);
-    std::string extractStringPattern(const std::vector<uint16_t>& opcodes);
+    std::u16string extractStringPattern(const std::vector<uint16_t>& opcodes);
+    
+    // Rule segmentation
+    std::vector<RuleSegment> segmentateOpcodes(const std::vector<uint16_t>& opcodes);
     
     // State management
     void saveStateSnapshot();
@@ -97,13 +109,13 @@ private:
     void updateActiveStates(const std::vector<int>& newStates);
     
     // Action generation
-    Output generateAction(const std::string& oldText, const std::string& newText);
-    int calculateDeleteCount(const std::string& oldText, const std::string& newText);
+    Output generateAction(const std::u16string& oldText, const std::u16string& newText);
+    int calculateDeleteCount(const std::u16string& oldText, const std::u16string& newText);
     
     // Helper methods
-    bool shouldStopRecursion(const std::string& text) const;
-    bool isSingleAsciiPrintable(const std::string& text) const;
-    std::string applySmartBackspace(const std::string& text) const;
+    bool shouldStopRecursion(const std::u16string& text) const;
+    bool isSingleAsciiPrintable(const std::u16string& text) const;
+    std::u16string applySmartBackspace(const std::u16string& text) const;
     
     // Members
     std::unique_ptr<EngineState> state_;
@@ -126,9 +138,9 @@ public:
     ~EngineState();
     
     // Composing text buffer
-    const std::string& getComposingText() const;
-    void setComposingText(const std::string& text);
-    void appendToComposingText(const std::string& text);
+    const std::u16string& getComposingText() const;
+    void setComposingText(const std::u16string& text);
+    void appendToComposingText(const std::u16string& text);
     void clearComposingText();
     
     // Active states (for state-based rules)
@@ -140,7 +152,7 @@ public:
     bool hasActiveState(int stateId) const;
     
     // Context for pattern matching
-    std::string getContext(size_t maxLength) const;
+    std::u16string getContext(size_t maxLength) const;
     
     // Reset all state
     void reset();
@@ -150,7 +162,7 @@ public:
     void copyFrom(const EngineState& other);
     
 private:
-    std::string composingText_;
+    std::u16string composingText_;
     std::unordered_set<int> activeStates_;
 };
 

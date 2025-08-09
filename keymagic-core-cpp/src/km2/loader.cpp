@@ -132,13 +132,17 @@ private:
         strings.reserve(count);
         
         for (uint16_t i = 0; i < count; ++i) {
-            if (offset + 2 > dataLen) return false;
+            if (offset + 2 > dataLen) {
+                return false;
+            }
             
             // Read string length (little-endian)
             uint16_t length = data[offset] | (data[offset + 1] << 8);
             offset += 2;
             
-            if (offset + length * 2 > dataLen) return false;
+            if (offset + length * 2 > dataLen) {
+                return false;
+            }
             
             // Read UTF-16LE string
             std::u16string str = utils::utf16leToUtf16(&data[offset], length * 2);
@@ -203,15 +207,27 @@ private:
     
     static bool readRuleSide(const uint8_t* data, size_t dataLen, size_t& offset,
                             std::vector<uint16_t>& opcodes) {
-        if (offset + 2 > dataLen) return false;
+        if (offset + 2 > dataLen) {
+            return false;
+        }
         
-        // Read length (in bytes, not opcodes)
-        uint16_t byteLength = data[offset] | (data[offset + 1] << 8);
+        // Read length (in 16-bit units/words, NOT bytes!)
+        // The Rust implementation multiplies this by 2 to get bytes
+        uint16_t wordLength = data[offset] | (data[offset + 1] << 8);
+        uint16_t byteLength = wordLength * 2;  // Convert to bytes
+        
         offset += 2;
         
-        if (offset + byteLength > dataLen) return false;
+        if (offset + byteLength > dataLen) {
+            return false;
+        }
         
         // Read opcodes
+        if (byteLength == 0) {
+            // Empty rule side is valid (e.g., for NULL output)
+            return true;
+        }
+        
         size_t opcodeCount = byteLength / 2;
         opcodes.reserve(opcodeCount);
         
@@ -247,9 +263,9 @@ std::string Metadata::getString(const uint8_t id[4]) const {
         return std::string();
     }
     
-    // Convert UTF-16LE to UTF-8
-    std::u16string utf16 = utils::utf16leToUtf16(data->data(), data->size());
-    return utils::utf16ToUtf8(utf16);
+    // The data is actually UTF-8, not UTF-16LE as originally thought
+    // Based on the KM2 dump, info strings are stored as UTF-8
+    return std::string(data->begin(), data->end());
 }
 
 bool Metadata::has(const uint8_t id[4]) const {

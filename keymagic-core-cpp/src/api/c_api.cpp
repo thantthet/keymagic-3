@@ -5,23 +5,894 @@
 #include <cstring>
 #include <mutex>
 #include <unordered_map>
+#include <sstream>
+#include <algorithm>
+#include <vector>
 
-// C API implementation stub
 namespace {
 std::mutex g_handleMutex;
+std::unordered_map<EngineHandle*, std::unique_ptr<keymagic::Engine>> g_engines;
+std::unordered_map<Km2FileHandle*, std::unique_ptr<keymagic::KM2File>> g_km2Files;
+
+// Helper to convert Windows VK codes to internal VirtualKey enum
+keymagic::VirtualKey windowsVkToInternal(int vkCode) {
+    switch (vkCode) {
+        case 0x08: return keymagic::VirtualKey::Back;
+        case 0x09: return keymagic::VirtualKey::Tab;
+        case 0x0D: return keymagic::VirtualKey::Return;
+        case 0x1B: return keymagic::VirtualKey::Escape;
+        case 0x20: return keymagic::VirtualKey::Space;
+        case 0x21: return keymagic::VirtualKey::Prior;
+        case 0x22: return keymagic::VirtualKey::Next;
+        case 0x23: return keymagic::VirtualKey::End;
+        case 0x24: return keymagic::VirtualKey::Home;
+        case 0x25: return keymagic::VirtualKey::Left;
+        case 0x26: return keymagic::VirtualKey::Up;
+        case 0x27: return keymagic::VirtualKey::Right;
+        case 0x28: return keymagic::VirtualKey::Down;
+        case 0x2D: return keymagic::VirtualKey::Insert;
+        case 0x2E: return keymagic::VirtualKey::Delete;
+        
+        // Numbers
+        case 0x30: return keymagic::VirtualKey::Key0;
+        case 0x31: return keymagic::VirtualKey::Key1;
+        case 0x32: return keymagic::VirtualKey::Key2;
+        case 0x33: return keymagic::VirtualKey::Key3;
+        case 0x34: return keymagic::VirtualKey::Key4;
+        case 0x35: return keymagic::VirtualKey::Key5;
+        case 0x36: return keymagic::VirtualKey::Key6;
+        case 0x37: return keymagic::VirtualKey::Key7;
+        case 0x38: return keymagic::VirtualKey::Key8;
+        case 0x39: return keymagic::VirtualKey::Key9;
+        
+        // Letters
+        case 0x41: return keymagic::VirtualKey::KeyA;
+        case 0x42: return keymagic::VirtualKey::KeyB;
+        case 0x43: return keymagic::VirtualKey::KeyC;
+        case 0x44: return keymagic::VirtualKey::KeyD;
+        case 0x45: return keymagic::VirtualKey::KeyE;
+        case 0x46: return keymagic::VirtualKey::KeyF;
+        case 0x47: return keymagic::VirtualKey::KeyG;
+        case 0x48: return keymagic::VirtualKey::KeyH;
+        case 0x49: return keymagic::VirtualKey::KeyI;
+        case 0x4A: return keymagic::VirtualKey::KeyJ;
+        case 0x4B: return keymagic::VirtualKey::KeyK;
+        case 0x4C: return keymagic::VirtualKey::KeyL;
+        case 0x4D: return keymagic::VirtualKey::KeyM;
+        case 0x4E: return keymagic::VirtualKey::KeyN;
+        case 0x4F: return keymagic::VirtualKey::KeyO;
+        case 0x50: return keymagic::VirtualKey::KeyP;
+        case 0x51: return keymagic::VirtualKey::KeyQ;
+        case 0x52: return keymagic::VirtualKey::KeyR;
+        case 0x53: return keymagic::VirtualKey::KeyS;
+        case 0x54: return keymagic::VirtualKey::KeyT;
+        case 0x55: return keymagic::VirtualKey::KeyU;
+        case 0x56: return keymagic::VirtualKey::KeyV;
+        case 0x57: return keymagic::VirtualKey::KeyW;
+        case 0x58: return keymagic::VirtualKey::KeyX;
+        case 0x59: return keymagic::VirtualKey::KeyY;
+        case 0x5A: return keymagic::VirtualKey::KeyZ;
+        
+        // Numpad
+        case 0x60: return keymagic::VirtualKey::Numpad0;
+        case 0x61: return keymagic::VirtualKey::Numpad1;
+        case 0x62: return keymagic::VirtualKey::Numpad2;
+        case 0x63: return keymagic::VirtualKey::Numpad3;
+        case 0x64: return keymagic::VirtualKey::Numpad4;
+        case 0x65: return keymagic::VirtualKey::Numpad5;
+        case 0x66: return keymagic::VirtualKey::Numpad6;
+        case 0x67: return keymagic::VirtualKey::Numpad7;
+        case 0x68: return keymagic::VirtualKey::Numpad8;
+        case 0x69: return keymagic::VirtualKey::Numpad9;
+        
+        // Function keys
+        case 0x70: return keymagic::VirtualKey::F1;
+        case 0x71: return keymagic::VirtualKey::F2;
+        case 0x72: return keymagic::VirtualKey::F3;
+        case 0x73: return keymagic::VirtualKey::F4;
+        case 0x74: return keymagic::VirtualKey::F5;
+        case 0x75: return keymagic::VirtualKey::F6;
+        case 0x76: return keymagic::VirtualKey::F7;
+        case 0x77: return keymagic::VirtualKey::F8;
+        case 0x78: return keymagic::VirtualKey::F9;
+        case 0x79: return keymagic::VirtualKey::F10;
+        case 0x7A: return keymagic::VirtualKey::F11;
+        case 0x7B: return keymagic::VirtualKey::F12;
+        
+        // OEM keys
+        case 0xBA: return keymagic::VirtualKey::Oem1;
+        case 0xBB: return keymagic::VirtualKey::OemPlus;
+        case 0xBC: return keymagic::VirtualKey::OemComma;
+        case 0xBD: return keymagic::VirtualKey::OemMinus;
+        case 0xBE: return keymagic::VirtualKey::OemPeriod;
+        case 0xBF: return keymagic::VirtualKey::Oem2;
+        case 0xC0: return keymagic::VirtualKey::Oem3;
+        case 0xDB: return keymagic::VirtualKey::Oem4;
+        case 0xDC: return keymagic::VirtualKey::Oem5;
+        case 0xDD: return keymagic::VirtualKey::Oem6;
+        case 0xDE: return keymagic::VirtualKey::Oem7;
+        case 0xDF: return keymagic::VirtualKey::Oem8;
+        
+        // Special
+        case 0x14: return keymagic::VirtualKey::Capital;
+        case 0x10: return keymagic::VirtualKey::Shift;
+        case 0x11: return keymagic::VirtualKey::Control;
+        case 0x12: return keymagic::VirtualKey::Menu;
+        case 0xA5: return keymagic::VirtualKey::Menu;  // Right Alt is same as Menu
+        
+        default: return keymagic::VirtualKey::Null;  // Use Null for unknown keys
+    }
 }
+
+char* allocateAndCopyString(const std::string& str) {
+    if (str.empty()) {
+        return nullptr;
+    }
+    char* result = new char[str.length() + 1];
+    std::strcpy(result, str.c_str());
+    return result;
+}
+
+void fillProcessKeyOutput(const keymagic::Output& output, ProcessKeyOutput* cOutput) {
+    if (!cOutput) return;
+    
+    // Map action type
+    switch (output.action) {
+        case keymagic::ActionType::None:
+            cOutput->action_type = 0;
+            break;
+        case keymagic::ActionType::Insert:
+            cOutput->action_type = 1;
+            break;
+        case keymagic::ActionType::BackspaceDelete:
+            cOutput->action_type = 2;
+            break;
+        case keymagic::ActionType::BackspaceDeleteAndInsert:
+            cOutput->action_type = 3;
+            break;
+    }
+    
+    cOutput->text = allocateAndCopyString(output.text);
+    cOutput->delete_count = output.deleteCount;
+    cOutput->composing_text = allocateAndCopyString(output.composingText);
+    cOutput->is_processed = output.isProcessed ? 1 : 0;
+}
+
+} // anonymous namespace
 
 extern "C" {
 
-EngineHandle* keymagic_engine_new(void) {
-    return nullptr;
+// Engine management
+KEYMAGIC_API EngineHandle* keymagic_engine_new(void) {
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    
+    auto engine = std::make_unique<keymagic::Engine>();
+    auto handle = reinterpret_cast<EngineHandle*>(engine.get());
+    g_engines[handle] = std::move(engine);
+    
+    return handle;
 }
 
-void keymagic_engine_free(EngineHandle* handle) {
+KEYMAGIC_API void keymagic_engine_free(EngineHandle* handle) {
+    if (!handle) return;
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    g_engines.erase(handle);
 }
 
-const char* keymagic_get_version(void) {
+// Keyboard loading
+KEYMAGIC_API KeyMagicResult keymagic_engine_load_keyboard(EngineHandle* handle, const char* km2_path) {
+    if (!handle || !km2_path) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    auto result = it->second->loadKeyboardFromPath(km2_path);
+    
+    switch (result) {
+        case keymagic::Result::Success:
+            return KeyMagicResult_Success;
+        case keymagic::Result::ErrorFileNotFound:
+        case keymagic::Result::ErrorInvalidFormat:
+            return KeyMagicResult_ErrorNoKeyboard;
+        default:
+            return KeyMagicResult_ErrorEngineFailure;
+    }
+}
+
+KEYMAGIC_API KeyMagicResult keymagic_engine_load_keyboard_from_memory(
+    EngineHandle* handle, 
+    const uint8_t* km2_data, 
+    size_t data_len
+) {
+    if (!handle || !km2_data || data_len == 0) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    auto km2 = keymagic::KM2Loader::loadFromMemory(km2_data, data_len);
+    if (!km2) {
+        return KeyMagicResult_ErrorNoKeyboard;
+    }
+    
+    auto result = it->second->loadKeyboard(std::move(km2));
+    
+    switch (result) {
+        case keymagic::Result::Success:
+            return KeyMagicResult_Success;
+        default:
+            return KeyMagicResult_ErrorEngineFailure;
+    }
+}
+
+// Key processing
+KEYMAGIC_API KeyMagicResult keymagic_engine_process_key(
+    EngineHandle* handle,
+    int key_code,
+    char character,
+    int shift,
+    int ctrl,
+    int alt,
+    int caps_lock,
+    ProcessKeyOutput* output
+) {
+    if (!handle || !output) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    keymagic::Input input;
+    input.keyCode = key_code;
+    if (character != 0) {
+        input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
+    }
+    input.modifiers.shift = shift != 0;
+    input.modifiers.ctrl = ctrl != 0;
+    input.modifiers.alt = alt != 0;
+    input.modifiers.capsLock = caps_lock != 0;
+    
+    auto result = it->second->processKey(input);
+    fillProcessKeyOutput(result, output);
+    
+    return KeyMagicResult_Success;
+}
+
+// Windows-specific key processing with VK codes
+KEYMAGIC_API KeyMagicResult keymagic_engine_process_key_win(
+    EngineHandle* handle,
+    int vk_code,
+    char character,
+    int shift,
+    int ctrl,
+    int alt,
+    int caps_lock,
+    ProcessKeyOutput* output
+) {
+    if (!handle || !output) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    keymagic::Input input;
+    input.keyCode = static_cast<int>(windowsVkToInternal(vk_code));
+    if (character != 0) {
+        input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
+    }
+    input.modifiers.shift = shift != 0;
+    input.modifiers.ctrl = ctrl != 0;
+    input.modifiers.alt = alt != 0;
+    input.modifiers.capsLock = caps_lock != 0;
+    
+    auto result = it->second->processKey(input);
+    fillProcessKeyOutput(result, output);
+    
+    return KeyMagicResult_Success;
+}
+
+// Test mode - non-modifying key processing for preview
+KEYMAGIC_API KeyMagicResult keymagic_engine_process_key_test_win(
+    EngineHandle* handle,
+    int vk_code,
+    char character,
+    int shift,
+    int ctrl,
+    int alt,
+    int caps_lock,
+    ProcessKeyOutput* output
+) {
+    if (!handle || !output) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    // Save current state
+    auto savedComposition = it->second->getComposingText();
+    
+    keymagic::Input input;
+    input.keyCode = static_cast<int>(windowsVkToInternal(vk_code));
+    if (character != 0) {
+        input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
+    }
+    input.modifiers.shift = shift != 0;
+    input.modifiers.ctrl = ctrl != 0;
+    input.modifiers.alt = alt != 0;
+    input.modifiers.capsLock = caps_lock != 0;
+    
+    auto result = it->second->processKey(input);
+    fillProcessKeyOutput(result, output);
+    
+    // Restore state
+    it->second->setComposingText(savedComposition);
+    
+    return KeyMagicResult_Success;
+}
+
+// Memory management
+KEYMAGIC_API void keymagic_free_string(char* s) {
+    delete[] s;
+}
+
+// Engine control
+KEYMAGIC_API KeyMagicResult keymagic_engine_reset(EngineHandle* handle) {
+    if (!handle) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    it->second->reset();
+    return KeyMagicResult_Success;
+}
+
+KEYMAGIC_API char* keymagic_engine_get_composition(EngineHandle* handle) {
+    if (!handle) {
+        return nullptr;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return nullptr;
+    }
+    
+    std::u16string composing = it->second->getComposingText();
+    return allocateAndCopyString(keymagic::utils::utf16ToUtf8(composing));
+}
+
+KEYMAGIC_API KeyMagicResult keymagic_engine_set_composition(EngineHandle* handle, const char* text) {
+    if (!handle) {
+        return KeyMagicResult_ErrorInvalidParameter;
+    }
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_engines.find(handle);
+    if (it == g_engines.end()) {
+        return KeyMagicResult_ErrorInvalidHandle;
+    }
+    
+    it->second->setComposingText(text ? keymagic::utils::utf8ToUtf16(text) : std::u16string());
+    return KeyMagicResult_Success;
+}
+
+// Version info
+KEYMAGIC_API const char* keymagic_get_version(void) {
     return "1.0.0";
+}
+
+// Hotkey parsing
+KEYMAGIC_API int keymagic_parse_hotkey(const char* hotkey_str, HotkeyInfo* info) {
+    if (!hotkey_str || !info) {
+        return 0;
+    }
+    
+    // Initialize info
+    info->key_code = 0;
+    info->ctrl = 0;
+    info->alt = 0;
+    info->shift = 0;
+    info->meta = 0;
+    
+    std::string str(hotkey_str);
+    
+    // Trim whitespace
+    str.erase(0, str.find_first_not_of(" \t\r\n"));
+    str.erase(str.find_last_not_of(" \t\r\n") + 1);
+    
+    if (str.empty()) {
+        return 0;
+    }
+    
+    // Convert to uppercase for case-insensitive parsing
+    std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+    
+    // Split by + or space
+    std::vector<std::string> parts;
+    std::string current;
+    for (char c : str) {
+        if (c == '+' || c == ' ') {
+            if (!current.empty()) {
+                parts.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += c;
+        }
+    }
+    if (!current.empty()) {
+        parts.push_back(current);
+    }
+    
+    if (parts.empty()) {
+        return 0;
+    }
+    
+    // Parse each part
+    int key_count = 0;
+    for (const auto& part : parts) {
+        // Check for modifiers
+        if (part == "CTRL" || part == "CONTROL") {
+            info->ctrl = 1;
+        } else if (part == "ALT" || part == "OPTION") {
+            info->alt = 1;
+        } else if (part == "SHIFT") {
+            info->shift = 1;
+        } else if (part == "META" || part == "CMD" || part == "COMMAND" || 
+                   part == "WIN" || part == "SUPER") {
+            info->meta = 1;
+        } else {
+            // Parse as key
+            if (key_count > 0) {
+                // Multiple keys specified - error
+                return 0;
+            }
+            
+            int vk_code = 0;
+            
+            // Single character keys
+            if (part.length() == 1) {
+                char ch = part[0];
+                if (ch >= 'A' && ch <= 'Z') {
+                    vk_code = 0x41 + (ch - 'A');  // VK_A to VK_Z
+                } else if (ch >= '0' && ch <= '9') {
+                    vk_code = 0x30 + (ch - '0');  // VK_0 to VK_9
+                } else {
+                    // Special single characters
+                    switch (ch) {
+                        case '=': vk_code = 0xBB; break;  // VK_OEM_PLUS
+                        case '-': vk_code = 0xBD; break;  // VK_OEM_MINUS
+                        case ',': vk_code = 0xBC; break;  // VK_OEM_COMMA
+                        case '.': vk_code = 0xBE; break;  // VK_OEM_PERIOD
+                        case ';': vk_code = 0xBA; break;  // VK_OEM_1
+                        case '/': vk_code = 0xBF; break;  // VK_OEM_2
+                        case '`': vk_code = 0xC0; break;  // VK_OEM_3
+                        case '[': vk_code = 0xDB; break;  // VK_OEM_4
+                        case '\\': vk_code = 0xDC; break; // VK_OEM_5
+                        case ']': vk_code = 0xDD; break;  // VK_OEM_6
+                        case '\'': vk_code = 0xDE; break; // VK_OEM_7
+                    }
+                }
+            } else {
+                // Multi-character key names
+                if (part == "SPACE") {
+                    vk_code = 0x20;
+                } else if (part == "ENTER" || part == "RETURN") {
+                    vk_code = 0x0D;
+                } else if (part == "TAB") {
+                    vk_code = 0x09;
+                } else if (part == "BACKSPACE" || part == "BACK" || part == "DELETE") {
+                    vk_code = 0x08;
+                } else if (part == "ESCAPE" || part == "ESC") {
+                    vk_code = 0x1B;
+                } else if (part == "CAPSLOCK" || part == "CAPS" || part == "CAPITAL") {
+                    vk_code = 0x14;
+                } else if (part == "INSERT" || part == "INS") {
+                    vk_code = 0x2D;
+                } else if (part == "DEL") {
+                    vk_code = 0x2E;
+                } else if (part == "HOME") {
+                    vk_code = 0x24;
+                } else if (part == "END") {
+                    vk_code = 0x23;
+                } else if (part == "PAGEUP" || part == "PGUP" || part == "PRIOR") {
+                    vk_code = 0x21;
+                } else if (part == "PAGEDOWN" || part == "PGDN" || part == "NEXT") {
+                    vk_code = 0x22;
+                } else if (part == "LEFT") {
+                    vk_code = 0x25;
+                } else if (part == "UP") {
+                    vk_code = 0x26;
+                } else if (part == "RIGHT") {
+                    vk_code = 0x27;
+                } else if (part == "DOWN") {
+                    vk_code = 0x28;
+                } else if (part == "PLUS") {
+                    vk_code = 0xBB;
+                } else if (part == "MINUS") {
+                    vk_code = 0xBD;
+                } else if (part == "COMMA") {
+                    vk_code = 0xBC;
+                } else if (part == "PERIOD") {
+                    vk_code = 0xBE;
+                } else if (part == "SEMICOLON") {
+                    vk_code = 0xBA;
+                } else if (part == "SLASH") {
+                    vk_code = 0xBF;
+                } else if (part == "GRAVE") {
+                    vk_code = 0xC0;
+                } else if (part == "LEFTBRACKET" || part == "LBRACKET") {
+                    vk_code = 0xDB;
+                } else if (part == "BACKSLASH") {
+                    vk_code = 0xDC;
+                } else if (part == "RIGHTBRACKET" || part == "RBRACKET") {
+                    vk_code = 0xDD;
+                } else if (part == "QUOTE" || part == "APOSTROPHE") {
+                    vk_code = 0xDE;
+                } else if (part.substr(0, 1) == "F" && part.length() <= 3) {
+                    // Function keys F1-F24
+                    std::string fnum = part.substr(1);
+                    try {
+                        int num = std::stoi(fnum);
+                        if (num >= 1 && num <= 24) {
+                            vk_code = 0x70 + (num - 1);  // VK_F1 = 0x70
+                        }
+                    } catch (...) {
+                        // Not a valid function key
+                    }
+                } else if (part.substr(0, 6) == "NUMPAD" && part.length() == 7) {
+                    // Numpad keys
+                    char numpad_ch = part[6];
+                    if (numpad_ch >= '0' && numpad_ch <= '9') {
+                        vk_code = 0x60 + (numpad_ch - '0');  // VK_NUMPAD0 = 0x60
+                    }
+                }
+            }
+            
+            if (vk_code == 0) {
+                // Unknown key
+                return 0;
+            }
+            
+            info->key_code = vk_code;
+            key_count++;
+        }
+    }
+    
+    // Must have exactly one key
+    return (info->key_code != 0) ? 1 : 0;
+}
+
+// KM2 file loading and metadata access
+KEYMAGIC_API Km2FileHandle* keymagic_km2_load(const char* path) {
+    if (!path) {
+        return nullptr;
+    }
+    
+    auto km2 = keymagic::KM2Loader::loadFromFile(path);
+    if (!km2) {
+        return nullptr;
+    }
+    
+    auto handle = reinterpret_cast<Km2FileHandle*>(km2.get());
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    g_km2Files[handle] = std::move(km2);
+    
+    return handle;
+}
+
+KEYMAGIC_API void keymagic_km2_free(Km2FileHandle* handle) {
+    if (!handle) return;
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    g_km2Files.erase(handle);
+}
+
+KEYMAGIC_API char* keymagic_km2_get_name(Km2FileHandle* handle) {
+    if (!handle) return nullptr;
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_km2Files.find(handle);
+    if (it == g_km2Files.end()) {
+        return nullptr;
+    }
+    
+    return allocateAndCopyString(it->second->metadata.getName());
+}
+
+KEYMAGIC_API char* keymagic_km2_get_description(Km2FileHandle* handle) {
+    if (!handle) return nullptr;
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_km2Files.find(handle);
+    if (it == g_km2Files.end()) {
+        return nullptr;
+    }
+    
+    return allocateAndCopyString(it->second->metadata.getDescription());
+}
+
+KEYMAGIC_API char* keymagic_km2_get_hotkey(Km2FileHandle* handle) {
+    if (!handle) return nullptr;
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_km2Files.find(handle);
+    if (it == g_km2Files.end()) {
+        return nullptr;
+    }
+    
+    return allocateAndCopyString(it->second->metadata.getHotkey());
+}
+
+KEYMAGIC_API size_t keymagic_km2_get_icon_data(Km2FileHandle* handle, uint8_t* buffer, size_t buffer_size) {
+    if (!handle) return 0;
+    
+    std::lock_guard<std::mutex> lock(g_handleMutex);
+    auto it = g_km2Files.find(handle);
+    if (it == g_km2Files.end()) {
+        return 0;
+    }
+    
+    const auto* iconData = it->second->metadata.getIcon();
+    if (!iconData || iconData->empty()) {
+        return 0;
+    }
+    
+    if (!buffer) {
+        // Return required size
+        return iconData->size();
+    }
+    
+    size_t copySize = std::min(iconData->size(), buffer_size);
+    std::memcpy(buffer, iconData->data(), copySize);
+    return copySize;
+}
+
+// Virtual key utilities
+KEYMAGIC_API char* keymagic_virtual_key_to_string(int key_code) {
+    std::string result;
+    
+    switch (key_code) {
+        // Control keys
+        case 0x08: result = "BACK"; break;
+        case 0x09: result = "TAB"; break;
+        case 0x0C: result = "CLEAR"; break;
+        case 0x0D: result = "RETURN"; break;
+        case 0x10: result = "SHIFT"; break;
+        case 0x11: result = "CONTROL"; break;
+        case 0x12: result = "MENU"; break;  // Alt key
+        case 0x13: result = "PAUSE"; break;
+        case 0x14: result = "CAPITAL"; break;  // Caps Lock
+        case 0x1B: result = "ESCAPE"; break;
+        case 0x20: result = "SPACE"; break;
+        
+        // Navigation keys
+        case 0x21: result = "PRIOR"; break;  // Page Up
+        case 0x22: result = "NEXT"; break;   // Page Down
+        case 0x23: result = "END"; break;
+        case 0x24: result = "HOME"; break;
+        case 0x25: result = "LEFT"; break;
+        case 0x26: result = "UP"; break;
+        case 0x27: result = "RIGHT"; break;
+        case 0x28: result = "DOWN"; break;
+        case 0x29: result = "SELECT"; break;
+        case 0x2A: result = "PRINT"; break;
+        case 0x2B: result = "EXECUTE"; break;
+        case 0x2C: result = "SNAPSHOT"; break;
+        case 0x2D: result = "INSERT"; break;
+        case 0x2E: result = "DELETE"; break;
+        case 0x2F: result = "HELP"; break;
+        
+        // Number keys
+        case 0x30: result = "0"; break;
+        case 0x31: result = "1"; break;
+        case 0x32: result = "2"; break;
+        case 0x33: result = "3"; break;
+        case 0x34: result = "4"; break;
+        case 0x35: result = "5"; break;
+        case 0x36: result = "6"; break;
+        case 0x37: result = "7"; break;
+        case 0x38: result = "8"; break;
+        case 0x39: result = "9"; break;
+        
+        // Letter keys
+        case 0x41: result = "A"; break;
+        case 0x42: result = "B"; break;
+        case 0x43: result = "C"; break;
+        case 0x44: result = "D"; break;
+        case 0x45: result = "E"; break;
+        case 0x46: result = "F"; break;
+        case 0x47: result = "G"; break;
+        case 0x48: result = "H"; break;
+        case 0x49: result = "I"; break;
+        case 0x4A: result = "J"; break;
+        case 0x4B: result = "K"; break;
+        case 0x4C: result = "L"; break;
+        case 0x4D: result = "M"; break;
+        case 0x4E: result = "N"; break;
+        case 0x4F: result = "O"; break;
+        case 0x50: result = "P"; break;
+        case 0x51: result = "Q"; break;
+        case 0x52: result = "R"; break;
+        case 0x53: result = "S"; break;
+        case 0x54: result = "T"; break;
+        case 0x55: result = "U"; break;
+        case 0x56: result = "V"; break;
+        case 0x57: result = "W"; break;
+        case 0x58: result = "X"; break;
+        case 0x59: result = "Y"; break;
+        case 0x5A: result = "Z"; break;
+        
+        // Windows keys
+        case 0x5B: result = "LWIN"; break;
+        case 0x5C: result = "RWIN"; break;
+        case 0x5D: result = "APPS"; break;
+        case 0x5F: result = "SLEEP"; break;
+        
+        // Numpad keys
+        case 0x60: result = "NUMPAD0"; break;
+        case 0x61: result = "NUMPAD1"; break;
+        case 0x62: result = "NUMPAD2"; break;
+        case 0x63: result = "NUMPAD3"; break;
+        case 0x64: result = "NUMPAD4"; break;
+        case 0x65: result = "NUMPAD5"; break;
+        case 0x66: result = "NUMPAD6"; break;
+        case 0x67: result = "NUMPAD7"; break;
+        case 0x68: result = "NUMPAD8"; break;
+        case 0x69: result = "NUMPAD9"; break;
+        case 0x6A: result = "MULTIPLY"; break;
+        case 0x6B: result = "ADD"; break;
+        case 0x6C: result = "SEPARATOR"; break;
+        case 0x6D: result = "SUBTRACT"; break;
+        case 0x6E: result = "DECIMAL"; break;
+        case 0x6F: result = "DIVIDE"; break;
+        
+        // Function keys
+        case 0x70: result = "F1"; break;
+        case 0x71: result = "F2"; break;
+        case 0x72: result = "F3"; break;
+        case 0x73: result = "F4"; break;
+        case 0x74: result = "F5"; break;
+        case 0x75: result = "F6"; break;
+        case 0x76: result = "F7"; break;
+        case 0x77: result = "F8"; break;
+        case 0x78: result = "F9"; break;
+        case 0x79: result = "F10"; break;
+        case 0x7A: result = "F11"; break;
+        case 0x7B: result = "F12"; break;
+        case 0x7C: result = "F13"; break;
+        case 0x7D: result = "F14"; break;
+        case 0x7E: result = "F15"; break;
+        case 0x7F: result = "F16"; break;
+        case 0x80: result = "F17"; break;
+        case 0x81: result = "F18"; break;
+        case 0x82: result = "F19"; break;
+        case 0x83: result = "F20"; break;
+        case 0x84: result = "F21"; break;
+        case 0x85: result = "F22"; break;
+        case 0x86: result = "F23"; break;
+        case 0x87: result = "F24"; break;
+        
+        // Lock keys
+        case 0x90: result = "NUMLOCK"; break;
+        case 0x91: result = "SCROLL"; break;
+        
+        // Modifier keys
+        case 0xA0: result = "LSHIFT"; break;
+        case 0xA1: result = "RSHIFT"; break;
+        case 0xA2: result = "LCONTROL"; break;
+        case 0xA3: result = "RCONTROL"; break;
+        case 0xA4: result = "LMENU"; break;  // Left Alt
+        case 0xA5: result = "RMENU"; break;  // Right Alt
+        
+        // Browser keys
+        case 0xA6: result = "BROWSER_BACK"; break;
+        case 0xA7: result = "BROWSER_FORWARD"; break;
+        case 0xA8: result = "BROWSER_REFRESH"; break;
+        case 0xA9: result = "BROWSER_STOP"; break;
+        case 0xAA: result = "BROWSER_SEARCH"; break;
+        case 0xAB: result = "BROWSER_FAVORITES"; break;
+        case 0xAC: result = "BROWSER_HOME"; break;
+        
+        // Volume keys
+        case 0xAD: result = "VOLUME_MUTE"; break;
+        case 0xAE: result = "VOLUME_DOWN"; break;
+        case 0xAF: result = "VOLUME_UP"; break;
+        
+        // Media keys
+        case 0xB0: result = "MEDIA_NEXT_TRACK"; break;
+        case 0xB1: result = "MEDIA_PREV_TRACK"; break;
+        case 0xB2: result = "MEDIA_STOP"; break;
+        case 0xB3: result = "MEDIA_PLAY_PAUSE"; break;
+        
+        // Launch keys
+        case 0xB4: result = "LAUNCH_MAIL"; break;
+        case 0xB5: result = "LAUNCH_MEDIA_SELECT"; break;
+        case 0xB6: result = "LAUNCH_APP1"; break;
+        case 0xB7: result = "LAUNCH_APP2"; break;
+        
+        // OEM keys
+        case 0xBA: result = "OEM_1"; break;      // ; :
+        case 0xBB: result = "OEM_PLUS"; break;   // = +
+        case 0xBC: result = "OEM_COMMA"; break;  // , <
+        case 0xBD: result = "OEM_MINUS"; break;  // - _
+        case 0xBE: result = "OEM_PERIOD"; break; // . >
+        case 0xBF: result = "OEM_2"; break;      // / ?
+        case 0xC0: result = "OEM_3"; break;      // ` ~
+        case 0xDB: result = "OEM_4"; break;      // [ {
+        case 0xDC: result = "OEM_5"; break;      // \ |
+        case 0xDD: result = "OEM_6"; break;      // ] }
+        case 0xDE: result = "OEM_7"; break;      // ' "
+        case 0xDF: result = "OEM_8"; break;
+        case 0xE2: result = "OEM_102"; break;    // < > on UK/Germany keyboards
+        
+        // Process key
+        case 0xE5: result = "PROCESSKEY"; break;
+        
+        // Packet key
+        case 0xE7: result = "PACKET"; break;
+        
+        // Attn key
+        case 0xF6: result = "ATTN"; break;
+        
+        // CrSel key
+        case 0xF7: result = "CRSEL"; break;
+        
+        // ExSel key
+        case 0xF8: result = "EXSEL"; break;
+        
+        // Erase EOF key
+        case 0xF9: result = "EREOF"; break;
+        
+        // Play key
+        case 0xFA: result = "PLAY"; break;
+        
+        // Zoom key
+        case 0xFB: result = "ZOOM"; break;
+        
+        // PA1 key
+        case 0xFD: result = "PA1"; break;
+        
+        // Clear key
+        case 0xFE: result = "OEM_CLEAR"; break;
+        
+        default: 
+            // For unknown keys, return hex code
+            std::stringstream ss;
+            ss << "VK_0x" << std::uppercase << std::hex << key_code;
+            result = ss.str();
+            break;
+    }
+    
+    return allocateAndCopyString(result);
 }
 
 } // extern "C"

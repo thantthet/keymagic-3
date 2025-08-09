@@ -140,22 +140,25 @@ struct Output {
 
 // Capture group for pattern matching
 struct Capture {
-    std::string value;
-    size_t position;  // Position in the matched pattern
+    std::u16string value;
+    size_t position;      // For Variable[*] wildcards, stores the position in the variable
+    size_t segmentIndex;  // Which LHS segment this capture came from (1-based)
     
-    Capture() : position(0) {}
-    Capture(const std::string& val, size_t pos) : value(val), position(pos) {}
+    Capture() : position(0), segmentIndex(0) {}
+    Capture(const std::u16string& val, size_t pos, size_t seg = 0) : value(val), position(pos), segmentIndex(seg) {}
 };
 
 // Match context for rule matching
 struct MatchContext {
-    std::string context;              // Current context string
+    std::u16string context;           // Current context string
     std::vector<Capture> captures;    // Captured groups
     std::vector<int> activeStates;    // Active state IDs
+    size_t matchedLength = 0;         // Length of matched text
     
     void clear() {
         context.clear();
         captures.clear();
+        matchedLength = 0;
         // Note: activeStates are not cleared here
     }
     
@@ -214,6 +217,27 @@ enum class PatternType {
     Any,             // ANY keyword
     State,           // State condition
     Composite        // Combination of patterns
+};
+
+// Rule segment type
+enum class SegmentType {
+    String,           // OP_STRING
+    Variable,         // OP_VARIABLE (simple variable reference)
+    AnyOfVariable,    // OP_VARIABLE with FLAG_ANYOF modifier ([*])
+    NotAnyOfVariable, // OP_VARIABLE with FLAG_NANYOF modifier ([^])
+    Any,             // OP_ANY
+    VirtualKey,      // OP_PREDEFINED (with optional OP_AND)
+    State,           // OP_SWITCH
+    Reference        // OP_REFERENCE (used in RHS for $1, $2, $3, etc.)
+};
+
+// Represents a logical segment in a rule pattern
+struct RuleSegment {
+    SegmentType type;
+    std::vector<uint16_t> opcodes;  // The opcodes that make up this segment
+    
+    RuleSegment(SegmentType t) : type(t) {}
+    RuleSegment(SegmentType t, const std::vector<uint16_t>& ops) : type(t), opcodes(ops) {}
 };
 
 // Helper functions

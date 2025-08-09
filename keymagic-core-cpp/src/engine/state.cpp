@@ -9,15 +9,15 @@ EngineState::EngineState() {
 EngineState::~EngineState() {
 }
 
-const std::string& EngineState::getComposingText() const {
+const std::u16string& EngineState::getComposingText() const {
     return composingText_;
 }
 
-void EngineState::setComposingText(const std::string& text) {
+void EngineState::setComposingText(const std::u16string& text) {
     composingText_ = text;
 }
 
-void EngineState::appendToComposingText(const std::string& text) {
+void EngineState::appendToComposingText(const std::u16string& text) {
     composingText_ += text;
 }
 
@@ -49,7 +49,7 @@ bool EngineState::hasActiveState(int stateId) const {
     return activeStates_.find(stateId) != activeStates_.end();
 }
 
-std::string EngineState::getContext(size_t maxLength) const {
+std::u16string EngineState::getContext(size_t maxLength) const {
     if (composingText_.size() <= maxLength) {
         return composingText_;
     }

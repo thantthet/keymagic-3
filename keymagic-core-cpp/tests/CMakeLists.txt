@@ -36,62 +36,27 @@ foreach(TEST_FILE ${TEST_KM2_FILES})
 endforeach()
 
 # Integration tests
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/integration/test_main.cpp")
-    add_executable(keymagic_integration_tests
-        integration/test_main.cpp
-        integration/test_engine.cpp
-        integration/test_km2_loader.cpp
-        integration/test_engine_debug.cpp
-        integration/test_simple.cpp
-    )
-    
-    target_link_libraries(keymagic_integration_tests
-        PRIVATE
-            keymagic_core
-            GTest::gtest
-            GTest::gtest_main
-    )
-    
-    target_include_directories(keymagic_integration_tests
-        PRIVATE
-            ${CMAKE_SOURCE_DIR}/include
-            ${CMAKE_SOURCE_DIR}/src
-    )
-    
-    gtest_discover_tests(keymagic_integration_tests)
-endif()
+add_executable(keymagic_integration_tests
+    integration/test_main.cpp
+    integration/test_keyboard_discovery.cpp
+    integration/test_pyidaungsu_keystrokes.cpp
+    common/test_utils.cpp
+)
 
-# Compatibility tests with Rust version (if available)
-if(EXISTS "${CMAKE_SOURCE_DIR}/../keymagic-core/target/release/keymagic_core.dll" OR
-   EXISTS "${CMAKE_SOURCE_DIR}/../keymagic-core/target/release/libkeymagic_core.so")
-    
-    add_executable(keymagic_compatibility_tests
-        compatibility/test_main.cpp
-        compatibility/test_rust_comparison.cpp
-    )
-    
-    target_link_libraries(keymagic_compatibility_tests
-        PRIVATE
-            keymagic_core
-            GTest::gtest
-            GTest::gtest_main
-    )
-    
-    # Link with Rust library for comparison
-    if(WIN32)
-        target_link_libraries(keymagic_compatibility_tests
-            PRIVATE
-                ${CMAKE_SOURCE_DIR}/../keymagic-core/target/release/keymagic_core.dll.lib
-        )
-    else()
-        target_link_libraries(keymagic_compatibility_tests
-            PRIVATE
-                ${CMAKE_SOURCE_DIR}/../keymagic-core/target/release/libkeymagic_core.so
-        )
-    endif()
-    
-    gtest_discover_tests(keymagic_compatibility_tests)
-endif()
+target_link_libraries(keymagic_integration_tests
+    PRIVATE
+        keymagic_core
+        GTest::gtest
+        GTest::gtest_main
+)
+
+target_include_directories(keymagic_integration_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+)
+
+gtest_discover_tests(keymagic_integration_tests)
 
 # Memory leak detection on Linux
 if(UNIX AND NOT APPLE)

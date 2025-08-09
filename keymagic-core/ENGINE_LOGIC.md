@@ -1,174 +1,433 @@
 # KeyMagic Key Processing Engine Logic
 
-This document outlines the logic of the key processing engine in KeyMagic.
+This document outlines the complete logic of the key processing engine in KeyMagic, including critical implementation details discovered through actual engine development.
 
 ## Core Components
 
 The key processing engine is composed of the following main components:
 
 - **Engine (`engine.rs`)**: The central component that orchestrates the entire key processing workflow.
-- **State (`state.rs`)**: Manages the state of the input context.
-- **Input (`input.rs`)**: Represents a keyboard event.
-- **Matcher (`matcher.rs`)**: Matches the input against predefined rules.
-- **Pattern (`pattern.rs`)**: Represents the patterns to be matched.
-- **Output (`output.rs`)**: Represents the result of the key processing.
+- **State (`state.rs`)**: Manages the state of the input context and active states.
+- **Input (`input.rs`)**: Represents a keyboard event with key codes and modifiers.
+- **Matcher (`matcher.rs`)**: Matches input against predefined rules using segmented pattern matching.
+- **Pattern (`pattern.rs`)**: Represents patterns with proper segmentation and reference handling.
+- **Output (`output.rs`)**: Represents the result of key processing with precise action instructions.
+
+## Architecture Overview
+
+### Internal Encoding Strategy
+
+**Implementation Requirement**: The engine MUST use UTF-16 encoding internally for all text processing to properly handle Unicode characters, especially complex scripts like Myanmar.
+
+**Encoding Boundaries**:
+- **Input**: Convert UTF-8 to UTF-16 at API entry points
+- **Processing**: All pattern matching, captures, and text operations in UTF-16 (`std::u16string`)
+- **Output**: Convert UTF-16 to UTF-8 at API exit points
+- **Storage**: Composing buffer maintained in UTF-16
+
+This ensures proper handling of multi-byte Unicode characters throughout the engine pipeline.
+
+### Rule Segmentation Architecture
+
+**Fundamental Requirement**: Rules cannot be processed as simple opcode sequences. They must be pre-processed into logical segments to handle references (`$1`, `$2`, `$3`) correctly.
+
+**Key Insight**: Opcode indices ≠ Segment indices. Each rule's left-hand side (LHS) pattern gets broken into sequential segments, and right-hand side (RHS) references refer to these segment indices.
+
+#### Segment Types
+
+```cpp
+enum class SegmentType {
+    String,           // Literal text patterns: "ka", "abc"
+    Variable,         // Variable references: $consonants, $vowels  
+    AnyOfVariable,    // Wildcard patterns: $consonants[*]
+    NotAnyOfVariable, // Exclusion patterns: $consonants[^]
+    Any,              // ANY keyword (ASCII printable chars only)
+    VirtualKey,       // Virtual key patterns: <VK_KEY_A>
+    State,            // State conditions: ('my_state')
+    Reference         // Back-references: $1, $2, $3
+};
+```
+
+#### Segmentation Process
+
+Rules are preprocessed using a `segmentateOpcodes()` function that:
+
+1. **Parses opcodes sequentially** into logical segments
+2. **Assigns 1-based indices** to each segment
+3. **Handles modifier flags** (ANYOF, NANYOF) properly
+4. **Groups related opcodes** (e.g., opVARIABLE + opMODIFIER = single segment)
+
+**Example Segmentation**:
+```kms
+// KMS Rule: $consonants[*] + "a" + $vowels[^] => $1 + $vowels[$3]
+// LHS Segments:
+//   Segment 1: $consonants[*]     (AnyOfVariable)
+//   Segment 2: "a"                (String) 
+//   Segment 3: $vowels[^]         (NotAnyOfVariable)
+// RHS References:
+//   $1 refers to Segment 1 capture
+//   $3 refers to Segment 3 capture position
+```
 
 ## Processing Flow
 
-The key processing begins when a key is pressed, triggering the `process_key` method in the `KeyMagicEngine`. The engine then performs the following steps:
+### 1. Key Event Reception
 
-### External Control
+When a key is pressed, the `process_key` method receives:
+- **Virtual Key Code**: Platform-specific key identifier
+- **Character**: Unicode character produced by the key
+- **Modifiers**: Ctrl, Alt, Shift, etc. state flags
 
-The engine provides methods for external control:
-- **Reset**: Clears both the composing buffer and active states, returning the engine to its initial state
-- **Set Composing Text**: Sets the composing buffer to a specific value and resets all active states. This ensures clean state when synchronizing with external text
+### 2. State Management
 
-These capabilities are essential for:
-- Handling focus changes between input fields
-- Responding to user cancellation (e.g., ESC key)
-- Preventing state leakage between different text contexts
-- Recovering from error conditions
-- Synchronizing engine state with editor content (e.g., when user moves cursor or selects text)
-- Restoring composing state after external text modifications
+The engine maintains two types of state:
 
-1.  **State Update**: The engine first updates its internal state based on the new input. This includes updating the context with the new character and resetting any flags.
+#### Persistent Composing Buffer
+- **Never automatically cleared** during normal processing
+- **Accumulates all input** across key events
+- **Only clears when**:
+  - Engine explicitly reset via `reset()`
+  - Composing text explicitly set via `set_composing_text()`
+  - A rule produces empty output (NULL)
 
-2.  **Rule Matching**: The `Matcher` is invoked to find a matching rule in the keyboard layout. Before matching, rules are pre-sorted to ensure a deterministic and logical matching order.
+#### Transient Active States
+- **Active for next key event** when state appears in rule output
+- **Cleared after each key event** unless explicitly re-activated
+- **1-based integer IDs** assigned during compilation
 
-    **Rule Priority**:
-    Rules are sorted and matched based on the following precedence:
-    1.  **State-specific rules**: Rules that include a state condition `('state')` are checked first.
-    2.  **Virtual key combinations**: Rules with `<VK_...>` patterns have priority over text-based patterns.
-    3.  **Longer patterns**: For rules of the same type, the one with the longer text pattern is checked first (e.g., "abc" matches before "ab").
-    4.  **First match wins**: Once a rule matches, no further rules are tested for the current input event.
+### 3. Rule Matching with Suffix-Based Pattern Processing
 
-    The matching process is as follows:
-    - The `Matcher` iterates through the pre-sorted rules.
-    - For each rule, it compares the current input context with the rule's pattern.
-    - A rule is considered a match if the context matches the rule's pattern and any associated conditions (e.g., modifier keys) are met.
+**Important**: Rule matching operates exclusively on suffixes of the composing text, not arbitrary substrings.
 
-3.  **Composing Text Management and Output Generation**: The engine maintains a persistent composing text buffer that accumulates ALL input across key events. This is fundamental to KeyMagic's operation:
+#### Suffix Matching Logic
 
-    **Composing Text Persistence**:
-    - The composing buffer is **never automatically cleared** by normal key processing
-    - Every key press either adds to or modifies the existing composing text
-    - Even when text is committed (action=Insert), the committed text remains in the composing buffer
-    - The composing buffer only clears when:
-      - The engine is explicitly reset (via `reset()` method)
-      - The composing text is explicitly set (via `set_composing_text()`)
-      - A rule produces empty output (effectively clearing the buffer)
+```cpp
+// Rule can only match if pattern appears at END of composing text
+bool canMatch = composingText.ends_with(patternText);
 
-    **How Composing Text Updates**:
-    - When no rule matches: The new character is appended to the composing buffer
-    - When a rule matches: The matched portion is replaced with the rule's output
-    - The engine then checks if the new composing text can trigger another rule through recursive matching
+// Examples:
+// Composing: "xyzabc", Pattern: "abc" → MATCH (suffix)
+// Composing: "abcxyz", Pattern: "abc" → NO MATCH (not suffix)
+```
 
-    **Action Generation**:
-    The engine tracks how the composing text changes and generates appropriate actions:
-    - **Text Insertion**: Insert new text at the cursor
-    - **Backspace + Insert**: Delete previous characters and insert new text
-    - **State Change**: Update the engine's state for subsequent key presses
-    - **Delete Only**: Remove characters without inserting new ones
+#### Sequential Segment Processing
 
-    **Example flows**:
+Pattern matching processes segments **right-to-left** (from end of composing text):
+
+1. **Calculate total expected pattern length** from all segments
+2. **Extract suffix** of that length from composing text
+3. **Process each segment** from rightmost to leftmost:
+   - Extract expected portion based on segment type and length
+   - Validate match according to segment rules
+   - Record capture with segment index and position data
+4. **Pattern succeeds** only if ALL segments match
+
+#### Pattern Length Calculation
+
+**Implementation Detail**: Length calculation varies by segment type:
+
+```cpp
+size_t calculateSegmentLength(const Segment& segment) {
+    switch (segment.type) {
+        case SegmentType::String:
+            return utf16_length(segment.stringValue);
+        case SegmentType::AnyOfVariable:
+        case SegmentType::NotAnyOfVariable:
+            return 1;  // Wildcards match exactly 1 character
+        case SegmentType::Variable:
+            return utf16_length(getVariableContent(segment.variableIndex));
+        case SegmentType::VirtualKey:
+        case SegmentType::State:
+            return 0;  // Don't consume composing text
+        case SegmentType::Any:
+            return 1;  // Matches 1 ASCII printable character
+    }
+}
+```
+
+### 4. Capture System with Segment Tracking
+
+#### Capture Structure
+
+```cpp
+struct Capture {
+    std::u16string value;     // The actual matched text
+    size_t position;          // Position in variable (for wildcards)
+    size_t segmentIndex;      // Which LHS segment produced this (1-based)
+};
+```
+
+#### Wildcard Capture Behavior
+
+**AnyOfVariable** (`[*]`): Captures character and its position in the variable
+**NotAnyOfVariable** (`[^]`): Captures character that is NOT in the variable
+
+```cpp
+// Example: $consonants = "ကခဂဃ", text = "ခ"
+// $consonants[*] matching "ခ" produces:
+//   capture.value = "ခ"
+//   capture.position = 1  (second character in variable, 0-based)
+//   capture.segmentIndex = 1
+```
+
+### 5. Rule Priority and Sorting
+
+Rules are pre-sorted to ensure deterministic matching:
+
+1. **State-specific rules first**: Rules with state conditions `('state')`
+2. **Virtual key combinations**: Rules with `<VK_...>` patterns  
+3. **Longer text patterns first**: "abc" matches before "ab"
+4. **First match wins**: No further rules tested after match
+
+### 6. Output Generation and Text Replacement
+
+#### Suffix-Only Replacement
+
+**Important Behavior**: When a rule matches, ONLY the matched suffix gets replaced, preserving any unmatched prefix.
+
+```cpp
+// Example: Composing text "hello world", pattern "world" => "universe"
+// Result: "hello universe" (NOT just "universe")
+
+if (matchedLength > 0 && currentContext.size() >= matchedLength) {
+    size_t unmatchedLength = currentContext.size() - matchedLength;
+    std::u16string unmatchedPrefix = currentContext.substr(0, unmatchedLength);
+    finalComposing = unmatchedPrefix + ruleOutput;
+}
+```
+
+#### Variable Indexing in Output
+
+**Advanced Feature**: RHS patterns can use `Variable[reference]` to extract specific characters from variables based on captured positions.
+
+```cpp
+// Pattern: $baseK[*] => $baseU[$1]
+// If $1 captured position 2, output character at position 2 from $baseU
+std::u16string processVariableIndex(uint16_t variableIndex, uint16_t referenceNum) {
+    Capture* capture = findCaptureBySegment(referenceNum);
+    if (capture && capture->position < getVariableLength(variableIndex)) {
+        return getVariableCharAt(variableIndex, capture->position);
+    }
+    return u"";  // Handle invalid references gracefully
+}
+```
+
+#### Reference Resolution
+
+RHS references (`$1`, `$2`, `$3`) are resolved by finding captures with matching segment indices:
+
+```cpp
+std::u16string resolveReference(uint16_t segmentNum, const std::vector<Capture>& captures) {
+    for (const auto& capture : captures) {
+        if (capture.segmentIndex == segmentNum) {
+            return capture.value;
+        }
+    }
+    return u"";  // Invalid reference returns empty string
+}
+```
+
+### 7. Action Generation
+
+The engine generates specific action types based on text changes:
+
+```cpp
+enum class ActionType {
+    Insert,                    // Insert new text at cursor
+    BackspaceDelete,          // Delete N characters backward  
+    BackspaceDeleteAndInsert  // Delete N chars, then insert text
+};
+```
+
+**Action Logic**:
+- **No rule match**: `Insert` the new character
+- **Rule match**: `BackspaceDeleteAndInsert` with matched length + new output
+- **Empty output**: `BackspaceDelete` only (removal)
+
+### 8. Recursive Rule Processing
+
+KeyMagic supports rule chaining where rule output can trigger additional rules:
+
+#### Initial vs Recursive Matching
+
+- **Initial matching**: Receives both VK code and character, can match virtual key rules
+- **Recursive matching**: Receives only composing text, matches text-based rules only
+
+#### Recursion Stop Conditions
+
+Rule processing continues until:
+1. **Empty output**: No characters remain
+2. **Single ASCII character**: Exactly one printable ASCII character (! through ~, excluding space)
+3. **No matching rule**: Current text doesn't trigger any rule
+
+#### Infinite Loop Prevention
+
+```cpp
+const int MAX_RECURSION_DEPTH = 100;  // Prevent infinite rule chains
+int depth = 0;
+while (hasMoreRules && ++depth < MAX_RECURSION_DEPTH) {
+    // Process recursive rules...
+}
+```
+
+### 9. External Control Interface
+
+The engine provides methods for external state management:
+
+#### Reset Operation
+```cpp
+void reset() {
+    composingBuffer.clear();
+    activeStates.clear();
+    // Complete state cleanup
+}
+```
+
+#### Composing Text Synchronization
+```cpp
+void setComposingText(const std::string& text) {
+    composingBuffer = utf8_to_utf16(text);
+    activeStates.clear();  // States don't persist across external changes
+}
+```
+
+These capabilities handle:
+- Focus changes between input fields
+- User cancellation (ESC key)
+- State leakage prevention
+- Error recovery
+- External editor synchronization
+
+## Detailed Component Behaviors
+
+### Matcher Component
+
+#### ANY Keyword Specifics
+
+The `ANY` keyword has very specific matching rules:
+- **Matches**: Printable ASCII characters from `!` to `~` (U+0021 to U+007E)
+- **Does NOT match**: Space character, Unicode characters, control characters
+- **Use case**: Handling ASCII input in Unicode-heavy layouts
+
+#### Wildcard Processing
+
+```cpp
+bool matchAnyOfVariable(char16_t ch, uint16_t variableIndex, size_t& position) {
+    std::u16string variable = getVariable(variableIndex);
+    auto pos = variable.find(ch);
+    if (pos != std::u16string::npos) {
+        position = pos;  // Store 0-based position for capture
+        return true;
+    }
+    return false;
+}
+```
+
+### Pattern Component
+
+#### Virtual Key Combination Handling
+
+Virtual key rules require special processing:
+- Must use `opAND` opcode first
+- Followed by sequence of `opPREDEFINED` opcodes
+- Platform-specific VK codes converted to internal enum values
+- Can combine multiple modifiers (Ctrl+Alt+Key)
+
+### State Component
+
+#### State Lifecycle Management
+
+```cpp
+class EngineState {
+private:
+    std::u16string composingText;      // Persistent across keys
+    std::set<uint32_t> activeStates;   // Transient per key event
     
-    Simple example - typing "ka":
-    - Press 'k': No rule matches, composing text = "k", action = Insert("k")
-    - Press 'a': Rule matches 'ka' => 'က', composing text = "က", action = BackspaceDeleteAndInsert(1, "က")
-    
-    Complex example - typing "title":
-    - Input keys: t, i, t, l → composing text: "titl"
-    - Input key: e → matches rule 'title' => 'Title'
-    - Composing text changes to: "Title"
-    - Action generated: backspace 4, insert "Title"
+public:
+    void processKeyEvent(const Input& input) {
+        // 1. Use current active states for matching
+        // 2. Clear all active states  
+        // 3. Apply new states from rule output
+        // 4. Update composing text
+    }
+};
+```
 
-4.  **Recursive Rule Matching**: KeyMagic supports recursive rule matching, allowing rule outputs to trigger additional rules. This enables complex transformations and rule chaining.
+## Error Handling and Validation
 
-    **Initial vs Subsequent Matching**:
-    - **Initial Rule Matching**: When a physical key is pressed, the matcher receives both the virtual key code (VK) and the character representation. This allows rules to match based on either the key itself (e.g., `<VK_KEY_A>`) or the character it produces (e.g., 'a').
-    - **Subsequent Rule Matching**: During recursive matching (when processing rule output), the matcher receives only the composing text - no VK or character input. This ensures that only text-based rules can match during recursion, not key-based rules.
+### Robustness Requirements
 
-    **Rule Chaining Example**:
-    ```
-    <VK_KEY_A> => 'a'
-    <VK_KEY_B> => 'b'
-    <VK_KEY_C> => 'c'
-    'abc' => 'x'
-    ```
+Production engines must handle:
 
-    With these rules, pressing keys A, B, C in sequence:
-    1. Press A: Matches `<VK_KEY_A> => 'a'`, composing text becomes "a"
-    2. Press B: Matches `<VK_KEY_B> => 'b'`, composing text becomes "ab"
-    3. Press C: Matches `<VK_KEY_C> => 'c'`, composing text becomes "abc"
-    4. Recursive match: The composing text "abc" matches `'abc' => 'x'`
-    5. Final output: "x" (with action: backspace 2, insert "x")
+#### Invalid References
+```cpp
+// Gracefully handle $N where N > segment count
+if (referenceNum > segments.size()) {
+    return u"";  // Return empty string, don't crash
+}
+```
 
-    This design allows virtual key rules to produce characters that can then be transformed by text-based rules, enabling sophisticated input method behaviors while preventing infinite loops from key-based rules.
+#### Malformed Rules
+- Variable references to non-existent variables
+- Circular variable dependencies
+- Invalid Unicode sequences
+- Out-of-bounds array accesses
 
-5.  **Return Value**: The `process_key` method returns an `Output` object containing:
-    - **Composing Text**: The current accumulated text in the composing buffer (ALWAYS returned, never empty unless explicitly cleared)
-    - **Actions**: Specific instructions for modifying the text (insert, delete count, or combination)
-    - **Is Processed**: Whether the key was handled by the engine (used to determine if the key should be consumed)
-    
-    **Important**: The composing text represents the engine's complete internal state and should be used for:
-    - Displaying composition indicators (underlines) in the UI
-    - Synchronizing engine state after external changes
-    - Debugging and logging
-    
-    The caller is responsible for executing these actions in the text editor or application.
+#### Resource Limits
+```cpp
+const size_t MAX_COMPOSING_LENGTH = 1000;     // Prevent memory exhaustion
+const size_t MAX_VARIABLE_LENGTH = 500;      // Limit variable sizes
+const int MAX_RULE_COUNT = 10000;            // Reasonable rule limits
+```
 
-## Detailed Component Descriptions
+### Debugging and Diagnostics
 
-### Engine
+Essential debugging capabilities:
+- Rule matching trace logs
+- Segment breakdown visualization  
+- Capture value inspection
+- UTF-16/UTF-8 conversion verification
+- Performance profiling for complex layouts
 
-The `KeyMagicEngine` struct holds the current keyboard layout and the engine's state. Its primary responsibilities include:
-- Managing the overall key processing workflow
-- Interacting with other components
-- Providing external control methods:
-  - `reset()`: Clears both composing buffer and active states simultaneously
-  - `set_composing_text(text)`: Sets the composing buffer and resets active states to ensure consistent state when synchronizing with external editor
+## Performance Considerations
 
-### State
+### Optimization Strategies
 
-The `EngineState` struct maintains:
-- **Composing Text Buffer**: Stores the current composing text persistently across all key events.
-- **Active States**: A set of integer IDs representing the states that are active for the *next* key press.
+1. **Rule Pre-sorting**: Sort once at load time, not per keystroke
+2. **Suffix Trees**: Use trie structures for fast suffix matching
+3. **Variable Caching**: Cache frequently accessed variable content
+4. **UTF-16 Operations**: Minimize encoding conversions
+5. **Early Termination**: Stop matching at first successful rule
 
-**Composing Text Buffer Behavior**:
-- **Persistent**: Never cleared automatically during normal key processing
-- **Accumulative**: Each key press modifies or appends to existing content
-- **Always Present**: Every `process_key` response includes the current composing text
-- **Manual Control**: Only cleared via `reset()` or `set_composing_text()`
+### Memory Management
 
-**State Behavior** (transient):
-- When a rule's output activates a state (e.g., `=> ('my_state')`), that state becomes active for the next key event.
-- After a key event is processed, all previously active states are cleared.
-- A state only persists across multiple key presses if the rule that matches for each key press also reactivates the state in its output.
+```cpp
+// Efficient capture storage
+std::vector<Capture> captures;
+captures.reserve(estimatedCaptureCount);  // Avoid reallocations
 
-### Matcher and Pattern
+// Composing buffer management
+if (composingText.length() > MAX_COMPOSING_LENGTH) {
+    // Trim or reset to prevent unbounded growth
+}
+```
 
-The `Matcher` and `Pattern` components work together to find the correct rule to apply. The `Pattern` defines what to look for, and the `Matcher` performs the search. This allows for complex rules, including those that depend on the preceding characters.
+## Integration Guidelines
 
-Key matching behaviors:
-- **ANY keyword**: Matches any single printable ASCII character from `!` to `~` (U+0021 to U+007E). It does **not** match the space character, Unicode characters, or control characters.
-- **Wildcards**: Support for [*] (any character in set) and [^] (any character NOT in set)
-- **State matching**: Rules can be state-specific, activated by state switches
+### Platform Integration
 
-### Input and Output
+1. **Input Conversion**: Platform key codes → internal VK enums
+2. **Output Actions**: Internal actions → platform-specific text operations
+3. **Unicode Handling**: Ensure proper UTF-8 ↔ UTF-16 conversions
+4. **State Persistence**: Handle app focus changes and context switches
 
-The `Input` and `Output` components serve as the data carriers for the engine:
+### Testing Requirements
 
-**Input**: Brings key events into the engine, including:
-- Key code
-- Modifier states (Shift, Ctrl, Alt)
-- Character representation
+Critical test categories:
+- **Rule Processing**: Verify all segment types and references work
+- **Unicode Support**: Test complex script handling (Myanmar, Arabic, etc.)
+- **Edge Cases**: Empty inputs, malformed rules, resource limits
+- **Performance**: Measure keystroke latency with real keyboard layouts
+- **Integration**: Test with actual platform input systems
 
-**Output**: Carries the processing results, containing:
-- **Composing Text**: The current text in the composing buffer
-- **Action Type**: The specific modification to perform:
-  - `Insert(text)`: Add new text
-  - `BackspaceDelete(count)`: Remove specified number of characters
-  - `BackspaceDeleteAndInsert(count, text)`: Delete characters then insert new text
-  - `None`: No action needed (e.g., for state changes only)
-
-This design decouples the engine from the specifics of the operating system's input and output mechanisms.
+This comprehensive documentation provides implementers with the complete technical knowledge required to build a correct, robust KeyMagic engine that handles all the discovered complexities of rule processing, pattern matching, and text manipulation.

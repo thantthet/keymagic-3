@@ -323,5 +323,83 @@ char32_t utf8ToChar32(const std::string& utf8, size_t& bytesConsumed) {
     return 0xFFFD;  // Replacement character
 }
 
+// UTF-16 substring by character count
+std::u16string utf16Substring(const std::u16string& utf16, size_t start, size_t length) {
+    if (start >= utf16.size()) {
+        return std::u16string();
+    }
+    
+    if (length == std::u16string::npos || start + length > utf16.size()) {
+        return utf16.substr(start);
+    }
+    
+    return utf16.substr(start, length);
+}
+
+// Convert single UTF-16 character (or surrogate pair) to char32_t
+char32_t utf16ToChar32(const std::u16string& utf16, size_t& charsConsumed) {
+    charsConsumed = 0;
+    
+    if (utf16.empty()) {
+        return 0;
+    }
+    
+    char16_t ch1 = utf16[0];
+    
+    // Check if it's a high surrogate
+    if (ch1 >= 0xD800 && ch1 <= 0xDBFF) {
+        // High surrogate - need low surrogate
+        if (utf16.size() < 2) {
+            charsConsumed = 1;
+            return 0xFFFD;  // Invalid
+        }
+        
+        char16_t ch2 = utf16[1];
+        if (ch2 >= 0xDC00 && ch2 <= 0xDFFF) {
+            // Valid surrogate pair
+            charsConsumed = 2;
+            char32_t high = (ch1 - 0xD800) << 10;
+            char32_t low = ch2 - 0xDC00;
+            return 0x10000 + high + low;
+        } else {
+            // Invalid low surrogate
+            charsConsumed = 1;
+            return 0xFFFD;
+        }
+    } else if (ch1 >= 0xDC00 && ch1 <= 0xDFFF) {
+        // Lone low surrogate
+        charsConsumed = 1;
+        return 0xFFFD;
+    } else {
+        // Regular BMP character
+        charsConsumed = 1;
+        return ch1;
+    }
+}
+
+// Convert char32_t to UTF-16 string
+std::u16string utf32ToUtf16(char32_t codepoint) {
+    if (codepoint <= 0xFFFF) {
+        // BMP character
+        if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
+            // Invalid code point (surrogate range)
+            return std::u16string(1, 0xFFFD);
+        }
+        return std::u16string(1, static_cast<char16_t>(codepoint));
+    } else if (codepoint <= 0x10FFFF) {
+        // Supplementary character - encode as surrogate pair
+        codepoint -= 0x10000;
+        char16_t high = static_cast<char16_t>(0xD800 + (codepoint >> 10));
+        char16_t low = static_cast<char16_t>(0xDC00 + (codepoint & 0x3FF));
+        std::u16string result;
+        result.push_back(high);
+        result.push_back(low);
+        return result;
+    } else {
+        // Invalid code point
+        return std::u16string(1, 0xFFFD);
+    }
+}
+
 } // namespace utils
 } // namespace keymagic

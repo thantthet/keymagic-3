@@ -28,12 +28,12 @@ constexpr uint16_t FLAG_ANYOF = 0x00F5;   // Match any character from variable
 constexpr uint16_t FLAG_NANYOF = 0x00F7;  // Match any character NOT in variable
 
 // Info section IDs (stored as little-endian in file)
-// These are the byte representations of ASCII strings
-constexpr uint8_t INFO_NAME[4] = {0x6E, 0x61, 0x6D, 0x65};  // "name" in LE
-constexpr uint8_t INFO_DESC[4] = {0x64, 0x65, 0x73, 0x63};  // "desc" in LE
-constexpr uint8_t INFO_FONT[4] = {0x66, 0x6F, 0x6E, 0x74};  // "font" in LE
-constexpr uint8_t INFO_ICON[4] = {0x69, 0x63, 0x6F, 0x6E};  // "icon" in LE
-constexpr uint8_t INFO_HTKY[4] = {0x68, 0x74, 0x6B, 0x79};  // "htky" in LE
+// These are the byte representations of ASCII strings (reversed due to little-endian)
+constexpr uint8_t INFO_NAME[4] = {0x65, 0x6D, 0x61, 0x6E};  // "eman" (name reversed) 
+constexpr uint8_t INFO_DESC[4] = {0x63, 0x73, 0x65, 0x64};  // "csed" (desc reversed)
+constexpr uint8_t INFO_FONT[4] = {0x74, 0x6E, 0x6F, 0x66};  // "tnof" (font reversed)
+constexpr uint8_t INFO_ICON[4] = {0x6E, 0x6F, 0x63, 0x69};  // "noci" (icon reversed)
+constexpr uint8_t INFO_HTKY[4] = {0x79, 0x6B, 0x74, 0x68};  // "ykth" (htky reversed)
 
 // Pack structures to match binary format exactly
 #pragma pack(push, 1)

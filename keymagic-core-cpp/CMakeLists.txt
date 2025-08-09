@@ -140,6 +140,8 @@ if(BUILD_SHARED_LIBS)
     )
 endif()
 
+# Debug matching disabled in production build
+
 # Installation
 install(TARGETS keymagic_core
     EXPORT KeyMagicCoreTargets
@@ -152,6 +154,7 @@ install(TARGETS keymagic_core
 install(FILES ${KEYMAGIC_CORE_HEADERS}
     DESTINATION include/keymagic
 )
+
 
 # Testing
 if(BUILD_TESTING)

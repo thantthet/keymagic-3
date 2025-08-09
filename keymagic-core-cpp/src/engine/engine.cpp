@@ -7,6 +7,7 @@
 #include "../matching/matcher.h"
 #include <algorithm>
 #include <sstream>
+#include <iostream>
 
 namespace keymagic {
 
@@ -94,44 +95,65 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
     // Get current context
     MatchContext context;
     context.context = state_->getComposingText();
-    
-    // Create potential new context for matching (current + new character)
-    std::string potentialContext = context.context;
-    if (input.character > 0 && input.character < 0x10000) {
-        potentialContext += utils::utf32ToUtf8(input.character);
-    }
-    
     context.activeStates = std::vector<int>(state_->getActiveStates().begin(), 
                                            state_->getActiveStates().end());
     
     // Store previous composing text
-    std::string oldComposing = state_->getComposingText();
+    std::u16string oldComposing = state_->getComposingText();
     
-    // Try to match rules against the potential new context
+    // Try to match rules
     bool matched = false;
-    MatchContext matchContext = context;
-    matchContext.context = potentialContext;
     
     for (const auto& rule : rules_) {
+        // Determine what text to match against based on rule type
+        MatchContext matchContext = context;
+        
+        // For non-VK patterns, we need to include the typed character in the match context
+        // For VK patterns, we only use the composing text (VK is checked separately)
+        if (rule.patternType != PatternType::VirtualKey && 
+            input.character > 0) {
+            // Non-VK pattern - append character to context for matching
+            matchContext.context = context.context + utils::utf32ToUtf16(input.character);
+        }
+        
         if (matchRule(rule, matchContext, input)) {
+            matched = true;
+            
             if (!testMode) {
+                // Apply the rule to get the replacement text
                 auto output = applyRule(rule, matchContext);
+                std::u16string ruleOutput = utils::utf8ToUtf16(output.composingText);
                 
-                // Adjust the delete count since we haven't actually added the character yet
-                // The delete count should be based on the OLD composing text length
-                if (output.action == ActionType::BackspaceDeleteAndInsert) {
-                    // We matched with the potential context, but the actual context is shorter
-                    // So we need to delete the old composing text length, not the potential length
-                    output.deleteCount = utils::utf8CharCount(oldComposing);
-                    output.action = output.deleteCount > 0 ? ActionType::BackspaceDeleteAndInsert : ActionType::Insert;
-                }
+                // Calculate the final composing text based on rule type
+                std::u16string finalComposing;
                 
-                // Update composing text based on output
-                if (output.action == ActionType::None && output.composingText.empty()) {
-                    // Rule matched but produced no output - keep existing composing
+                if (rule.patternType == PatternType::VirtualKey) {
+                    // For VK patterns, the output is the complete replacement
+                    finalComposing = ruleOutput;
                 } else {
-                    state_->setComposingText(output.composingText);
+                    // For text patterns: replace only the matched suffix with rule output
+                    size_t matchedLength = matchContext.matchedLength;
+                    
+                    // The current context includes the typed character for matching
+                    std::u16string currentContext = matchContext.context;
+                    
+                    if (matchedLength > 0 && currentContext.size() >= matchedLength) {
+                        // Keep the unmatched prefix + replace the matched suffix with rule output
+                        size_t unmatchedLength = currentContext.size() - matchedLength;
+                        std::u16string unmatchedPrefix = currentContext.substr(0, unmatchedLength);
+                        finalComposing = unmatchedPrefix + ruleOutput;
+                    } else {
+                        // Fallback: just use the rule output
+                        finalComposing = ruleOutput;
+                    }
                 }
+                
+                state_->setComposingText(finalComposing);
+                
+                // Calculate proper action based on before/after text
+                output = generateAction(oldComposing, finalComposing);
+                output.composingText = utils::utf16ToUtf8(finalComposing);
+                output.isProcessed = true;
                 
                 // Perform recursive matching if enabled
                 if (recursionEnabled_ && currentRecursionDepth_ < maxRecursionDepth_) {
@@ -141,7 +163,12 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                     
                     // Only use recursive output if it actually matched something
                     if (recursiveOutput.action != ActionType::None) {
-                        output = recursiveOutput;
+                        // Update with recursive output
+                        std::u16string recursiveComposing = utils::utf8ToUtf16(recursiveOutput.composingText);
+                        state_->setComposingText(recursiveComposing);
+                        output = generateAction(oldComposing, recursiveComposing);
+                        output.composingText = utils::utf16ToUtf8(recursiveComposing);
+                        output.isProcessed = true;
                     }
                 }
                 
@@ -150,7 +177,6 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                 // Test mode - just return what would happen
                 return applyRule(rule, matchContext);
             }
-            matched = true;
             break;
         }
     }
@@ -163,14 +189,14 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         }
         
         // Append character to composing text if it's printable
-        if (input.character > 0 && input.character < 0x10000) {
+        if (input.character > 0) {
             if (!testMode) {
-                std::string charStr = utils::utf32ToUtf8(input.character);
+                std::u16string charStr = utils::utf32ToUtf16(input.character);
                 state_->appendToComposingText(charStr);
             }
             
-            std::string newComposing = oldComposing + utils::utf32ToUtf8(input.character);
-            return Output::Insert(utils::utf32ToUtf8(input.character), newComposing);
+            std::u16string newComposing = oldComposing + utils::utf32ToUtf16(input.character);
+            return Output::Insert(utils::utf32ToUtf8(input.character), utils::utf16ToUtf8(newComposing));
         }
     }
     
@@ -183,11 +209,11 @@ void Engine::reset() {
     currentRecursionDepth_ = 0;
 }
 
-std::string Engine::getComposingText() const {
+std::u16string Engine::getComposingText() const {
     return state_->getComposingText();
 }
 
-void Engine::setComposingText(const std::string& text) {
+void Engine::setComposingText(const std::u16string& text) {
     saveStateSnapshot();
     state_->setComposingText(text);
     state_->clearActiveStates();
@@ -241,6 +267,10 @@ void Engine::preprocessRules() {
         processedRule.lhsOpcodes = keyboard_->rules[i].lhs;
         processedRule.rhsOpcodes = keyboard_->rules[i].rhs;
         
+        // Segment the opcodes into logical components
+        processedRule.lhsSegments = segmentateOpcodes(keyboard_->rules[i].lhs);
+        processedRule.rhsSegments = segmentateOpcodes(keyboard_->rules[i].rhs);
+        
         // Analyze pattern type and extract key information
         analyzePattern(processedRule);
         
@@ -293,27 +323,31 @@ void Engine::analyzePattern(ProcessedRule& rule) {
         return;
     }
     
+    // Check for VARIABLE pattern
+    if (rule.lhsOpcodes[0] == OP_VARIABLE) {
+        rule.patternType = PatternType::Variable;
+        return;
+    }
+    
     // Default to string pattern
     rule.patternType = PatternType::String;
     
     // Extract string pattern for matching
     rule.stringPattern = extractStringPattern(rule.lhsOpcodes);
-    rule.patternLength = utils::utf8CharCount(rule.stringPattern);
+    rule.patternLength = rule.stringPattern.size();  // UTF-16 character count
 }
 
-std::string Engine::extractStringPattern(const std::vector<uint16_t>& opcodes) {
-    std::string pattern;
+std::u16string Engine::extractStringPattern(const std::vector<uint16_t>& opcodes) {
+    std::u16string pattern;
     
     for (size_t i = 0; i < opcodes.size(); ++i) {
         if (opcodes[i] == OP_STRING && i + 1 < opcodes.size()) {
             uint16_t length = opcodes[i + 1];
             i += 2;
             
-            std::u16string str;
             for (uint16_t j = 0; j < length && i < opcodes.size(); ++j, ++i) {
-                str.push_back(static_cast<char16_t>(opcodes[i]));
+                pattern.push_back(static_cast<char16_t>(opcodes[i]));
             }
-            pattern += utils::utf16ToUtf8(str);
             i--; // Adjust for loop increment
         }
     }
@@ -324,36 +358,137 @@ std::string Engine::extractStringPattern(const std::vector<uint16_t>& opcodes) {
 void Engine::sortRulesByPriority() {
     std::stable_sort(rules_.begin(), rules_.end(), 
         [](const ProcessedRule& a, const ProcessedRule& b) {
+            // Higher priority values should come first (like Rust's has_priority_over)
             if (a.priority != b.priority) {
-                return a.priority < b.priority;
+                return static_cast<int>(a.priority) > static_cast<int>(b.priority);
             }
             // For same priority, maintain original order
             return a.originalIndex < b.originalIndex;
         });
+    
+    #ifdef DEBUG_MATCHING
+    // Debug print the first 50 rules after sorting
+    std::cerr << "\n=== Rules After Sorting (First 50) ===" << std::endl;
+    for (size_t i = 0; i < std::min(rules_.size(), size_t(50)); ++i) {
+        const auto& rule = rules_[i];
+        std::cerr << "Index[" << i << "] OriginalIndex[" << rule.originalIndex 
+                  << "] Priority[" << static_cast<int>(rule.priority) << "]";
+        if (rule.originalIndex == 37 || rule.originalIndex == 39) {
+            std::cerr << " *** IMPORTANT ***";
+        }
+        std::cerr << std::endl;
+    }
+    std::cerr << "===================================" << std::endl;
+    #endif
 }
 
 RulePriority Engine::calculateRulePriority(const ProcessedRule& rule) const {
-    // State-specific rules have highest priority
-    if (rule.patternType == PatternType::State && rule.stateId >= 0) {
-        return RulePriority::StateSpecific;
-    }
+    // Calculate exact char_length like Rust implementation
+    size_t charLength = calculateCharLength(rule);
+    size_t stateCount = 0;
+    size_t vkCount = 0;
     
-    // Virtual key rules
-    if (rule.patternType == PatternType::VirtualKey) {
-        return RulePriority::VirtualKey;
-    }
-    
-    // String patterns - longer patterns have higher priority
-    if (rule.patternType == PatternType::String) {
-        if (rule.patternLength > 3) {
-            return RulePriority::LongPattern;
+    // Count states and virtual keys
+    for (size_t i = 0; i < rule.lhsOpcodes.size(); ++i) {
+        uint16_t op = rule.lhsOpcodes[i];
+        
+        if (op == OP_SWITCH) {
+            stateCount++;
+            i++; // Skip state ID
+        } else if (op == OP_PREDEFINED || op == OP_AND) {
+            if (op == OP_AND) {
+                // Count subsequent OP_PREDEFINED elements
+                size_t j = i + 1;
+                while (j < rule.lhsOpcodes.size() && rule.lhsOpcodes[j] == OP_PREDEFINED) {
+                    vkCount++;
+                    j += 2; // Skip OP_PREDEFINED and its value
+                }
+                i = j - 1; // Continue from last processed position
+            } else {
+                vkCount++;
+                i++; // Skip predefined value
+            }
         }
     }
     
-    return RulePriority::ShortPattern;
+    // Use Rust-style priority calculation based on counts
+    // Higher numbers get higher priority (checked first)
+    RulePriority priority;
+    if (stateCount > 0) {
+        // State-specific rules: priority = 1000 + stateCount + vkCount + charLength
+        priority = static_cast<RulePriority>(1000 + stateCount * 100 + vkCount * 10 + charLength);
+    } else if (vkCount > 0) {
+        // Virtual key rules: priority = 500 + vkCount + charLength  
+        priority = static_cast<RulePriority>(500 + vkCount * 10 + charLength);
+    } else {
+        // Text rules: priority = charLength (longer patterns get higher priority)
+        priority = static_cast<RulePriority>(charLength);
+    }
+    
+    #ifdef DEBUG_MATCHING
+    if (rule.originalIndex == 37 || rule.originalIndex == 39) {
+        std::cerr << "PRIORITY CALC: Rule[" << rule.originalIndex 
+                  << "] charLength=" << charLength 
+                  << " stateCount=" << stateCount 
+                  << " vkCount=" << vkCount 
+                  << " -> priority=" << static_cast<int>(priority) << std::endl;
+    }
+    #endif
+    
+    return priority;
 }
 
-bool Engine::matchRule(const ProcessedRule& rule, const MatchContext& context, const Input& input) {
+size_t Engine::calculateCharLength(const ProcessedRule& rule) const {
+    size_t charLength = 0;
+    
+    for (size_t i = 0; i < rule.lhsOpcodes.size(); ++i) {
+        uint16_t op = rule.lhsOpcodes[i];
+        
+        if (op == OP_STRING) {
+            // Count actual characters in the string
+            if (i + 1 < rule.lhsOpcodes.size()) {
+                uint16_t len = rule.lhsOpcodes[i + 1];
+                
+                // Count UTF-16 characters (each counts as 1)
+                charLength += len;
+                
+                // Skip OP_STRING, length, and string data
+                i += 1 + len; // Skip OP_STRING + length + len characters
+            }
+        } else if (op == OP_VARIABLE) {
+            i++; // Skip variable index
+            
+            // Check if followed by modifier (wildcard)
+            if (i + 1 < rule.lhsOpcodes.size() && rule.lhsOpcodes[i + 1] == OP_MODIFIER) {
+                uint16_t modifier = rule.lhsOpcodes[i + 2];
+                if (modifier == FLAG_ANYOF || modifier == FLAG_NANYOF) {
+                    // Variable with wildcard [*] or [^] counts as 1 character
+                    charLength += 1;
+                }
+                i += 2; // Skip OP_MODIFIER and modifier value
+            }
+            // Variable without wildcard doesn't contribute to charLength during pattern creation
+        } else if (op == OP_ANY) {
+            // ANY matches exactly 1 character
+            charLength += 1;
+        } else if (op == OP_SWITCH) {
+            // Skip state switch and its ID
+            i++; 
+        } else if (op == OP_AND || op == OP_PREDEFINED) {
+            // Virtual keys don't contribute to character length
+            if (op == OP_PREDEFINED) {
+                i++; // Skip predefined value
+            }
+        } else if (op == OP_MODIFIER) {
+            // Skip modifier value
+            i++;
+        }
+    }
+    
+    return charLength;
+}
+
+bool Engine::matchRule(const ProcessedRule& rule, MatchContext& context, const Input& input) {
     // Delegate to matcher
     return matcher_->matchRule(rule, context, input, keyboard_->strings);
 }
@@ -363,7 +498,7 @@ Output Engine::applyRule(const ProcessedRule& rule, const MatchContext& context)
     return matcher_->applyRule(rule, context, keyboard_->strings, state_.get());
 }
 
-Output Engine::performRecursiveMatching(const std::string& text) {
+Output Engine::performRecursiveMatching(const std::u16string& text) {
     // Check recursion stop conditions
     if (shouldStopRecursion(text)) {
         return Output::None();
@@ -391,7 +526,7 @@ Output Engine::performRecursiveMatching(const std::string& text) {
     return Output::None();
 }
 
-bool Engine::shouldStopRecursion(const std::string& text) const {
+bool Engine::shouldStopRecursion(const std::u16string& text) const {
     // Stop if text is empty
     if (text.empty()) return true;
     
@@ -401,11 +536,11 @@ bool Engine::shouldStopRecursion(const std::string& text) const {
     return false;
 }
 
-bool Engine::isSingleAsciiPrintable(const std::string& text) const {
+bool Engine::isSingleAsciiPrintable(const std::u16string& text) const {
     return utils::isSingleAsciiPrintable(text);
 }
 
-std::string Engine::applySmartBackspace(const std::string& text) const {
+std::u16string Engine::applySmartBackspace(const std::u16string& text) const {
     if (!keyboard_ || !keyboard_->hasSmartBackspace()) {
         return text;
     }
@@ -413,10 +548,10 @@ std::string Engine::applySmartBackspace(const std::string& text) const {
     // Smart backspace logic - remove complete clusters
     // This is a simplified version - real implementation would need
     // language-specific cluster detection
-    return utils::utf8Substring(text, 0, utils::utf8CharCount(text) - 1);
+    return utils::utf16Substring(text, 0, text.size() - 1);
 }
 
-Output Engine::generateAction(const std::string& oldText, const std::string& newText) {
+Output Engine::generateAction(const std::u16string& oldText, const std::u16string& newText) {
     if (oldText == newText) {
         return Output::None();
     }
@@ -425,21 +560,21 @@ Output Engine::generateAction(const std::string& oldText, const std::string& new
     int deleteCount = calculateDeleteCount(oldText, newText);
     
     if (deleteCount > 0) {
-        std::string insertText = newText.substr(oldText.size() - deleteCount);
+        std::u16string insertText = newText.substr(oldText.size() - deleteCount);
         if (!insertText.empty()) {
-            return Output::DeleteAndInsert(deleteCount, insertText, newText);
+            return Output::DeleteAndInsert(deleteCount, utils::utf16ToUtf8(insertText), utils::utf16ToUtf8(newText));
         } else {
-            return Output::Delete(deleteCount, newText);
+            return Output::Delete(deleteCount, utils::utf16ToUtf8(newText));
         }
     } else if (newText.size() > oldText.size()) {
-        std::string insertText = newText.substr(oldText.size());
-        return Output::Insert(insertText, newText);
+        std::u16string insertText = newText.substr(oldText.size());
+        return Output::Insert(utils::utf16ToUtf8(insertText), utils::utf16ToUtf8(newText));
     }
     
     return Output::None();
 }
 
-int Engine::calculateDeleteCount(const std::string& oldText, const std::string& newText) {
+int Engine::calculateDeleteCount(const std::u16string& oldText, const std::u16string& newText) {
     // Find common prefix
     size_t commonPrefix = 0;
     size_t oldLen = oldText.size();
@@ -472,6 +607,105 @@ void Engine::updateActiveStates(const std::vector<int>& newStates) {
     for (int stateId : newStates) {
         state_->addActiveState(stateId);
     }
+}
+
+std::vector<RuleSegment> Engine::segmentateOpcodes(const std::vector<uint16_t>& opcodes) {
+    std::vector<RuleSegment> segments;
+    size_t i = 0;
+    
+    while (i < opcodes.size()) {
+        uint16_t op = opcodes[i];
+        
+        if (op == OP_STRING) {
+            // OP_STRING length char1 char2 ... charN
+            if (i + 1 >= opcodes.size()) break;
+            
+            uint16_t length = opcodes[i + 1];
+            std::vector<uint16_t> segmentOpcodes;
+            
+            // Include OP_STRING, length, and all characters
+            for (size_t j = 0; j < 2 + length && i + j < opcodes.size(); ++j) {
+                segmentOpcodes.push_back(opcodes[i + j]);
+            }
+            
+            segments.emplace_back(SegmentType::String, segmentOpcodes);
+            i += 2 + length;
+            
+        } else if (op == OP_VARIABLE) {
+            // OP_VARIABLE varIndex [OP_MODIFIER modifierValue]
+            if (i + 1 >= opcodes.size()) break;
+            
+            std::vector<uint16_t> segmentOpcodes = { op, opcodes[i + 1] };
+            SegmentType segmentType = SegmentType::Variable;
+            i += 2;
+            
+            // Check for modifier
+            if (i < opcodes.size() && opcodes[i] == OP_MODIFIER) {
+                if (i + 1 < opcodes.size()) {
+                    uint16_t modifier = opcodes[i + 1];
+                    segmentOpcodes.push_back(opcodes[i]);     // OP_MODIFIER
+                    segmentOpcodes.push_back(opcodes[i + 1]); // modifier value
+                    
+                    // Determine segment type based on modifier
+                    if (modifier == FLAG_ANYOF) {
+                        segmentType = SegmentType::AnyOfVariable;
+                    } else if (modifier == FLAG_NANYOF) {
+                        segmentType = SegmentType::NotAnyOfVariable;
+                    }
+                    i += 2;
+                }
+            }
+            
+            segments.emplace_back(segmentType, segmentOpcodes);
+            
+        } else if (op == OP_ANY) {
+            // OP_ANY
+            segments.emplace_back(SegmentType::Any, std::vector<uint16_t>{op});
+            i++;
+            
+        } else if (op == OP_SWITCH) {
+            // OP_SWITCH stateId
+            if (i + 1 >= opcodes.size()) break;
+            std::vector<uint16_t> segmentOpcodes = { op, opcodes[i + 1] };
+            segments.emplace_back(SegmentType::State, segmentOpcodes);
+            i += 2;
+            
+        } else if (op == OP_AND) {
+            // OP_AND OP_PREDEFINED vk1 OP_PREDEFINED vk2 ...
+            // Collect all the virtual keys in this combination
+            std::vector<uint16_t> segmentOpcodes = { op };
+            i++; // Skip OP_AND
+            
+            while (i < opcodes.size() && opcodes[i] == OP_PREDEFINED) {
+                if (i + 1 >= opcodes.size()) break;
+                segmentOpcodes.push_back(opcodes[i]);     // OP_PREDEFINED
+                segmentOpcodes.push_back(opcodes[i + 1]); // VK value
+                i += 2;
+            }
+            
+            segments.emplace_back(SegmentType::VirtualKey, segmentOpcodes);
+            
+        } else if (op == OP_PREDEFINED) {
+            // Single OP_PREDEFINED vkValue
+            if (i + 1 >= opcodes.size()) break;
+            std::vector<uint16_t> segmentOpcodes = { op, opcodes[i + 1] };
+            segments.emplace_back(SegmentType::VirtualKey, segmentOpcodes);
+            i += 2;
+            
+        } else if (op == OP_REFERENCE) {
+            // OP_REFERENCE refNum (used in RHS)
+            if (i + 1 >= opcodes.size()) break;
+            std::vector<uint16_t> segmentOpcodes = { op, opcodes[i + 1] };
+            segments.emplace_back(SegmentType::Reference, segmentOpcodes);
+            i += 2;
+            
+        } else {
+            // Unknown opcode, skip it
+            i++;
+        }
+    }
+    
+    return segments;
 }
 
 // KeyMagicEngine public API implementation
@@ -515,11 +749,12 @@ void KeyMagicEngine::reset() {
 }
 
 std::string KeyMagicEngine::getComposition() const {
-    return engine_->getComposingText();
+    std::u16string composing = engine_->getComposingText();
+    return utils::utf16ToUtf8(composing);
 }
 
 void KeyMagicEngine::setComposition(const std::string& text) {
-    engine_->setComposingText(text);
+    engine_->setComposingText(utils::utf8ToUtf16(text));
 }
 
 bool KeyMagicEngine::hasKeyboard() const {

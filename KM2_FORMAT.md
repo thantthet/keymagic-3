@@ -169,6 +169,10 @@ Each rule consists of:
 
 - **LHS (Left-Hand Side)**: Input pattern to match
 - **RHS (Right-Hand Side)**: Output pattern to generate
+- **Length fields**: The LHS Len and RHS Len are specified in **16-bit words (uint16_t units)**, not bytes!
+  - To get the actual byte count, multiply the length value by 2
+  - Example: Length value of 3 means 3 words = 6 bytes
+  - This allows for efficient storage since all opcodes are 16-bit values
 
 ### Binary Opcodes
 
@@ -286,6 +290,7 @@ The KeyMagic engine loads KM2 files using this sequence:
 
 4. **Rule Loading**
    - Read `ruleCount` binary rule entries
+   - **Important**: Rule lengths are in 16-bit words, multiply by 2 for byte count
    - Convert opcodes to internal rule representation
    - Sort rules by matching priority
 

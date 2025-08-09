@@ -25,11 +25,23 @@ size_t utf8CharCount(const std::string& utf8);
 std::string utf8Substring(const std::string& utf8, size_t start, size_t length = std::string::npos);
 bool isValidUtf8(const std::string& utf8);
 
+// UTF-16 string utilities
+std::u16string utf16Substring(const std::u16string& utf16, size_t start, size_t length = std::u16string::npos);
+char32_t utf16ToChar32(const std::u16string& utf16, size_t& charsConsumed);
+std::u16string utf32ToUtf16(char32_t codepoint);
+
 // Helper to check if a character is a single ASCII printable (for recursion stopping)
 inline bool isSingleAsciiPrintable(const std::string& str) {
     if (str.size() != 1) return false;
     char ch = str[0];
     return ch >= '!' && ch <= '~';  // ASCII printable range excluding space
+}
+
+// UTF-16 version
+inline bool isSingleAsciiPrintable(const std::u16string& str) {
+    if (str.size() != 1) return false;
+    char16_t ch = str[0];
+    return ch >= u'!' && ch <= u'~';  // ASCII printable range excluding space
 }
 
 // Helper to check if character is in ANY range (ASCII printable)
