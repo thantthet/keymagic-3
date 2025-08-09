@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <keymagic/km2_format.h>
+#include <memory>
 
 namespace keymagic_test {
 
@@ -108,6 +110,116 @@ std::string getKeyboardLoadingHelp() {
     }
     
     return help;
+}
+
+std::unique_ptr<keymagic::KM2File> createBasicKM2WithOptions(bool autoBksp, bool eat, bool trackCaps) {
+    auto km2 = std::make_unique<keymagic::KM2File>();
+    
+    // Set header with version info
+    km2->header.magicCode[0] = 'K';
+    km2->header.magicCode[1] = 'M';
+    km2->header.magicCode[2] = 'K';
+    km2->header.magicCode[3] = 'L';
+    km2->header.majorVersion = 1;
+    km2->header.minorVersion = 5;
+    
+    // Set layout options
+    km2->header.layoutOptions.trackCaps = trackCaps ? 1 : 0;
+    km2->header.layoutOptions.autoBksp = autoBksp ? 1 : 0;
+    km2->header.layoutOptions.eat = eat ? 1 : 0;
+    km2->header.layoutOptions.posBased = 0;
+    km2->header.layoutOptions.rightAlt = 1;
+    
+    // Initialize counts
+    km2->header.stringCount = 0;
+    km2->header.infoCount = 0; 
+    km2->header.ruleCount = 0;
+    
+    return km2;
+}
+
+std::unique_ptr<keymagic::KM2File> createKM2WithRule(const std::string& lhsPattern, 
+                                                     const std::string& rhsOutput,
+                                                     bool autoBksp, 
+                                                     bool eat, 
+                                                     bool trackCaps) {
+    auto km2 = createBasicKM2WithOptions(autoBksp, eat, trackCaps);
+    
+    // Add strings for the rule - need to convert std::string to std::u16string
+    keymagic::StringEntry lhsString;
+    // Simple ASCII to UTF-16 conversion
+    for (char ch : lhsPattern) {
+        lhsString.value.push_back(static_cast<char16_t>(ch));
+    }
+    km2->strings.push_back(lhsString);
+    
+    keymagic::StringEntry rhsString;
+    // Proper UTF-8 to UTF-16 conversion for rhsOutput
+    // This handles Myanmar and other Unicode characters correctly
+    const char* ptr = rhsOutput.c_str();
+    const char* end = ptr + rhsOutput.size();
+    while (ptr < end) {
+        uint32_t codepoint = 0;
+        unsigned char ch = *ptr;
+        
+        if (ch < 0x80) {
+            // ASCII
+            codepoint = ch;
+            ptr++;
+        } else if ((ch & 0xE0) == 0xC0) {
+            // 2-byte UTF-8
+            codepoint = ((ch & 0x1F) << 6) | (ptr[1] & 0x3F);
+            ptr += 2;
+        } else if ((ch & 0xF0) == 0xE0) {
+            // 3-byte UTF-8
+            codepoint = ((ch & 0x0F) << 12) | ((ptr[1] & 0x3F) << 6) | (ptr[2] & 0x3F);
+            ptr += 3;
+        } else if ((ch & 0xF8) == 0xF0) {
+            // 4-byte UTF-8
+            codepoint = ((ch & 0x07) << 18) | ((ptr[1] & 0x3F) << 12) | 
+                       ((ptr[2] & 0x3F) << 6) | (ptr[3] & 0x3F);
+            ptr += 4;
+        } else {
+            // Invalid UTF-8, skip
+            ptr++;
+            continue;
+        }
+        
+        // Convert to UTF-16
+        if (codepoint < 0x10000) {
+            rhsString.value.push_back(static_cast<char16_t>(codepoint));
+        } else {
+            // Surrogate pair
+            codepoint -= 0x10000;
+            rhsString.value.push_back(static_cast<char16_t>(0xD800 + (codepoint >> 10)));
+            rhsString.value.push_back(static_cast<char16_t>(0xDC00 + (codepoint & 0x3FF)));
+        }
+    }
+    km2->strings.push_back(rhsString);
+    
+    km2->header.stringCount = 2;
+    
+    // Create a simple rule: lhsPattern => rhsOutput
+    keymagic::BinaryRule rule;
+    
+    // LHS: STRING(lhsPattern)
+    rule.lhs.push_back(keymagic::OP_STRING);
+    rule.lhs.push_back(static_cast<uint16_t>(lhsPattern.size()));
+    for (char ch : lhsPattern) {
+        rule.lhs.push_back(static_cast<uint16_t>(ch));
+    }
+    
+    // RHS: STRING(rhsOutput) - use the UTF-16 value we already converted
+    rule.rhs.push_back(keymagic::OP_STRING);
+    rule.rhs.push_back(static_cast<uint16_t>(rhsString.value.size()));
+    for (char16_t ch : rhsString.value) {
+        rule.rhs.push_back(static_cast<uint16_t>(ch));
+    }
+    
+    km2->rules.push_back(rule);
+    km2->header.ruleCount = 1;
+    
+    return km2;
 }
 
 } // namespace keymagic_test

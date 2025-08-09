@@ -227,6 +227,9 @@ public:
     bool treatsCtrlAltAsRightAlt() const { 
         return hasRightAltOption() ? header.layoutOptions.getRightAlt() : true; 
     }
+    
+    // Get reference to layout options
+    const KM2LayoutOptions& getLayoutOptions() const { return header.layoutOptions; }
 };
 
 } // namespace keymagic

@@ -136,6 +136,15 @@ struct Output {
         out.isProcessed = true;
         return out;
     }
+    
+    // Aliases for backspace-specific operations
+    static Output BackspaceDelete(int count, const std::string& composing) {
+        return Delete(count, composing);
+    }
+    
+    static Output BackspaceDeleteAndInsert(int count, const std::string& text, const std::string& composing) {
+        return DeleteAndInsert(count, text, composing);
+    }
 };
 
 // Capture group for pattern matching

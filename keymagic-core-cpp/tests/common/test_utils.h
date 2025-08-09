@@ -4,6 +4,9 @@
 #include <string>
 #include <filesystem>
 #include <optional>
+#include <memory>
+#include <vector>
+#include <keymagic/km2_format.h>
 
 namespace keymagic_test {
 
@@ -50,6 +53,30 @@ private:
  * Helper function to get a readable error message for keyboard loading failures
  */
 std::string getKeyboardLoadingHelp();
+
+/**
+ * Creates a basic KM2 file with specified layout options for testing
+ * @param autoBksp Enable smart backspace behavior
+ * @param eat Consume keys that don't match any rule  
+ * @param trackCaps Track CAPSLOCK key state
+ * @return KM2File object with the specified options
+ */
+std::unique_ptr<keymagic::KM2File> createBasicKM2WithOptions(bool autoBksp = false, bool eat = false, bool trackCaps = true);
+
+/**
+ * Creates a KM2 file with a single rule and specified layout options
+ * @param lhsPattern Left-hand side pattern (e.g., "ka")
+ * @param rhsOutput Right-hand side output (e.g., "က")
+ * @param autoBksp Enable smart backspace behavior
+ * @param eat Consume keys that don't match any rule
+ * @param trackCaps Track CAPSLOCK key state
+ * @return KM2File object with the rule and options
+ */
+std::unique_ptr<keymagic::KM2File> createKM2WithRule(const std::string& lhsPattern, 
+                                                     const std::string& rhsOutput,
+                                                     bool autoBksp = false, 
+                                                     bool eat = false, 
+                                                     bool trackCaps = true);
 
 } // namespace keymagic_test
 

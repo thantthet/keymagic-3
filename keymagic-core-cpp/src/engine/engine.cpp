@@ -87,10 +87,15 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         return Output::None();
     }
     
-    // Save state for potential undo
-    if (!testMode) {
-        saveStateSnapshot();
-    }
+    // Track whether a key is processed
+    bool isProcessed = false;
+    
+    // Check if this is a backspace key (we'll handle it later but need to know now for history)
+    bool isBackspace = (input.keyCode == static_cast<int>(VirtualKey::Back));
+    
+    // Save state for potential undo BEFORE processing (but NOT for backspace operations)
+    // This matches Rust behavior where backspace operations don't record history
+    bool shouldRecordHistory = !testMode && !isBackspace;
     
     // Get current context
     MatchContext context;
@@ -118,6 +123,12 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         
         if (matchRule(rule, matchContext, input)) {
             matched = true;
+            isProcessed = true;
+            
+            // Record history before applying the rule (if not backspace and not test mode)
+            if (shouldRecordHistory) {
+                saveStateSnapshot();
+            }
             
             if (!testMode) {
                 // Apply the rule to get the replacement text
@@ -183,6 +194,65 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
     
     // No rule matched
     if (!matched) {
+        // Check if this is a backspace key
+        if (isBackspace && !state_->getComposingText().empty()) {
+            isProcessed = true;
+            
+            // Handle backspace based on auto_bksp option
+            if (keyboard_->getLayoutOptions().getAutoBksp()) {
+                // Smart backspace with history restoration
+                if (!history_.empty() && !testMode) {
+                    // Restore from history (undo-like behavior)
+                    auto& previousSnapshot = history_.back();
+                    state_->copyFrom(*previousSnapshot.state);
+                    history_.pop_back();
+                } else if (!history_.empty() && testMode) {
+                    // Test mode: simulate history restoration without modifying actual state
+                    auto& previousSnapshot = history_.back();
+                    std::u16string restoredComposing = previousSnapshot.state->getComposingText();
+                    return Output::BackspaceDeleteAndInsert(
+                        static_cast<int>(oldComposing.size()),
+                        utils::utf16ToUtf8(restoredComposing),
+                        utils::utf16ToUtf8(restoredComposing)
+                    );
+                } else {
+                    // No history available, delete one character backward
+                    std::u16string newComposing = utils::utf16Substring(oldComposing, 0, 
+                                                                       oldComposing.size() - 1);
+                    if (!testMode) {
+                        state_->setComposingText(newComposing);
+                    }
+                    return Output::BackspaceDelete(1, utils::utf16ToUtf8(newComposing));
+                }
+            } else {
+                // Simple backspace: delete one character
+                std::u16string newComposing = utils::utf16Substring(oldComposing, 0, 
+                                                                   oldComposing.size() - 1);
+                if (!testMode) {
+                    state_->setComposingText(newComposing);
+                }
+                return Output::BackspaceDelete(1, utils::utf16ToUtf8(newComposing));
+            }
+            
+            // If we restored from history successfully in non-test mode, generate proper output
+            if (!testMode && keyboard_->getLayoutOptions().getAutoBksp()) {
+                std::u16string newComposing = state_->getComposingText();
+                return Output::BackspaceDeleteAndInsert(
+                    static_cast<int>(oldComposing.size()),
+                    utils::utf16ToUtf8(newComposing),
+                    utils::utf16ToUtf8(newComposing)
+                );
+            }
+            
+            // Clear active states after backspace
+            if (!testMode) {
+                state_->clearActiveStates();
+            }
+            
+            // Backspace was processed
+            return Output::BackspaceDelete(1, utils::utf16ToUtf8(state_->getComposingText()));
+        }
+        
         // Check if we should eat the key
         if (keyboard_->eatsAllUnusedKeys()) {
             return Output::None();
@@ -190,13 +260,28 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         
         // Append character to composing text if it's printable
         if (input.character > 0) {
+            isProcessed = true;
+            
+            // Record history before adding character (if not test mode)
+            if (shouldRecordHistory) {
+                saveStateSnapshot();
+            }
+            
             if (!testMode) {
                 std::u16string charStr = utils::utf32ToUtf16(input.character);
                 state_->appendToComposingText(charStr);
+                
+                // Clear active states after adding character
+                state_->clearActiveStates();
             }
             
             std::u16string newComposing = oldComposing + utils::utf32ToUtf16(input.character);
             return Output::Insert(utils::utf32ToUtf8(input.character), utils::utf16ToUtf8(newComposing));
+        }
+        
+        // Clear active states for unused keys
+        if (!testMode) {
+            state_->clearActiveStates();
         }
     }
     
@@ -213,10 +298,19 @@ std::u16string Engine::getComposingText() const {
     return state_->getComposingText();
 }
 
+std::string Engine::getComposingTextUtf8() const {
+    return utils::utf16ToUtf8(state_->getComposingText());
+}
+
 void Engine::setComposingText(const std::u16string& text) {
-    saveStateSnapshot();
+    // Clear history when composing text is set externally
+    history_.clear();
     state_->setComposingText(text);
     state_->clearActiveStates();
+}
+
+void Engine::setComposingText(const std::string& text) {
+    setComposingText(utils::utf8ToUtf16(text));
 }
 
 std::string Engine::getKeyboardName() const {

@@ -65,7 +65,9 @@ public:
     // State management
     void reset();
     std::u16string getComposingText() const;
+    std::string getComposingTextUtf8() const;  // UTF-8 convenience method
     void setComposingText(const std::u16string& text);
+    void setComposingText(const std::string& text);  // UTF-8 convenience overload
     
     // Keyboard information
     std::string getKeyboardName() const;

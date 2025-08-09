@@ -40,6 +40,7 @@ add_executable(keymagic_integration_tests
     integration/test_main.cpp
     integration/test_keyboard_discovery.cpp
     integration/test_pyidaungsu_keystrokes.cpp
+    integration/test_backspace_history.cpp
     common/test_utils.cpp
 )
 
