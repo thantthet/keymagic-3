@@ -74,23 +74,19 @@ else()
     set(RUST_TARGET_DIR "")
 endif()
 
-# Link to Rust keymagic-core static library based on configuration
-# Using relative paths from the CMake source directory
+# Link to C++ keymagic-core library
 # For ARM64X builds, this is handled by arm64x.cmake
 if(NOT DEFINED BUILD_AS_ARM64X)
-    if(RUST_TARGET_DIR)
-        # Cross-compilation - use target-specific directory
-        target_link_libraries(KeyMagicTSF PRIVATE
-            debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/debug/keymagic_core.lib"
-            optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/release/keymagic_core.lib"
-        )
-    else()
-        # Native compilation - use default directory
-        target_link_libraries(KeyMagicTSF PRIVATE
-            debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/debug/keymagic_core.lib"
-            optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/release/keymagic_core.lib"
-        )
-    endif()
+    # Build the C++ core library as a subdirectory
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../keymagic-core-cpp keymagic-core-cpp-build)
+    
+    # Link to the C++ core library
+    target_link_libraries(KeyMagicTSF PRIVATE keymagic_core)
+    
+    # Include C++ core headers
+    target_include_directories(KeyMagicTSF PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../keymagic-core-cpp/include
+    )
 endif()
 
 # Set static runtime
@@ -142,6 +138,6 @@ if(DEFINED BUILD_AS_ARM64X)
     # Include the ARM64X build logic
     include("${CMAKE_CURRENT_SOURCE_DIR}/arm64x.cmake")
     
-    # Configure Rust for ARM64X (uses static libraries)
-    configure_rust_for_arm64x(KeyMagicTSF)
+    # Configure C++ core for ARM64X (uses static libraries)
+    configure_cpp_core_for_arm64x(KeyMagicTSF)
 endif()

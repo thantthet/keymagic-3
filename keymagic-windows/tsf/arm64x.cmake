@@ -71,21 +71,22 @@ elseif("${BUILD_AS_ARM64X}" STREQUAL "ARM64EC")
     endforeach()
 endif()
 
-# Function to handle Rust static library paths for ARM64X builds
-function(configure_rust_for_arm64x target)
-    if("${BUILD_AS_ARM64X}" STREQUAL "ARM64")
-        set(RUST_TARGET_DIR "aarch64-pc-windows-msvc")
-    elseif("${BUILD_AS_ARM64X}" STREQUAL "ARM64EC")
-        set(RUST_TARGET_DIR "arm64ec-pc-windows-msvc")
-    else()
-        return()
+# Function to handle C++ core library for ARM64X builds
+function(configure_cpp_core_for_arm64x target)
+    if("${BUILD_AS_ARM64X}" STREQUAL "ARM64" OR "${BUILD_AS_ARM64X}" STREQUAL "ARM64EC")
+        # Build the C++ core library as a subdirectory
+        # Use a unique build directory for each configuration
+        set(CPP_BUILD_DIR "keymagic-core-cpp-${BUILD_AS_ARM64X}-${CMAKE_BUILD_TYPE}")
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../keymagic-core-cpp ${CPP_BUILD_DIR})
+        
+        # Link to the C++ core library
+        target_link_libraries(${target} PRIVATE keymagic_core)
+        
+        # Include C++ core headers
+        target_include_directories(${target} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../keymagic-core-cpp/include
+        )
+        
+        message(STATUS "Configured C++ core lib for ${target} (${BUILD_AS_ARM64X})")
     endif()
-    
-    # For ARM64X builds, we need static libraries
-    target_link_libraries(${target} PRIVATE
-        debug "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/debug/keymagic_core.lib"
-        optimized "${CMAKE_CURRENT_SOURCE_DIR}/../../target/${RUST_TARGET_DIR}/release/keymagic_core.lib"
-    )
-    
-    message(STATUS "Configured Rust static lib for ${target} (${RUST_TARGET_DIR})")
 endfunction()
