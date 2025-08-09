@@ -29,7 +29,7 @@ struct MacHotkey {
     /// Initialize from HotkeyInfo and optional original string
     init?(from info: KeyMagicHotkeyInfo, originalString: String? = nil) {
         // Convert VirtualKey to macOS key equivalent
-        guard let keyEquiv = MacHotkey.virtualKeyToKeyEquivalent(Int32(info.key_code.rawValue)) else {
+        guard let keyEquiv = MacHotkey.virtualKeyToKeyEquivalent(info.key_code.rawValue) else {
             return nil
         }
         
@@ -113,7 +113,7 @@ struct MacHotkey {
     }
     
     /// Convert VirtualKey enum value to macOS key equivalent string
-    private static func virtualKeyToKeyEquivalent(_ vkCode: Int32) -> String? {
+    private static func virtualKeyToKeyEquivalent(_ vkCode: UInt32) -> String? {
         guard let vk = VirtualKey(rawValue: vkCode) else { return nil }
         
         switch vk {

@@ -43,7 +43,7 @@ private let LOG_TAG = "KeyMagicEngine"
 #endif
 
 class KMInputController: IMKInputController {
-    private var engine: UnsafeMutablePointer<EngineHandle?>?
+    private var engine: OpaquePointer?
     private var currentKeyboardPath: String?
     private var currentKeyboardId: String?
     private var composingText: String = ""

@@ -9,7 +9,7 @@ import Foundation
 import Carbon.HIToolbox
 
 // KeyMagic VirtualKey enum values (from Rust)
-enum VirtualKey: Int32 {
+enum VirtualKey: UInt32 {
     case back = 2
     case tab = 3
     case `return` = 4
