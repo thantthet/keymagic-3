@@ -91,7 +91,7 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
     bool isProcessed = false;
     
     // Check if this is a backspace key (we'll handle it later but need to know now for history)
-    bool isBackspace = (input.keyCode == static_cast<int>(VirtualKey::Back));
+    bool isBackspace = (input.keyCode == VirtualKey::Back);
     
     // Save state for potential undo BEFORE processing (but NOT for backspace operations)
     // This matches Rust behavior where backspace operations don't record history
@@ -824,7 +824,7 @@ Output KeyMagicEngine::processKey(const Input& input) {
     return engine_->processKey(input);
 }
 
-Output KeyMagicEngine::processKey(int keyCode, char32_t character, const Modifiers& modifiers) {
+Output KeyMagicEngine::processKey(VirtualKey keyCode, char32_t character, const Modifiers& modifiers) {
     Input input(keyCode, character, modifiers);
     return engine_->processKey(input);
 }

@@ -257,7 +257,7 @@ KEYMAGIC_API KeyMagicResult keymagic_engine_process_key(
     }
     
     keymagic::Input input;
-    input.keyCode = static_cast<int>(key_code);
+    input.keyCode = static_cast<keymagic::VirtualKey>(key_code);
     if (character != 0) {
         input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
     }
@@ -294,7 +294,7 @@ KEYMAGIC_API KeyMagicResult keymagic_engine_process_key_win(
     }
     
     keymagic::Input input;
-    input.keyCode = static_cast<int>(windowsVkToInternal(vk_code));
+    input.keyCode = windowsVkToInternal(vk_code);
     if (character != 0) {
         input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
     }
@@ -334,7 +334,7 @@ KEYMAGIC_API KeyMagicResult keymagic_engine_process_key_test_win(
     auto savedComposition = it->second->getComposingText();
     
     keymagic::Input input;
-    input.keyCode = static_cast<int>(windowsVkToInternal(vk_code));
+    input.keyCode = windowsVkToInternal(vk_code);
     if (character != 0) {
         input.character = static_cast<char32_t>(static_cast<unsigned char>(character));
     }

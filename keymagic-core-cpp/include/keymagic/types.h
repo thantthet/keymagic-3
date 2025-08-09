@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <optional>
+#include "virtual_keys.h"
 
 namespace keymagic {
 
@@ -85,13 +86,16 @@ struct Modifiers {
 
 // Input event
 struct Input {
-    int keyCode;          // Virtual key code or character code
+    VirtualKey keyCode;   // Virtual key code
     char32_t character;   // Unicode character (if applicable)
     Modifiers modifiers;
     
-    Input() : keyCode(0), character(0) {}
-    Input(int kc, char32_t ch, const Modifiers& mods)
+    Input() : keyCode(VirtualKey::Null), character(0) {}
+    Input(VirtualKey kc, char32_t ch, const Modifiers& mods)
         : keyCode(kc), character(ch), modifiers(mods) {}
+    // Constructor accepting int for compatibility
+    Input(int kc, char32_t ch, const Modifiers& mods)
+        : keyCode(static_cast<VirtualKey>(kc)), character(ch), modifiers(mods) {}
 };
 
 // Processing output
@@ -181,13 +185,13 @@ struct MatchContext {
 
 // Hotkey information
 struct HotkeyInfo {
-    int keyCode;       // Virtual key code
+    VirtualKey keyCode; // Virtual key code
     bool ctrl;
     bool alt;
     bool shift;
     bool meta;
     
-    HotkeyInfo() : keyCode(0), ctrl(false), alt(false), shift(false), meta(false) {}
+    HotkeyInfo() : keyCode(VirtualKey::Null), ctrl(false), alt(false), shift(false), meta(false) {}
 };
 
 // Binary format version

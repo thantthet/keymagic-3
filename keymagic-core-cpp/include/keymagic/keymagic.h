@@ -42,7 +42,7 @@ public:
     
     // Key processing
     Output processKey(const Input& input);
-    Output processKey(int keyCode, char32_t character, const Modifiers& modifiers);
+    Output processKey(VirtualKey keyCode, char32_t character, const Modifiers& modifiers);
     
     // Windows-specific processing
     Output processWindowsKey(int vkCode, char character, const Modifiers& modifiers);
