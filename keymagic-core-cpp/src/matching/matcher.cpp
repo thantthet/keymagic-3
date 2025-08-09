@@ -590,8 +590,6 @@ bool Matcher::matchVirtualKey(const std::vector<VirtualKey>& keys, const Input& 
     
     // Check if the input matches the virtual key combination
     for (const auto& key : keys) {
-        int windowsVK = VirtualKeyHelper::toWindowsVK(key);
-        
         // Check if this is a modifier key
         if (isModifierKey(key)) {
             switch (key) {
@@ -620,8 +618,8 @@ bool Matcher::matchVirtualKey(const std::vector<VirtualKey>& keys, const Input& 
                     break;
             }
         } else {
-            // Check if the key code matches
-            if (input.keyCode != windowsVK) {
+            // Check if the key code matches (compare internal VK codes)
+            if (input.keyCode != key) {
                 return false;
             }
         }
