@@ -222,16 +222,6 @@ enum class RulePriority {
     ShortPattern = 3      // Shorter text patterns
 };
 
-// Pattern type
-enum class PatternType {
-    String,           // Simple string pattern
-    Variable,         // Variable reference
-    VirtualKey,       // Virtual key combination
-    Any,             // ANY keyword
-    State,           // State condition
-    Composite        // Combination of patterns
-};
-
 // Rule segment type
 enum class SegmentType {
     String,           // OP_STRING

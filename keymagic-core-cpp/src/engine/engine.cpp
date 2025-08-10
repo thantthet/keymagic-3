@@ -117,7 +117,7 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         
         // For non-VK patterns, we need to include the typed character in the match context
         // For VK patterns, we only use the composing text (VK is checked separately)
-        if (rule.patternType != PatternType::VirtualKey && 
+        if (!rule.hasVirtualKey() && 
             input.character > 0) {
             // Non-VK pattern - append character to context for matching
             matchContext.context = context.context + utils::utf32ToUtf16(input.character);
@@ -137,30 +137,21 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                 auto output = applyRule(rule, matchContext);
                 std::u16string ruleOutput = utils::utf8ToUtf16(output.composingText);
                 
-                // Calculate the final composing text based on rule type
+                // Always preserve unmatched prefix and replace only the matched suffix
                 std::u16string finalComposing;
+                size_t matchedLength = matchContext.matchedLength;
                 
-                if (rule.patternType == PatternType::VirtualKey) {
-                    // For VK patterns, append to existing composition
-                    // VK patterns don't match existing text, they match key events
-                    // So their output should be appended to what's already there
-                    finalComposing = matchContext.context + ruleOutput;
+                // For VK rules, matchedLength is 0 since VK doesn't consume text
+                // For text rules, matchedLength is the length of the matched pattern
+                
+                if (matchedLength > 0 && matchContext.context.size() >= matchedLength) {
+                    // Keep the unmatched prefix + replace the matched suffix with rule output
+                    size_t unmatchedLength = matchContext.context.size() - matchedLength;
+                    std::u16string unmatchedPrefix = matchContext.context.substr(0, unmatchedLength);
+                    finalComposing = unmatchedPrefix + ruleOutput;
                 } else {
-                    // For text patterns: replace only the matched suffix with rule output
-                    size_t matchedLength = matchContext.matchedLength;
-                    
-                    // The current context includes the typed character for matching
-                    std::u16string currentContext = matchContext.context;
-                    
-                    if (matchedLength > 0 && currentContext.size() >= matchedLength) {
-                        // Keep the unmatched prefix + replace the matched suffix with rule output
-                        size_t unmatchedLength = currentContext.size() - matchedLength;
-                        std::u16string unmatchedPrefix = currentContext.substr(0, unmatchedLength);
-                        finalComposing = unmatchedPrefix + ruleOutput;
-                    } else {
-                        // Fallback: just use the rule output
-                        finalComposing = ruleOutput;
-                    }
+                    // No matched text to replace (e.g., pure VK rule), append output
+                    finalComposing = matchContext.context + ruleOutput;
                 }
                 
                 state_->setComposingText(finalComposing);
@@ -418,22 +409,19 @@ void Engine::preprocessRules() {
 
 void Engine::analyzePattern(ProcessedRule& rule) {
     if (rule.lhsOpcodes.empty()) {
-        rule.patternType = PatternType::String;
         return;
     }
     
-    // Check for state pattern
-    if (rule.lhsOpcodes[0] == OP_SWITCH) {
-        rule.patternType = PatternType::State;
-        if (rule.lhsOpcodes.size() > 1) {
-            rule.stateId = rule.lhsOpcodes[1];
+    // Extract all state IDs from the pattern (can have multiple states)
+    for (size_t i = 0; i < rule.lhsOpcodes.size(); i++) {
+        if (rule.lhsOpcodes[i] == OP_SWITCH && i + 1 < rule.lhsOpcodes.size()) {
+            rule.stateIds.push_back(rule.lhsOpcodes[i + 1]);
+            i++; // Skip the state ID
         }
-        return;
     }
     
     // Check for virtual key pattern
     if (rule.lhsOpcodes[0] == OP_AND || rule.lhsOpcodes[0] == OP_PREDEFINED) {
-        rule.patternType = PatternType::VirtualKey;
         // Extract virtual key information
         for (size_t i = 0; i < rule.lhsOpcodes.size(); ++i) {
             if (rule.lhsOpcodes[i] == OP_PREDEFINED && i + 1 < rule.lhsOpcodes.size()) {
@@ -449,22 +437,7 @@ void Engine::analyzePattern(ProcessedRule& rule) {
         return;
     }
     
-    // Check for ANY pattern
-    if (rule.lhsOpcodes[0] == OP_ANY) {
-        rule.patternType = PatternType::Any;
-        return;
-    }
-    
-    // Check for VARIABLE pattern
-    if (rule.lhsOpcodes[0] == OP_VARIABLE) {
-        rule.patternType = PatternType::Variable;
-        return;
-    }
-    
-    // Default to string pattern
-    rule.patternType = PatternType::String;
-    
-    // Extract string pattern for matching
+    // For all patterns, extract string content if present
     rule.stringPattern = extractStringPattern(rule.lhsOpcodes);
     rule.patternLength = rule.stringPattern.size();  // UTF-16 character count
 }
@@ -517,17 +490,14 @@ void Engine::sortRulesByPriority() {
 RulePriority Engine::calculateRulePriority(const ProcessedRule& rule) const {
     // Calculate exact char_length like Rust implementation
     size_t charLength = calculateCharLength(rule);
-    size_t stateCount = 0;
+    size_t stateCount = rule.stateIds.size();  // Use the extracted state IDs
     size_t vkCount = 0;
     
-    // Count states and virtual keys
+    // Count virtual keys
     for (size_t i = 0; i < rule.lhsOpcodes.size(); ++i) {
         uint16_t op = rule.lhsOpcodes[i];
         
-        if (op == OP_SWITCH) {
-            stateCount++;
-            i++; // Skip state ID
-        } else if (op == OP_PREDEFINED || op == OP_AND) {
+        if (op == OP_PREDEFINED || op == OP_AND) {
             if (op == OP_AND) {
                 // Count subsequent OP_PREDEFINED elements
                 size_t j = i + 1;
@@ -672,18 +642,15 @@ Output Engine::performRecursiveMatching(const std::u16string& text) {
                 Output ruleOutput = applyRule(rule, recursiveContext);
                 std::u16string ruleOutputText = utils::utf8ToUtf16(ruleOutput.composingText);
                 
-                // For text patterns, we need to preserve the unmatched prefix
-                if (rule.patternType != PatternType::VirtualKey) {
-                    size_t matchedLength = recursiveContext.matchedLength;
-                    if (matchedLength > 0 && currentText.size() >= matchedLength) {
-                        // Keep unmatched prefix + apply replacement to matched suffix
-                        size_t unmatchedLength = currentText.size() - matchedLength;
-                        std::u16string unmatchedPrefix = currentText.substr(0, unmatchedLength);
-                        currentText = unmatchedPrefix + ruleOutputText;
-                    } else {
-                        currentText = ruleOutputText;
-                    }
+                // Always preserve the unmatched prefix and replace only the matched suffix
+                size_t matchedLength = recursiveContext.matchedLength;
+                if (matchedLength > 0 && currentText.size() >= matchedLength) {
+                    // Keep unmatched prefix + apply replacement to matched suffix
+                    size_t unmatchedLength = currentText.size() - matchedLength;
+                    std::u16string unmatchedPrefix = currentText.substr(0, unmatchedLength);
+                    currentText = unmatchedPrefix + ruleOutputText;
                 } else {
+                    // No text was matched (shouldn't happen in recursive), use output as-is
                     currentText = ruleOutputText;
                 }
                 

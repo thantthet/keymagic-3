@@ -14,20 +14,36 @@ Matcher::~Matcher() {
 
 bool Matcher::matchRule(const ProcessedRule& rule, MatchContext& context, 
                        const Input& input, const std::vector<StringEntry>& strings) {
-    // Check state conditions first
-    if (rule.patternType == PatternType::State) {
-        if (!context.hasState(rule.stateId)) {
-            return false;
+    // Check state conditions first (all states must be active)
+    if (!rule.stateIds.empty()) {
+        for (int stateId : rule.stateIds) {
+            if (!context.hasState(stateId)) {
+                return false;
+            }
         }
-        // Check if there's more pattern after the state
-        if (rule.lhsSegments.size() <= 1) {
+        // Check if there's more pattern after the states
+        // Count how many state segments we have
+        size_t stateSegmentCount = 0;
+        for (const auto& segment : rule.lhsSegments) {
+            if (segment.type == SegmentType::State) {
+                stateSegmentCount++;
+            }
+        }
+        if (rule.lhsSegments.size() <= stateSegmentCount) {
             return true; // State-only rule
         }
     }
     
     // Check virtual key patterns
-    if (rule.patternType == PatternType::VirtualKey) {
-        return matchVirtualKey(rule.keyCombo, input);
+    if (rule.hasVirtualKey()) {
+        bool vkMatched = matchVirtualKey(rule.keyCombo, input);
+        if (vkMatched) {
+            // VK patterns don't consume text, so matchedLength is 0
+            context.matchedLength = 0;
+            // Clear captures for VK patterns
+            context.captures.clear();
+        }
+        return vkMatched;
     }
     
     // Match text patterns using segments

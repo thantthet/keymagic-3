@@ -29,9 +29,8 @@ struct ProcessedRule {
     std::vector<RuleSegment> rhsSegments;  // RHS broken into logical segments
     
     // Preprocessed pattern info for faster matching
-    PatternType patternType;
     std::u16string stringPattern;     // For string patterns
-    int stateId;                   // For state-based rules
+    std::vector<int> stateIds;        // For state-based rules (can have multiple states)
     VirtualKey virtualKey;          // For VK-based rules
     std::vector<VirtualKey> keyCombo;  // For VK combinations
     size_t patternLength;           // Effective pattern length
@@ -39,9 +38,18 @@ struct ProcessedRule {
     // Priority for sorting
     RulePriority priority;
     
-    ProcessedRule() : originalIndex(0), patternType(PatternType::String), 
-                     stateId(-1), virtualKey(VirtualKey::Null), 
+    ProcessedRule() : originalIndex(0), virtualKey(VirtualKey::Null), 
                      patternLength(0), priority(RulePriority::ShortPattern) {}
+    
+    // Helper method to check if rule has VK components
+    bool hasVirtualKey() const {
+        for (const auto& op : lhsOpcodes) {
+            if (op == OP_AND || op == OP_PREDEFINED) {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 // Internal engine class (implementation detail)
