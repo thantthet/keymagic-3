@@ -4,7 +4,7 @@
 
 // Test hotkey parsing
 void test_hotkey_parsing() {
-    HotkeyInfo info;
+    KeyMagicHotkeyInfo info;
     
     // Test simple hotkey
     assert(keymagic_parse_hotkey("ctrl+a", &info) == 1);

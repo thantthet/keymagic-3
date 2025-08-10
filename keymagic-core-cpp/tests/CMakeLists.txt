@@ -7,6 +7,9 @@ add_executable(keymagic_core_tests
     unit/test_types.cpp
     unit/test_virtual_keys.cpp
     unit/test_km2_format.cpp
+    unit/test_hotkey_parsing.cpp
+    unit/test_km2_metadata.cpp
+    common/test_utils.cpp
 )
 
 # Link with Google Test and KeyMagic Core

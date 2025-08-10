@@ -64,10 +64,11 @@ public:
 private:
     static bool readHeader(const uint8_t* data, size_t dataLen, size_t& offset, FileHeader& header) {
         // Try v1.5 header first
-        if (dataLen >= sizeof(FileHeader)) {
+        if (dataLen >= sizeof(FileHeader) + 1) {  // +1 for padding byte
             std::memcpy(&header, data, sizeof(FileHeader));
             if (header.isValid() && header.minorVersion == 5) {
-                offset = sizeof(FileHeader);
+                // v1.5 files have an extra padding byte after the header
+                offset = sizeof(FileHeader) + 1;  // Skip the padding byte
                 return header.isCompatibleVersion();
             }
         }

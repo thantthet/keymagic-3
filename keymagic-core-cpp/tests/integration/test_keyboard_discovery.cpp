@@ -35,7 +35,7 @@ TEST_F(KeyboardDiscoveryTest, CanListKeyboardFiles) {
         EXPECT_EQ(keyboard.extension().string(), ".km2");
     }
     
-    // We expect at least the Pyidaungsu keyboard
+    // We expect at least the bundled keyboards (including macOS metadata files if present)
     EXPECT_GT(keyboards.size(), 0) << "No keyboard files found";
 }
 

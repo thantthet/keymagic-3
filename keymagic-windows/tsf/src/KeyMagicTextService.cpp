@@ -13,6 +13,7 @@
 #include "../../shared/include/RegistryUtils.h"
 #include "../../shared/include/KeyboardInfo.h"
 #include "../../shared/include/KeyMagicUtils.h"
+#include <keymagic/virtual_keys.h>
 #include <string>
 #include <codecvt>
 #include <locale>
@@ -985,78 +986,18 @@ HRESULT CKeyMagicTextService::ParseHotkeyString(const std::wstring& hotkeyStr, T
         return E_FAIL;
     }
     
-    // Convert VirtualKey enum to Windows VK code
-    // The info.key_code is a VirtualKey enum value that needs to be converted
-    // to the actual Windows Virtual Key code.
-    // For now, we'll use a simple mapping for the most common keys
-    UINT vkCode = 0;
-    switch (info.key_code)
+    // Convert KeyMagic VirtualKey enum to Windows VK code using the helper function
+    // Cast the C API enum value to the C++ VirtualKey enum
+    keymagic::VirtualKey vk = static_cast<keymagic::VirtualKey>(info.key_code);
+    int vkCode = keymagic::VirtualKeyHelper::toWindowsVK(vk);
+    
+    if (vkCode == 0)
     {
-        // Letter keys (VirtualKey enum values 26-51 map to VK codes 0x41-0x5A)
-        case 26: vkCode = 0x41; break; // A
-        case 27: vkCode = 0x42; break; // B
-        case 28: vkCode = 0x43; break; // C
-        case 29: vkCode = 0x44; break; // D
-        case 30: vkCode = 0x45; break; // E
-        case 31: vkCode = 0x46; break; // F
-        case 32: vkCode = 0x47; break; // G
-        case 33: vkCode = 0x48; break; // H
-        case 34: vkCode = 0x49; break; // I
-        case 35: vkCode = 0x4A; break; // J
-        case 36: vkCode = 0x4B; break; // K
-        case 37: vkCode = 0x4C; break; // L
-        case 38: vkCode = 0x4D; break; // M
-        case 39: vkCode = 0x4E; break; // N
-        case 40: vkCode = 0x4F; break; // O
-        case 41: vkCode = 0x50; break; // P
-        case 42: vkCode = 0x51; break; // Q
-        case 43: vkCode = 0x52; break; // R
-        case 44: vkCode = 0x53; break; // S
-        case 45: vkCode = 0x54; break; // T
-        case 46: vkCode = 0x55; break; // U
-        case 47: vkCode = 0x56; break; // V
-        case 48: vkCode = 0x57; break; // W
-        case 49: vkCode = 0x58; break; // X
-        case 50: vkCode = 0x59; break; // Y
-        case 51: vkCode = 0x5A; break; // Z
-        
-        // Number keys (VirtualKey enum values 52-61 map to VK codes 0x30-0x39)
-        case 52: vkCode = 0x30; break; // 0
-        case 53: vkCode = 0x31; break; // 1
-        case 54: vkCode = 0x32; break; // 2
-        case 55: vkCode = 0x33; break; // 3
-        case 56: vkCode = 0x34; break; // 4
-        case 57: vkCode = 0x35; break; // 5
-        case 58: vkCode = 0x36; break; // 6
-        case 59: vkCode = 0x37; break; // 7
-        case 60: vkCode = 0x38; break; // 8
-        case 61: vkCode = 0x39; break; // 9
-        
-        // Function keys
-        case 71: vkCode = 0x70; break; // F1
-        case 72: vkCode = 0x71; break; // F2
-        case 73: vkCode = 0x72; break; // F3
-        case 74: vkCode = 0x73; break; // F4
-        case 75: vkCode = 0x74; break; // F5
-        case 76: vkCode = 0x75; break; // F6
-        case 77: vkCode = 0x76; break; // F7
-        case 78: vkCode = 0x77; break; // F8
-        case 79: vkCode = 0x78; break; // F9
-        case 80: vkCode = 0x79; break; // F10
-        case 81: vkCode = 0x7A; break; // F11
-        case 82: vkCode = 0x7B; break; // F12
-        
-        // Special keys
-        case 12: vkCode = 0x20; break; // Space
-        case 9: vkCode = 0x09; break;  // Tab
-        case 8: vkCode = 0x0D; break;  // Enter/Return
-        
-        default:
-            DEBUG_LOG(L"Unknown virtual key code: " + std::to_wstring(info.key_code));
-            return E_FAIL;
+        DEBUG_LOG(L"Failed to convert virtual key code: " + std::to_wstring(info.key_code));
+        return E_FAIL;
     }
     
-    tfKey.uVKey = vkCode;
+    tfKey.uVKey = static_cast<UINT>(vkCode);
     
     // TSF preserved keys don't support Windows/Meta key
     if (info.meta)
