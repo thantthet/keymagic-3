@@ -304,3 +304,31 @@ TEST_F(ZawCodeKeystrokeTest, TestComplexWordSequence) {
     // Should produce "မြန်မာ"
     EXPECT_EQ(result6.composingText, std::string("မြန်မာ"));
 }
+
+TEST_F(ZawCodeKeystrokeTest, TestFullStackedConsonants) {
+    // Test full stacked consonants: u`u should produce က္က
+    // First 'u' produces က, then backtick+u produces ္က, resulting in က္က
+    engine.reset();
+    
+    // Type 'u' for က - VK_KEY_U
+    Input input_u1(VirtualKey::KeyU, static_cast<char32_t>('u'), Modifiers());
+    auto result1 = engine.processKey(input_u1);
+    EXPECT_TRUE(result1.isProcessed);
+    EXPECT_EQ(result1.composingText, "က");
+    
+    // Type '`' (backtick) to activate state 1
+    Input input_backtick(VirtualKey::Oem3, static_cast<char32_t>('`'), Modifiers());
+    auto result2 = engine.processKey(input_backtick);
+    EXPECT_TRUE(result2.isProcessed);
+    // State activation should not produce visible output
+    EXPECT_EQ(engine.getComposition(), "က"); // Still just က
+    
+    // Type 'u' with state 1 active - should add ္က
+    Input input_u2(VirtualKey::KeyU, static_cast<char32_t>('u'), Modifiers());
+    auto result3 = engine.processKey(input_u2);
+    EXPECT_TRUE(result3.isProcessed);
+    
+    // Final result should be "က္က" (stacked consonants)
+    EXPECT_EQ(engine.getComposition(), std::string("က္က")) 
+        << "Expected 'က္က' (stacked), got: " << engine.getComposition();
+}

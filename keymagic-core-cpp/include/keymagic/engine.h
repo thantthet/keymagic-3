@@ -31,14 +31,13 @@ struct ProcessedRule {
     // Preprocessed pattern info for faster matching
     std::u16string stringPattern;     // For string patterns
     std::vector<int> stateIds;        // For state-based rules (can have multiple states)
-    VirtualKey virtualKey;          // For VK-based rules
-    std::vector<VirtualKey> keyCombo;  // For VK combinations
+    std::vector<VirtualKey> keyCombo;  // For VK combinations (single or multiple)
     size_t patternLength;           // Effective pattern length
     
     // Priority for sorting
     RulePriority priority;
     
-    ProcessedRule() : originalIndex(0), virtualKey(VirtualKey::Null), 
+    ProcessedRule() : originalIndex(0), 
                      patternLength(0), priority(RulePriority::ShortPattern) {}
     
     // Helper method to check if rule has VK components
@@ -99,8 +98,8 @@ private:
     // Core processing methods
     Output processKeyInternal(const Input& input, bool testMode);
     bool matchRule(const ProcessedRule& rule, MatchContext& context, const Input& input);
-    Output applyRule(const ProcessedRule& rule, const MatchContext& context);
-    Output performRecursiveMatching(const std::u16string& text);
+    RuleApplicationResult applyRule(const ProcessedRule& rule, const MatchContext& context);
+    RuleApplicationResult performRecursiveMatching(const std::u16string& text);
     
     // Rule preprocessing
     void preprocessRules();

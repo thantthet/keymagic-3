@@ -98,6 +98,17 @@ struct Input {
         : keyCode(static_cast<VirtualKey>(kc)), character(ch), modifiers(mods) {}
 };
 
+// Rule application result (internal)
+struct RuleApplicationResult {
+    std::u16string newContext;        // New composing context after applying rule
+    std::vector<int> newStates;       // New states to activate
+    size_t matchedLength = 0;         // Length of text that was matched
+    
+    RuleApplicationResult() = default;
+    RuleApplicationResult(const std::u16string& ctx, const std::vector<int>& states, size_t len)
+        : newContext(ctx), newStates(states), matchedLength(len) {}
+};
+
 // Processing output
 struct Output {
     ActionType action = ActionType::None;
@@ -231,7 +242,8 @@ enum class SegmentType {
     Any,             // OP_ANY
     VirtualKey,      // OP_PREDEFINED (with optional OP_AND)
     State,           // OP_SWITCH
-    Reference        // OP_REFERENCE (used in RHS for $1, $2, $3, etc.)
+    Reference,       // OP_REFERENCE (used in RHS for $1, $2, $3, etc.)
+    Null             // OP_PREDEFINED with value 1 (NULL) in RHS only
 };
 
 // Represents a logical segment in a rule pattern

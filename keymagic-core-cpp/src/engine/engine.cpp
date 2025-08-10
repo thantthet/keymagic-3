@@ -3,11 +3,10 @@
 #include <keymagic/km2_format.h>
 #include "../km2/loader.h"
 #include "../utils/utf8.h"
-#include "../utils/debug.h"
 #include "../matching/matcher.h"
 #include <algorithm>
 #include <sstream>
-#include <iostream>
+#include <set>
 
 namespace keymagic {
 
@@ -89,6 +88,12 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         return Output::None();
     }
     
+    // For test mode, save the current state and restore it at the end
+    std::unique_ptr<EngineState> savedState;
+    if (testMode) {
+        savedState = state_->clone();
+    }
+    
     // Track whether a key is processed
     bool isProcessed = false;
     
@@ -105,11 +110,16 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
     context.activeStates = std::vector<int>(state_->getActiveStates().begin(), 
                                            state_->getActiveStates().end());
     
+    
     // Store previous composing text
     std::u16string oldComposing = state_->getComposingText();
     
     // Try to match rules
     bool matched = false;
+    
+    // Save current states for the next key event
+    auto statesForNextKey = std::vector<int>(state_->getActiveStates().begin(), 
+                                             state_->getActiveStates().end());
     
     for (const auto& rule : rules_) {
         // Determine what text to match against based on rule type
@@ -127,62 +137,69 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
             matched = true;
             isProcessed = true;
             
+            
             // Record history before applying the rule (if not backspace and not test mode)
             if (shouldRecordHistory) {
                 saveStateSnapshot();
             }
             
-            if (!testMode) {
-                // Apply the rule to get the replacement text
-                auto output = applyRule(rule, matchContext);
-                std::u16string ruleOutput = utils::utf8ToUtf16(output.composingText);
-                
-                // Always preserve unmatched prefix and replace only the matched suffix
-                std::u16string finalComposing;
-                size_t matchedLength = matchContext.matchedLength;
-                
-                // For VK rules, matchedLength is 0 since VK doesn't consume text
-                // For text rules, matchedLength is the length of the matched pattern
-                
-                if (matchedLength > 0 && matchContext.context.size() >= matchedLength) {
-                    // Keep the unmatched prefix + replace the matched suffix with rule output
-                    size_t unmatchedLength = matchContext.context.size() - matchedLength;
-                    std::u16string unmatchedPrefix = matchContext.context.substr(0, unmatchedLength);
-                    finalComposing = unmatchedPrefix + ruleOutput;
-                } else {
-                    // No matched text to replace (e.g., pure VK rule), append output
-                    finalComposing = matchContext.context + ruleOutput;
-                }
-                
-                state_->setComposingText(finalComposing);
-                
-                // Calculate proper action based on before/after text
-                output = generateAction(oldComposing, finalComposing);
-                output.composingText = utils::utf16ToUtf8(finalComposing);
-                output.isProcessed = true;
-                
-                // Perform recursive matching if enabled
-                if (recursionEnabled_ && currentRecursionDepth_ < maxRecursionDepth_) {
-                    currentRecursionDepth_++;
-                    Output recursiveOutput = performRecursiveMatching(state_->getComposingText());
-                    currentRecursionDepth_ = 0;
-                    
-                    // Only use recursive output if it actually matched something
-                    if (recursiveOutput.isProcessed || !recursiveOutput.composingText.empty()) {
-                        // Update with recursive output
-                        std::u16string recursiveComposing = utils::utf8ToUtf16(recursiveOutput.composingText);
-                        state_->setComposingText(recursiveComposing);
-                        output = generateAction(oldComposing, recursiveComposing);
-                        output.composingText = utils::utf16ToUtf8(recursiveComposing);
-                        output.isProcessed = true;
-                    }
-                }
-                
-                return output;
-            } else {
-                // Test mode - just return what would happen
-                return applyRule(rule, matchContext);
+            // Apply the rule to get the new context and states
+            auto result = applyRule(rule, matchContext);
+            
+            
+            // Update the composing text with the new context
+            state_->setComposingText(result.newContext);
+            
+            // Clear active states and set new states from the rule
+            // This matches Rust behavior where states are cleared and new states set
+            state_->clearActiveStates();
+            for (int stateId : result.newStates) {
+                state_->addActiveState(stateId);
             }
+            
+            
+            std::u16string finalComposing = result.newContext;
+            
+            // Calculate proper action based on before/after text
+            Output output = generateAction(oldComposing, finalComposing);
+            output.composingText = utils::utf16ToUtf8(finalComposing);
+            output.isProcessed = true;
+            
+            // Perform recursive matching if enabled
+            if (recursionEnabled_ && currentRecursionDepth_ < maxRecursionDepth_) {
+                currentRecursionDepth_++;
+                auto recursiveResult = performRecursiveMatching(state_->getComposingText());
+                currentRecursionDepth_ = 0;
+                
+                // Check if recursive matching changed anything
+                if (recursiveResult.newContext != state_->getComposingText() || 
+                    recursiveResult.newStates != std::vector<int>(state_->getActiveStates().begin(), 
+                                                                   state_->getActiveStates().end())) {
+                    // Update text if changed
+                    if (recursiveResult.newContext != state_->getComposingText()) {
+                        state_->setComposingText(recursiveResult.newContext);
+                    }
+                    
+                    // Update states - clear and set new ones
+                    state_->clearActiveStates();
+                    for (int stateId : recursiveResult.newStates) {
+                        state_->addActiveState(stateId);
+                    }
+                    
+                    output = generateAction(oldComposing, state_->getComposingText());
+                    output.composingText = utils::utf16ToUtf8(state_->getComposingText());
+                    output.isProcessed = true;
+                }
+            }
+            
+            // For test mode, get the final composing text before restoring
+            if (testMode) {
+                output.composingText = utils::utf16ToUtf8(state_->getComposingText());
+                // Restore the saved state
+                state_->copyFrom(*savedState);
+            }
+            
+            return output;
             break;
         }
     }
@@ -205,6 +222,12 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                     // Test mode: simulate history restoration without modifying actual state
                     auto& previousSnapshot = history_.back();
                     std::u16string restoredComposing = previousSnapshot.state->getComposingText();
+                    
+                    // Restore the saved state before returning
+                    if (savedState) {
+                        state_->copyFrom(*savedState);
+                    }
+                    
                     return Output::BackspaceDeleteAndInsert(
                         static_cast<int>(oldComposing.size()),
                         utils::utf16ToUtf8(restoredComposing),
@@ -216,6 +239,11 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                                                                        oldComposing.size() - 1);
                     if (!testMode) {
                         state_->setComposingText(newComposing);
+                    } else {
+                        // Restore the saved state before returning
+                        if (savedState) {
+                            state_->copyFrom(*savedState);
+                        }
                     }
                     return Output::BackspaceDelete(1, utils::utf16ToUtf8(newComposing));
                 }
@@ -225,6 +253,11 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                                                                    oldComposing.size() - 1);
                 if (!testMode) {
                     state_->setComposingText(newComposing);
+                } else {
+                    // Restore the saved state before returning
+                    if (savedState) {
+                        state_->copyFrom(*savedState);
+                    }
                 }
                 return Output::BackspaceDelete(1, utils::utf16ToUtf8(newComposing));
             }
@@ -276,14 +309,27 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
             // Clear active states after backspace
             if (!testMode) {
                 state_->clearActiveStates();
+            } else {
+                // Test mode: get the result before restoring
+                std::u16string resultComposing = state_->getComposingText();
+                // Restore the saved state
+                if (savedState) {
+                    state_->copyFrom(*savedState);
+                }
+                // Return with the simulated result
+                return Output::BackspaceDelete(1, utils::utf16ToUtf8(resultComposing));
             }
             
-            // Backspace was processed
+            // Backspace was processed (normal mode)
             return Output::BackspaceDelete(1, utils::utf16ToUtf8(state_->getComposingText()));
         }
         
         // Check if we should eat the key
         if (keyboard_->eatsAllUnusedKeys()) {
+            // Restore test mode state before returning
+            if (testMode && savedState) {
+                state_->copyFrom(*savedState);
+            }
             return Output::None();
         }
         
@@ -305,6 +351,12 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
             }
             
             std::u16string newComposing = oldComposing + utils::utf32ToUtf16(input.character);
+            
+            // Restore test mode state before returning
+            if (testMode && savedState) {
+                state_->copyFrom(*savedState);
+            }
+            
             return Output::Insert(utils::utf32ToUtf8(input.character), utils::utf16ToUtf8(newComposing));
         }
         
@@ -312,6 +364,11 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
         if (!testMode) {
             state_->clearActiveStates();
         }
+    }
+    
+    // For test mode, restore the saved state before returning
+    if (testMode && savedState) {
+        state_->copyFrom(*savedState);
     }
     
     return Output::None();
@@ -420,21 +477,28 @@ void Engine::analyzePattern(ProcessedRule& rule) {
         }
     }
     
-    // Check for virtual key pattern
-    if (rule.lhsOpcodes[0] == OP_AND || rule.lhsOpcodes[0] == OP_PREDEFINED) {
-        // Extract virtual key information
-        for (size_t i = 0; i < rule.lhsOpcodes.size(); ++i) {
-            if (rule.lhsOpcodes[i] == OP_PREDEFINED && i + 1 < rule.lhsOpcodes.size()) {
-                uint16_t vkValue = rule.lhsOpcodes[i + 1];
-                if (VirtualKeyHelper::isValid(vkValue)) {
-                    rule.keyCombo.push_back(static_cast<VirtualKey>(vkValue));
+    // Extract virtual key information
+    // In LHS, OP_PREDEFINED must ALWAYS be preceded by OP_AND
+    // Standalone OP_PREDEFINED without OP_AND is illegal in LHS
+    for (size_t i = 0; i < rule.lhsOpcodes.size(); ++i) {
+        if (rule.lhsOpcodes[i] == OP_AND) {
+            // OP_AND indicates a VK combination follows
+            // All OP_PREDEFINED following OP_AND are part of the same combination
+            i++; // Move past OP_AND
+            while (i < rule.lhsOpcodes.size() && rule.lhsOpcodes[i] == OP_PREDEFINED) {
+                if (i + 1 < rule.lhsOpcodes.size()) {
+                    uint16_t vkValue = rule.lhsOpcodes[i + 1];
+                    if (VirtualKeyHelper::isValid(vkValue)) {
+                        rule.keyCombo.push_back(static_cast<VirtualKey>(vkValue));
+                    }
+                    i++; // Skip to the VK value
                 }
+                i++; // Move past the VK value
             }
+            i--; // Adjust for loop increment
+            break; // Only one VK combination per rule
         }
-        if (!rule.keyCombo.empty()) {
-            rule.virtualKey = rule.keyCombo[0];
-        }
-        return;
+        // Note: OP_PREDEFINED without OP_AND is illegal in LHS, so we don't handle it
     }
     
     // For all patterns, extract string content if present
@@ -463,7 +527,18 @@ std::u16string Engine::extractStringPattern(const std::vector<uint16_t>& opcodes
 void Engine::sortRulesByPriority() {
     std::stable_sort(rules_.begin(), rules_.end(), 
         [](const ProcessedRule& a, const ProcessedRule& b) {
-            // Higher priority values should come first (like Rust's has_priority_over)
+            // State-specific rules ALWAYS come before non-state rules
+            bool aHasState = !a.stateIds.empty();
+            bool bHasState = !b.stateIds.empty();
+            
+            if (aHasState && !bHasState) {
+                return true;  // a (with state) comes before b (no state)
+            }
+            if (!aHasState && bHasState) {
+                return false; // b (with state) comes before a (no state)
+            }
+            
+            // Both have states or both don't have states - use priority
             if (a.priority != b.priority) {
                 return static_cast<int>(a.priority) > static_cast<int>(b.priority);
             }
@@ -471,20 +546,6 @@ void Engine::sortRulesByPriority() {
             return a.originalIndex < b.originalIndex;
         });
     
-    #ifdef DEBUG_MATCHING
-    // Debug print the first 50 rules after sorting
-    std::cerr << "\n=== Rules After Sorting (First 50) ===" << std::endl;
-    for (size_t i = 0; i < std::min(rules_.size(), size_t(50)); ++i) {
-        const auto& rule = rules_[i];
-        std::cerr << "Index[" << i << "] OriginalIndex[" << rule.originalIndex 
-                  << "] Priority[" << static_cast<int>(rule.priority) << "]";
-        if (rule.originalIndex == 37 || rule.originalIndex == 39) {
-            std::cerr << " *** IMPORTANT ***";
-        }
-        std::cerr << std::endl;
-    }
-    std::cerr << "===================================" << std::endl;
-    #endif
 }
 
 RulePriority Engine::calculateRulePriority(const ProcessedRule& rule) const {
@@ -527,15 +588,6 @@ RulePriority Engine::calculateRulePriority(const ProcessedRule& rule) const {
         priority = static_cast<RulePriority>(charLength);
     }
     
-    #ifdef DEBUG_MATCHING
-    if (rule.originalIndex == 37 || rule.originalIndex == 39) {
-        std::cerr << "PRIORITY CALC: Rule[" << rule.originalIndex 
-                  << "] charLength=" << charLength 
-                  << " stateCount=" << stateCount 
-                  << " vkCount=" << vkCount 
-                  << " -> priority=" << static_cast<int>(priority) << std::endl;
-    }
-    #endif
     
     return priority;
 }
@@ -595,20 +647,26 @@ bool Engine::matchRule(const ProcessedRule& rule, MatchContext& context, const I
     return matcher_->matchRule(rule, context, input, keyboard_->strings);
 }
 
-Output Engine::applyRule(const ProcessedRule& rule, const MatchContext& context) {
-    // Apply the rule and generate output
-    return matcher_->applyRule(rule, context, keyboard_->strings, state_.get());
+RuleApplicationResult Engine::applyRule(const ProcessedRule& rule, const MatchContext& context) {
+    // Apply the rule and generate the new context and states
+    return matcher_->applyRule(rule, context, keyboard_->strings);
 }
 
-Output Engine::performRecursiveMatching(const std::u16string& text) {
+RuleApplicationResult Engine::performRecursiveMatching(const std::u16string& text) {
     // Check recursion stop conditions
     if (shouldStopRecursion(text)) {
-        return Output::None();
+        // Return unchanged text with current states
+        std::vector<int> currentStates(state_->getActiveStates().begin(),
+                                      state_->getActiveStates().end());
+        return RuleApplicationResult(text, currentStates, 0);
     }
     
     std::u16string currentText = text;
     std::u16string lastText;
-    Output finalOutput = Output::None();
+    
+    // Start with current active states
+    std::vector<int> currentStates(state_->getActiveStates().begin(),
+                                  state_->getActiveStates().end());
     
     // Keep applying rules until no more rules match or text doesn't change
     while (currentText != lastText && !shouldStopRecursion(currentText)) {
@@ -618,8 +676,7 @@ Output Engine::performRecursiveMatching(const std::u16string& text) {
         Input dummyInput;
         MatchContext recursiveContext;
         recursiveContext.context = currentText;
-        recursiveContext.activeStates = std::vector<int>(state_->getActiveStates().begin(),
-                                                        state_->getActiveStates().end());
+        recursiveContext.activeStates = currentStates;  // Use our tracked states
         
         // Try to match rules with text only (no VK input)
         bool matched = false;
@@ -638,27 +695,18 @@ Output Engine::performRecursiveMatching(const std::u16string& text) {
             }
             
             if (matchRule(rule, recursiveContext, dummyInput)) {
-                // Apply the rule
-                Output ruleOutput = applyRule(rule, recursiveContext);
-                std::u16string ruleOutputText = utils::utf8ToUtf16(ruleOutput.composingText);
+                // Apply the rule to get new context
+                auto result = applyRule(rule, recursiveContext);
                 
-                // Always preserve the unmatched prefix and replace only the matched suffix
-                size_t matchedLength = recursiveContext.matchedLength;
-                if (matchedLength > 0 && currentText.size() >= matchedLength) {
-                    // Keep unmatched prefix + apply replacement to matched suffix
-                    size_t unmatchedLength = currentText.size() - matchedLength;
-                    std::u16string unmatchedPrefix = currentText.substr(0, unmatchedLength);
-                    currentText = unmatchedPrefix + ruleOutputText;
-                } else {
-                    // No text was matched (shouldn't happen in recursive), use output as-is
-                    currentText = ruleOutputText;
+                // Update current text with the result
+                currentText = result.newContext;
+                
+                // Update our tracked states if the rule provided new ones
+                if (!result.newStates.empty()) {
+                    currentStates = result.newStates;
                 }
                 
-                finalOutput.composingText = utils::utf16ToUtf8(currentText);
-                finalOutput.action = ActionType::None; // Will be set properly later
-                finalOutput.isProcessed = true;
                 matched = true;
-                
                 break; // Start over with the new text
             }
         }
@@ -668,7 +716,8 @@ Output Engine::performRecursiveMatching(const std::u16string& text) {
         }
     }
     
-    return finalOutput;
+    // Return the final text and states after all recursive matching
+    return RuleApplicationResult(currentText, currentStates, 0);
 }
 
 bool Engine::shouldStopRecursion(const std::u16string& text) const {
@@ -817,6 +866,7 @@ std::vector<RuleSegment> Engine::segmentateOpcodes(const std::vector<uint16_t>& 
             
         } else if (op == OP_AND) {
             // OP_AND OP_PREDEFINED vk1 OP_PREDEFINED vk2 ...
+            // In LHS: OP_PREDEFINED must always be preceded by OP_AND
             // Collect all the virtual keys in this combination
             std::vector<uint16_t> segmentOpcodes = { op };
             i++; // Skip OP_AND
@@ -831,10 +881,22 @@ std::vector<RuleSegment> Engine::segmentateOpcodes(const std::vector<uint16_t>& 
             segments.emplace_back(SegmentType::VirtualKey, segmentOpcodes);
             
         } else if (op == OP_PREDEFINED) {
-            // Single OP_PREDEFINED vkValue
+            // Standalone OP_PREDEFINED without OP_AND
+            // This is only legal in RHS for NULL (value 1)
             if (i + 1 >= opcodes.size()) break;
-            std::vector<uint16_t> segmentOpcodes = { op, opcodes[i + 1] };
-            segments.emplace_back(SegmentType::VirtualKey, segmentOpcodes);
+            uint16_t value = opcodes[i + 1];
+            std::vector<uint16_t> segmentOpcodes = { op, value };
+            
+            if (value == 1) {
+                // NULL value in RHS
+                segments.emplace_back(SegmentType::Null, segmentOpcodes);
+            } else {
+                // This shouldn't happen in valid KM2 files
+                // In LHS, OP_PREDEFINED must have OP_AND
+                // In RHS, only NULL (value 1) is allowed
+                // Treat it as a VirtualKey segment for error recovery
+                segments.emplace_back(SegmentType::VirtualKey, segmentOpcodes);
+            }
             i += 2;
             
         } else if (op == OP_REFERENCE) {

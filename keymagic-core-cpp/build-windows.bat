@@ -52,16 +52,14 @@ echo.
 echo Building...
 cmake --build . --config %CONFIG% || exit /b 1
 
-:: Run tests (only for x64)
-if /i "%ARCH%"=="x64" (
-    echo.
-    echo Running tests...
-    ctest -C %CONFIG% --output-on-failure
-    if !errorlevel! neq 0 (
-        echo [WARNING] Some tests failed
-    ) else (
-        echo [SUCCESS] All tests passed
-    )
+:: Run tests
+echo.
+echo Running tests...
+ctest -C %CONFIG% --output-on-failure
+if !errorlevel! neq 0 (
+    echo [WARNING] Some tests failed
+) else (
+    echo [SUCCESS] All tests passed
 )
 
 cd ..

@@ -2,7 +2,6 @@
 #include "../utils/utf8.h"
 #include <algorithm>
 #include <sstream>
-#include <iostream>
 
 namespace keymagic {
 
@@ -37,26 +36,38 @@ bool Matcher::matchRule(const ProcessedRule& rule, MatchContext& context,
     // Check virtual key patterns
     if (rule.hasVirtualKey()) {
         bool vkMatched = matchVirtualKey(rule.keyCombo, input);
-        if (vkMatched) {
-            // VK patterns don't consume text, so matchedLength is 0
-            context.matchedLength = 0;
-            // Clear captures for VK patterns
-            context.captures.clear();
+        
+        if (!vkMatched) {
+            return false; // VK didn't match, rule fails
         }
-        return vkMatched;
+        
+        // VK matched. Now check if there's also a string pattern to match
+        if (!rule.stringPattern.empty() || rule.patternLength > 0) {
+            // This rule has both VK and string pattern - need to match both
+            std::vector<Capture> captures;
+            size_t matchedLength = 0;
+            bool stringMatched = matchPatternSegmented(rule.lhsSegments, context.context, input, strings, captures, matchedLength);
+            
+            if (!stringMatched) {
+                return false; // String pattern didn't match
+            }
+            
+            // Both VK and string pattern matched
+            context.captures = captures;
+            context.matchedLength = matchedLength;
+            return true;
+        } else {
+            // VK-only rule (no string pattern)
+            context.matchedLength = 0;
+            context.captures.clear();
+            return true;
+        }
     }
     
     // Match text patterns using segments
     std::vector<Capture> captures;
     size_t matchedLength = 0;
     bool matched = matchPatternSegmented(rule.lhsSegments, context.context, input, strings, captures, matchedLength);
-    
-    #ifdef DEBUG_MATCHING
-    if (matched) {
-        std::cerr << "RULE MATCHED! originalIndex=" << rule.originalIndex 
-                  << " captures.size=" << captures.size() << " matchedLength=" << matchedLength << std::endl;
-    }
-    #endif
     
     if (matched) {
         // Store captures and matched length in context for rule application
@@ -66,37 +77,30 @@ bool Matcher::matchRule(const ProcessedRule& rule, MatchContext& context,
     return matched;
 }
 
-Output Matcher::applyRule(const ProcessedRule& rule, const MatchContext& context,
-                         const std::vector<StringEntry>& strings, EngineState* state) {
+RuleApplicationResult Matcher::applyRule(const ProcessedRule& rule, const MatchContext& context,
+                                        const std::vector<StringEntry>& strings) {
     // Process the RHS segments to generate output
     std::vector<Capture> captures = context.captures;
     std::vector<int> newStates;
     
     std::u16string ruleOutput = generateOutputSegmented(rule.rhsSegments, captures, strings, newStates);
     
+    // Calculate the new context by replacing the matched portion
+    std::u16string newContext;
+    const std::u16string& currentContext = context.context;
+    size_t matchedLength = context.matchedLength;
     
-    #ifdef DEBUG_MATCHER
-    std::cerr << "Generated output: '" << utils::utf16ToUtf8(ruleOutput) << "'" << std::endl;
-    #endif
-    
-    // Update states if needed
-    if (!newStates.empty()) {
-        state->clearActiveStates();
-        for (int stateId : newStates) {
-            state->addActiveState(stateId);
-        }
+    // Keep the unmatched prefix and append/replace with the rule output
+    if (matchedLength > 0 && currentContext.size() >= matchedLength) {
+        // Text was matched - replace the matched suffix with rule output
+        size_t unmatchedLength = currentContext.size() - matchedLength;
+        newContext = currentContext.substr(0, unmatchedLength) + ruleOutput;
+    } else {
+        // No text was matched (e.g., VK rules) - append output to existing context
+        newContext = currentContext + ruleOutput;
     }
     
-    // The key insight from Rust implementation:
-    // We need to calculate what text was actually matched and replace it with the rule output
-    // For most patterns, the matched text is at the END of the context
-    
-    // For now, we'll return just the rule output
-    // The Engine will handle replacing the appropriate portion of the composing text
-    Output output = Output::None();
-    output.composingText = utils::utf16ToUtf8(ruleOutput);  // Convert to UTF-8 for Output struct
-    output.isProcessed = true;
-    return output;
+    return RuleApplicationResult(newContext, newStates, matchedLength);
 }
 
 bool Matcher::matchPattern(const std::vector<uint16_t>& opcodes, const std::u16string& context,
@@ -104,16 +108,8 @@ bool Matcher::matchPattern(const std::vector<uint16_t>& opcodes, const std::u16s
                           std::vector<Capture>& captures, size_t& matchedLength) {
     matchedLength = 0;
     
-    #ifdef DEBUG_MATCHING
-    std::cerr << "matchPattern: context='" << utils::utf16ToUtf8(context) << "' opcodes.size=" << opcodes.size() << std::endl;
-    #endif
-    
     // Step 1: Calculate the expected pattern length in UTF-16 characters
     size_t expectedPatternLength = calculatePatternLength(opcodes, strings);
-    
-    #ifdef DEBUG_MATCHING
-    std::cerr << "  expectedPatternLength=" << expectedPatternLength << std::endl;
-    #endif
     
     // Step 2: Extract suffix from context that matches the pattern length
     std::u16string matchContext;
@@ -132,10 +128,6 @@ bool Matcher::matchPattern(const std::vector<uint16_t>& opcodes, const std::u16s
         // Extract the last expectedPatternLength characters
         matchContext = utils::utf16Substring(context, contextCharCount - expectedPatternLength, expectedPatternLength);
     }
-    
-    #ifdef DEBUG_MATCHING
-    std::cerr << "  matchContext='" << utils::utf16ToUtf8(matchContext) << "'" << std::endl;
-    #endif
     
     // Step 3: Apply sequential matching to the suffix
     size_t opcodeIndex = 0;
@@ -418,10 +410,15 @@ std::u16string Matcher::generateOutputSegmented(const std::vector<RuleSegment>& 
             }
             
             case SegmentType::VirtualKey: {
-                // Handle NULL output (VirtualKey::Null = 1)
-                if (segment.opcodes.size() >= 2 && segment.opcodes[1] == 1) {
-                    output.clear(); // NULL clears all output
-                }
+                // VirtualKey segments in RHS shouldn't happen in valid KM2 files
+                // (except for error recovery when OP_PREDEFINED appears without OP_AND)
+                break;
+            }
+            
+            case SegmentType::Null: {
+                // NULL output (OP_PREDEFINED with value 1 in RHS)
+                // NULL clears all output
+                output.clear();
                 break;
             }
             
@@ -457,12 +454,6 @@ bool Matcher::matchVariableSequential(uint16_t varIndex, uint16_t modifier,
     
     std::u16string varContent = strings[varIndex - 1].value;
     
-    #ifdef DEBUG_MATCHING
-    std::string varStr = utils::utf16ToUtf8(varContent);
-    std::cerr << "matchVariableSequential: varIndex=" << varIndex << " modifier=0x" << std::hex << modifier 
-              << std::dec << " remainingContext='" << utils::utf16ToUtf8(remainingContext) << "' varStr='" << varStr << "'" << std::endl;
-    #endif
-    
     if (modifier == FLAG_ANYOF) {
         // Match any single character from the variable at current position
         if (remainingContext.empty()) {
@@ -473,11 +464,6 @@ bool Matcher::matchVariableSequential(uint16_t varIndex, uint16_t modifier,
         size_t charsConsumed = 0;
         char32_t ch = utils::utf16ToChar32(remainingContext, charsConsumed);
         
-        #ifdef DEBUG_MATCHING
-        std::cerr << "  ANYOF: checking char='" << utils::utf32ToUtf8(ch) << "' (U+" 
-                  << std::hex << ch << std::dec << ")" << std::endl;
-        #endif
-        
         // Check if character is in the variable
         for (size_t i = 0; i < varContent.size(); ++i) {
             char16_t varCh = varContent[i];
@@ -486,16 +472,9 @@ bool Matcher::matchVariableSequential(uint16_t varIndex, uint16_t modifier,
                 std::u16string matchedChar = utils::utf32ToUtf16(ch);
                 captures.emplace_back(matchedChar, i, segmentIndex);
                 contextPos += charsConsumed;  // Advance position
-                #ifdef DEBUG_MATCHING
-                std::cerr << "  ANYOF: matched at position " << i << std::endl;
-                #endif
                 return true;
             }
         }
-        
-        #ifdef DEBUG_MATCHING
-        std::cerr << "  ANYOF: no match found" << std::endl;
-        #endif
         return false;
         
     } else if (modifier == FLAG_NANYOF) {
@@ -540,23 +519,12 @@ bool Matcher::matchVariable(uint16_t varIndex, uint16_t modifier, const std::u16
     
     std::u16string varContent = strings[varIndex - 1].value;
     
-    #ifdef DEBUG_MATCHING
-    std::string varStr = utils::utf16ToUtf8(varContent);
-    std::cerr << "matchVariable: varIndex=" << varIndex << " modifier=0x" << std::hex << modifier 
-              << std::dec << " context='" << utils::utf16ToUtf8(context) << "' varStr='" << varStr << "'" << std::endl;
-    #endif
-    
     if (modifier == FLAG_ANYOF) {
         // Match any character from the variable
         if (!context.empty()) {
             // Get the last character from the context
             size_t charsConsumed = 0;
             char32_t lastChar = utils::utf16ToChar32(context.substr(context.size() - 1), charsConsumed);
-            
-            #ifdef DEBUG_MATCHING
-            std::cerr << "  ANYOF: lastChar='" << utils::utf32ToUtf8(lastChar) << "' (U+" 
-                      << std::hex << lastChar << std::dec << ")" << std::endl;
-            #endif
             
             // Check if last character is in the variable
             for (size_t i = 0; i < varContent.size(); ++i) {
@@ -565,15 +533,9 @@ bool Matcher::matchVariable(uint16_t varIndex, uint16_t modifier, const std::u16
                     // Capture the matched character and its position
                     std::u16string matchedChar = utils::utf32ToUtf16(lastChar);
                     captures.emplace_back(matchedChar, i);
-                    #ifdef DEBUG_MATCHING
-                    std::cerr << "  ANYOF: matched at position " << i << std::endl;
-                    #endif
                     return true;
                 }
             }
-            #ifdef DEBUG_MATCHING
-            std::cerr << "  ANYOF: no match found" << std::endl;
-            #endif
         }
         return false;
     } else if (modifier == FLAG_NANYOF) {
@@ -765,19 +727,11 @@ bool Matcher::matchPatternSegmented(const std::vector<RuleSegment>& segments, co
                                    std::vector<Capture>& captures, size_t& matchedLength) {
     matchedLength = 0;
     
-    #ifdef DEBUG_MATCHING
-    std::cerr << "matchPatternSegmented: context='" << utils::utf16ToUtf8(context) << "' segments.size=" << segments.size() << std::endl;
-    #endif
-    
     // Step 1: Calculate the expected pattern length from segments
     size_t expectedPatternLength = 0;
     for (const auto& segment : segments) {
         expectedPatternLength += calculateSegmentLength(segment, strings);
     }
-    
-    #ifdef DEBUG_MATCHING
-    std::cerr << "  expectedPatternLength=" << expectedPatternLength << std::endl;
-    #endif
     
     // Step 2: Extract suffix from context that matches the pattern length
     std::u16string matchContext;
@@ -791,10 +745,6 @@ bool Matcher::matchPatternSegmented(const std::vector<RuleSegment>& segments, co
         }
         matchContext = utils::utf16Substring(context, contextCharCount - expectedPatternLength, expectedPatternLength);
     }
-    
-    #ifdef DEBUG_MATCHING
-    std::cerr << "  matchContext='" << utils::utf16ToUtf8(matchContext) << "'" << std::endl;
-    #endif
     
     // Step 3: Match each segment sequentially
     size_t contextPos = 0;

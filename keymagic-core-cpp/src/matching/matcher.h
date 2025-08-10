@@ -14,8 +14,8 @@ public:
     bool matchRule(const ProcessedRule& rule, MatchContext& context, 
                   const Input& input, const std::vector<StringEntry>& strings);
     
-    Output applyRule(const ProcessedRule& rule, const MatchContext& context,
-                    const std::vector<StringEntry>& strings, EngineState* state);
+    RuleApplicationResult applyRule(const ProcessedRule& rule, const MatchContext& context,
+                                   const std::vector<StringEntry>& strings);
     
 private:
     bool matchPattern(const std::vector<uint16_t>& opcodes, const std::u16string& context,
