@@ -22,7 +22,7 @@ Engine::Engine()
     , matcher_(std::make_unique<Matcher>())
     , maxHistorySize_(50)
     , recursionEnabled_(true)
-    , maxRecursionDepth_(10)
+    , maxRecursionDepth_(100)
     , currentRecursionDepth_(0) {
 }
 
