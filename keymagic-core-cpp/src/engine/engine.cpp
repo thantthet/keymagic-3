@@ -141,8 +141,10 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                 std::u16string finalComposing;
                 
                 if (rule.patternType == PatternType::VirtualKey) {
-                    // For VK patterns, the output is the complete replacement
-                    finalComposing = ruleOutput;
+                    // For VK patterns, append to existing composition
+                    // VK patterns don't match existing text, they match key events
+                    // So their output should be appended to what's already there
+                    finalComposing = matchContext.context + ruleOutput;
                 } else {
                     // For text patterns: replace only the matched suffix with rule output
                     size_t matchedLength = matchContext.matchedLength;
@@ -175,7 +177,7 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
                     currentRecursionDepth_ = 0;
                     
                     // Only use recursive output if it actually matched something
-                    if (recursiveOutput.action != ActionType::None) {
+                    if (recursiveOutput.isProcessed || !recursiveOutput.composingText.empty()) {
                         // Update with recursive output
                         std::u16string recursiveComposing = utils::utf8ToUtf16(recursiveOutput.composingText);
                         state_->setComposingText(recursiveComposing);
@@ -239,11 +241,45 @@ Output Engine::processKeyInternal(const Input& input, bool testMode) {
             // If we restored from history successfully in non-test mode, generate proper output
             if (!testMode && keyboard_->getLayoutOptions().getAutoBksp()) {
                 std::u16string newComposing = state_->getComposingText();
-                return Output::BackspaceDeleteAndInsert(
-                    static_cast<int>(oldComposing.size()),
-                    utils::utf16ToUtf8(newComposing),
-                    utils::utf16ToUtf8(newComposing)
-                );
+                
+                // Check if this is just a simple single character deletion
+                if (oldComposing.size() == newComposing.size() + 1 &&
+                    oldComposing.substr(0, newComposing.size()) == newComposing) {
+                    // Simple backspace - just deleted one character from the end
+                    return Output::BackspaceDelete(1, utils::utf16ToUtf8(newComposing));
+                } else {
+                    // Complex restoration from history - calculate the actual difference
+                    // Find the common prefix length
+                    size_t commonPrefix = 0;
+                    size_t minLen = std::min(oldComposing.size(), newComposing.size());
+                    while (commonPrefix < minLen && oldComposing[commonPrefix] == newComposing[commonPrefix]) {
+                        commonPrefix++;
+                    }
+                    
+                    // Calculate how many characters to delete from the end
+                    int deleteCount = static_cast<int>(oldComposing.size() - commonPrefix);
+                    
+                    // Get the text to insert (the part after the common prefix)
+                    std::u16string insertText = newComposing.substr(commonPrefix);
+                    
+                    if (deleteCount > 0 && !insertText.empty()) {
+                        // Need to both delete and insert
+                        return Output::BackspaceDeleteAndInsert(
+                            deleteCount,
+                            utils::utf16ToUtf8(insertText),
+                            utils::utf16ToUtf8(newComposing)
+                        );
+                    } else if (deleteCount > 0) {
+                        // Only delete
+                        return Output::BackspaceDelete(deleteCount, utils::utf16ToUtf8(newComposing));
+                    } else if (!insertText.empty()) {
+                        // Only insert (shouldn't happen for backspace but handle it)
+                        return Output::Insert(utils::utf16ToUtf8(insertText), utils::utf16ToUtf8(newComposing));
+                    } else {
+                        // No change (shouldn't happen but handle it)
+                        return Output::None();
+                    }
+                }
             }
             
             // Clear active states after backspace
@@ -600,26 +636,72 @@ Output Engine::performRecursiveMatching(const std::u16string& text) {
         return Output::None();
     }
     
-    // Create a dummy input for recursive matching
-    Input dummyInput;
-    MatchContext recursiveContext;
-    recursiveContext.context = text;
-    recursiveContext.activeStates = std::vector<int>(state_->getActiveStates().begin(),
-                                                    state_->getActiveStates().end());
+    std::u16string currentText = text;
+    std::u16string lastText;
+    Output finalOutput = Output::None();
     
-    // Try to match rules with text only (no VK input)
-    for (const auto& rule : rules_) {
-        // Skip VK-only rules in recursive matching
-        if (rule.patternType == PatternType::VirtualKey) {
-            continue;
+    // Keep applying rules until no more rules match or text doesn't change
+    while (currentText != lastText && !shouldStopRecursion(currentText)) {
+        lastText = currentText;
+        
+        // Create a dummy input for recursive matching
+        Input dummyInput;
+        MatchContext recursiveContext;
+        recursiveContext.context = currentText;
+        recursiveContext.activeStates = std::vector<int>(state_->getActiveStates().begin(),
+                                                        state_->getActiveStates().end());
+        
+        // Try to match rules with text only (no VK input)
+        bool matched = false;
+        for (const auto& rule : rules_) {
+            // Skip rules with ANY VK components in recursive matching
+            // This includes pure VK rules and mixed VK+text rules
+            bool hasVK = false;
+            for (const auto& op : rule.lhsOpcodes) {
+                if (op == OP_AND || op == OP_PREDEFINED) {
+                    hasVK = true;
+                    break;
+                }
+            }
+            if (hasVK) {
+                continue;
+            }
+            
+            if (matchRule(rule, recursiveContext, dummyInput)) {
+                // Apply the rule
+                Output ruleOutput = applyRule(rule, recursiveContext);
+                std::u16string ruleOutputText = utils::utf8ToUtf16(ruleOutput.composingText);
+                
+                // For text patterns, we need to preserve the unmatched prefix
+                if (rule.patternType != PatternType::VirtualKey) {
+                    size_t matchedLength = recursiveContext.matchedLength;
+                    if (matchedLength > 0 && currentText.size() >= matchedLength) {
+                        // Keep unmatched prefix + apply replacement to matched suffix
+                        size_t unmatchedLength = currentText.size() - matchedLength;
+                        std::u16string unmatchedPrefix = currentText.substr(0, unmatchedLength);
+                        currentText = unmatchedPrefix + ruleOutputText;
+                    } else {
+                        currentText = ruleOutputText;
+                    }
+                } else {
+                    currentText = ruleOutputText;
+                }
+                
+                finalOutput.composingText = utils::utf16ToUtf8(currentText);
+                finalOutput.action = ActionType::None; // Will be set properly later
+                finalOutput.isProcessed = true;
+                matched = true;
+                
+                break; // Start over with the new text
+            }
         }
         
-        if (matchRule(rule, recursiveContext, dummyInput)) {
-            return applyRule(rule, recursiveContext);
+        if (!matched) {
+            break; // No more rules match, stop
         }
     }
     
-    return Output::None();
+    return finalOutput;
 }
 
 bool Engine::shouldStopRecursion(const std::u16string& text) const {

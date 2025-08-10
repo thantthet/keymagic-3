@@ -38,24 +38,9 @@ impl RecursiveProcessor {
                 let matched_len = pattern.calculate_match_length(strings).unwrap_or(0);
                 // Apply the rule
                 let output = RuleProcessor::apply_rule(rule, state, &captures, strings)?;
-
-                // log rule
-                println!("Recursive Rule: {:?}", rule);
-                // log matched length
-                println!("Recursive Matched length: {}", matched_len);
-                // log pattern
-                println!("Recursive Pattern: {:?}", pattern);
-                // log captures
-                println!("Recursive Captures: {:?}", captures);
-                // log output
-                println!("Recursive Output: {}", output);
-                // log composing buffer
-                println!("Recursive Composing buffer: {}", state.composing_text());
                 
                 // Update composing buffer by replacing only the matched portion
                 state.composing_buffer_mut().replace_from_end(matched_len, &output);
-                // log composing buffer
-                println!("Recursive Composing buffer after: {}", state.composing_text());
                 
                 // Check stop conditions based on the output
                 if should_stop_recursion(&output) {
