@@ -92,21 +92,26 @@ BOOL SetRegValue(HKEY hKeyParent, LPCWSTR lpszKeyName, LPCWSTR lpszValueName, LP
 
 // Helper function to set directory permissions for EVERYONE, ALL APPLICATION PACKAGES, and Low Integrity
 // This preserves existing permissions while adding new ones
+// Also explicitly ensures the owner has full control (fixes directories broken by buggy permission code)
 static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
 {
     BOOL bResult = FALSE;
     PACL pOldDacl = NULL;
     PACL pNewDacl = NULL;
     PSECURITY_DESCRIPTOR pSD = NULL;
-    EXPLICIT_ACCESS ea[4] = {0};
+    EXPLICIT_ACCESS ea[5] = {0};  // Increased to 5 to include owner
     PSID pEveryoneSID = NULL;
     PSID pAllAppsSID = NULL;
     PSID pLowIntegritySID = NULL;
     PSID pUntrustedSID = NULL;
+    PSID pCurrentUserSID = NULL;
     SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
     SID_IDENTIFIER_AUTHORITY SIDAuthAppPackage = SECURITY_APP_PACKAGE_AUTHORITY;
     SID_IDENTIFIER_AUTHORITY SIDAuthMandatory = SECURITY_MANDATORY_LABEL_AUTHORITY;
     DWORD dwRes = 0;
+    HANDLE hToken = NULL;
+    PTOKEN_USER pTokenUser = NULL;
+    DWORD dwTokenUserSize = 0;
     
     // Get the existing DACL
     dwRes = GetNamedSecurityInfo(pszDirectory, SE_FILE_OBJECT,
@@ -117,6 +122,23 @@ static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
     {
         // If we can't get existing permissions, still try to set new ones
         pOldDacl = NULL;
+    }
+    
+    // Get the current user's SID
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+    {
+        // Get required buffer size
+        GetTokenInformation(hToken, TokenUser, NULL, 0, &dwTokenUserSize);
+        if (dwTokenUserSize > 0)
+        {
+            pTokenUser = (PTOKEN_USER)LocalAlloc(LPTR, dwTokenUserSize);
+            if (pTokenUser && GetTokenInformation(hToken, TokenUser, pTokenUser, dwTokenUserSize, &dwTokenUserSize))
+            {
+                // We have the current user's SID in pTokenUser->User.Sid
+                pCurrentUserSID = pTokenUser->User.Sid;
+            }
+        }
+        CloseHandle(hToken);
     }
     
     // Create SID for EVERYONE
@@ -148,40 +170,65 @@ static BOOL SetDirectoryPermissions(LPCWSTR pszDirectory)
                                   &pUntrustedSID))
         goto Cleanup;
     
+    // Set up permissions array
+    int nEntries = 0;
+    
+    // If we have the current user's SID, explicitly grant full control
+    // This fixes directories that lost owner permissions due to buggy code
+    // Use SET_ACCESS to replace any existing permissions for this user
+    if (pCurrentUserSID)
+    {
+        ea[nEntries].grfAccessPermissions = GENERIC_ALL;
+        ea[nEntries].grfAccessMode = SET_ACCESS;  // Replace existing entries for this SID
+        ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;  // Apply to this folder, subfolders and files
+        ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_USER;
+        ea[nEntries].Trustee.ptstrName = (LPWSTR)pCurrentUserSID;
+        nEntries++;
+    }
+    
     // Set up EXPLICIT_ACCESS for EVERYONE
-    ea[0].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
-    ea[0].grfAccessMode = GRANT_ACCESS;
-    ea[0].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-    ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
-    ea[0].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-    ea[0].Trustee.ptstrName = (LPWSTR)pEveryoneSID;
+    // Use SET_ACCESS to avoid duplicate entries
+    ea[nEntries].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+    ea[nEntries].grfAccessMode = SET_ACCESS;  // Replace existing entries for this SID
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;  // Apply to this folder, subfolders and files
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pEveryoneSID;
+    nEntries++;
     
     // Set up EXPLICIT_ACCESS for ALL APPLICATION PACKAGES
-    ea[1].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
-    ea[1].grfAccessMode = GRANT_ACCESS;
-    ea[1].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-    ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
-    ea[1].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-    ea[1].Trustee.ptstrName = (LPWSTR)pAllAppsSID;
+    // Use SET_ACCESS to avoid duplicate entries
+    ea[nEntries].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+    ea[nEntries].grfAccessMode = SET_ACCESS;  // Replace existing entries for this SID
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;  // Apply to this folder, subfolders and files
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pAllAppsSID;
+    nEntries++;
     
     // Set up EXPLICIT_ACCESS for Low Integrity
-    ea[2].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
-    ea[2].grfAccessMode = GRANT_ACCESS;
-    ea[2].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-    ea[2].Trustee.TrusteeForm = TRUSTEE_IS_SID;
-    ea[2].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
-    ea[2].Trustee.ptstrName = (LPWSTR)pLowIntegritySID;
+    // Use SET_ACCESS to avoid duplicate entries
+    ea[nEntries].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+    ea[nEntries].grfAccessMode = SET_ACCESS;  // Replace existing entries for this SID
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;  // Apply to this folder, subfolders and files
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pLowIntegritySID;
+    nEntries++;
     
     // Set up EXPLICIT_ACCESS for Untrusted Integrity
-    ea[3].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
-    ea[3].grfAccessMode = GRANT_ACCESS;
-    ea[3].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-    ea[3].Trustee.TrusteeForm = TRUSTEE_IS_SID;
-    ea[3].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
-    ea[3].Trustee.ptstrName = (LPWSTR)pUntrustedSID;
+    // Use SET_ACCESS to avoid duplicate entries
+    ea[nEntries].grfAccessPermissions = GENERIC_READ | GENERIC_EXECUTE;
+    ea[nEntries].grfAccessMode = SET_ACCESS;  // Replace existing entries for this SID
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;  // Apply to this folder, subfolders and files
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pUntrustedSID;
+    nEntries++;
     
     // Add the new entries to the existing DACL (preserving existing permissions)
-    dwRes = SetEntriesInAcl(4, ea, pOldDacl, &pNewDacl);
+    dwRes = SetEntriesInAcl(nEntries, ea, pOldDacl, &pNewDacl);
     if (dwRes != ERROR_SUCCESS)
         goto Cleanup;
     
@@ -200,6 +247,7 @@ Cleanup:
     if (pAllAppsSID) FreeSid(pAllAppsSID);
     if (pLowIntegritySID) FreeSid(pLowIntegritySID);
     if (pUntrustedSID) FreeSid(pUntrustedSID);
+    if (pTokenUser) LocalFree(pTokenUser);  // This also frees pCurrentUserSID
     if (pNewDacl) LocalFree(pNewDacl);
     if (pSD) LocalFree(pSD);
     
