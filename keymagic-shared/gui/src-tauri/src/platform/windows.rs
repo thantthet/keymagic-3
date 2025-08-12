@@ -8,10 +8,6 @@ use winreg::enums::*;
 use winreg::RegKey;
 use keymagic_core::hotkey::HotkeyBinding;
 
-#[path = "windows_registry_permissions.rs"]
-mod windows_registry_permissions;
-use windows_registry_permissions::apply_keymagic_registry_permissions;
-
 use windows::Win32::System::Registry::{
     RegQueryValueExW, RegSetValueExW, REG_MULTI_SZ, REG_VALUE_TYPE,
 };
@@ -223,13 +219,6 @@ impl WindowsBackend {
             .context("Failed to save keyboards path to registry")?;
         
         log::info!("Keyboards directory path saved to registry: {}", keyboards_dir.display());
-        
-        // Apply permissions for low integrity access (for SearchHost.exe and similar)
-        // This allows very low integrity processes to read our registry keys
-        if let Err(e) = apply_keymagic_registry_permissions() {
-            // Log the error but don't fail - permissions might not be settable in some environments
-            log::warn!("Failed to set registry permissions for low integrity access: {}", e);
-        }
         
         Ok(Self { registry_key })
     }
@@ -467,12 +456,6 @@ impl Platform for WindowsBackend {
         // Save composition mode hosts as REG_MULTI_SZ
         if !config.composition_mode.enabled_hosts.is_empty() {
             write_multi_string_value(&settings_key, "CompositionModeHosts", &config.composition_mode.enabled_hosts)?;
-        }
-        
-        // Reapply permissions after saving (in case new keys were created)
-        // This ensures SearchHost.exe and other low integrity processes can read the keys
-        if let Err(e) = apply_keymagic_registry_permissions() {
-            log::warn!("Failed to update registry permissions after save: {}", e);
         }
         
         Ok(())
