@@ -1,13 +1,13 @@
 Package: keymagic3
-Version: 0.0.8
+Version: 0.0.9
 Architecture: arm64
 Maintainer: Thant Thet Khin Zaw <contact@keymagic.net>
 Depends: libgtk-3-0, ibus (>= 1.5.0), libwebkit2gtk-4.1-0
-Filename: pool/main/k/keymagic3/keymagic3_0.0.8_arm64.deb
-Size: 5281550
-MD5sum: 44affc3cfd4b62e8018c9cdd7cf503ac
-SHA1: 1a9ba57509d42c0ee99ca77402878f2d32b07358
-SHA256: b4206be8b0d1705c9026b22977d2852bae35f7389ef6a976b45a7d494b08e715
+Filename: pool/main/k/keymagic3/keymagic3_0.0.9_arm64.deb
+Size: 5252354
+MD5sum: 126286e934ea52ed53204c6fc72efa45
+SHA1: dbff77b15d039146ec78a054ec1c40ee869dd034
+SHA256: c44a42222dfa809a3a1f96c1d09d6a26139978b89a3bb6e7175e105af2735a4f
 Section: utils
 Priority: optional
 Homepage: https://github.com/thantthet/keymagic-3
