@@ -13,6 +13,7 @@
 #include <fstream>
 #include <aclapi.h>
 #include <sddl.h>
+#include <accctrl.h>
 
 // List of categories to register the text service under
 static const GUID* g_SupportedCategories[] = {
@@ -252,6 +253,215 @@ Cleanup:
     if (pSD) LocalFree(pSD);
     
     return bResult;
+}
+
+// Helper function to set registry key permissions for low integrity access
+static BOOL SetRegistryPermissions(HKEY hKey)
+{
+    BOOL bResult = FALSE;
+    PACL pOldDacl = NULL;
+    PACL pNewDacl = NULL;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    EXPLICIT_ACCESS ea[5] = {0};
+    PSID pEveryoneSID = NULL;
+    PSID pAllAppsSID = NULL;
+    PSID pLowIntegritySID = NULL;
+    PSID pUntrustedSID = NULL;
+    PSID pCurrentUserSID = NULL;
+    SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+    SID_IDENTIFIER_AUTHORITY SIDAuthAppPackage = SECURITY_APP_PACKAGE_AUTHORITY;
+    SID_IDENTIFIER_AUTHORITY SIDAuthMandatory = SECURITY_MANDATORY_LABEL_AUTHORITY;
+    DWORD dwRes = 0;
+    HANDLE hToken = NULL;
+    PTOKEN_USER pTokenUser = NULL;
+    DWORD dwTokenUserSize = 0;
+    
+    // Get the existing DACL
+    dwRes = GetSecurityInfo((HANDLE)hKey, SE_REGISTRY_KEY,
+                            DACL_SECURITY_INFORMATION,
+                            NULL, NULL, &pOldDacl, NULL, &pSD);
+    
+    if (dwRes != ERROR_SUCCESS)
+    {
+        // If we can't get existing permissions, still try to set new ones
+        pOldDacl = NULL;
+    }
+    
+    // Get the current user's SID
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+    {
+        // Get required buffer size
+        GetTokenInformation(hToken, TokenUser, NULL, 0, &dwTokenUserSize);
+        if (dwTokenUserSize > 0)
+        {
+            pTokenUser = (PTOKEN_USER)LocalAlloc(LPTR, dwTokenUserSize);
+            if (pTokenUser && GetTokenInformation(hToken, TokenUser, pTokenUser, dwTokenUserSize, &dwTokenUserSize))
+            {
+                // We have the current user's SID in pTokenUser->User.Sid
+                pCurrentUserSID = pTokenUser->User.Sid;
+            }
+        }
+        CloseHandle(hToken);
+    }
+    
+    // Create SID for EVERYONE
+    if (!AllocateAndInitializeSid(&SIDAuthWorld, 1,
+                                  SECURITY_WORLD_RID,
+                                  0, 0, 0, 0, 0, 0, 0,
+                                  &pEveryoneSID))
+        goto Cleanup;
+    
+    // Create SID for ALL APPLICATION PACKAGES
+    if (!AllocateAndInitializeSid(&SIDAuthAppPackage, 2,
+                                  SECURITY_APP_PACKAGE_BASE_RID,
+                                  SECURITY_BUILTIN_PACKAGE_ANY_PACKAGE,
+                                  0, 0, 0, 0, 0, 0,
+                                  &pAllAppsSID))
+        goto Cleanup;
+    
+    // Create SID for Low Integrity Level
+    if (!AllocateAndInitializeSid(&SIDAuthMandatory, 1,
+                                  SECURITY_MANDATORY_LOW_RID,
+                                  0, 0, 0, 0, 0, 0, 0,
+                                  &pLowIntegritySID))
+        goto Cleanup;
+    
+    // Create SID for Untrusted Integrity Level
+    if (!AllocateAndInitializeSid(&SIDAuthMandatory, 1,
+                                  SECURITY_MANDATORY_UNTRUSTED_RID,
+                                  0, 0, 0, 0, 0, 0, 0,
+                                  &pUntrustedSID))
+        goto Cleanup;
+    
+    // Set up permissions array
+    int nEntries = 0;
+    
+    // Grant current user full control
+    if (pCurrentUserSID)
+    {
+        ea[nEntries].grfAccessPermissions = KEY_ALL_ACCESS;
+        ea[nEntries].grfAccessMode = SET_ACCESS;
+        ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
+        ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_USER;
+        ea[nEntries].Trustee.ptstrName = (LPWSTR)pCurrentUserSID;
+        nEntries++;
+    }
+    
+    // Grant EVERYONE read access
+    ea[nEntries].grfAccessPermissions = KEY_READ;
+    ea[nEntries].grfAccessMode = SET_ACCESS;
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pEveryoneSID;
+    nEntries++;
+    
+    // Grant ALL APPLICATION PACKAGES read access
+    ea[nEntries].grfAccessPermissions = KEY_READ;
+    ea[nEntries].grfAccessMode = SET_ACCESS;
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pAllAppsSID;
+    nEntries++;
+    
+    // Grant Low Integrity read access
+    ea[nEntries].grfAccessPermissions = KEY_READ;
+    ea[nEntries].grfAccessMode = SET_ACCESS;
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pLowIntegritySID;
+    nEntries++;
+    
+    // Grant Untrusted Integrity read access
+    ea[nEntries].grfAccessPermissions = KEY_READ;
+    ea[nEntries].grfAccessMode = SET_ACCESS;
+    ea[nEntries].grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
+    ea[nEntries].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea[nEntries].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+    ea[nEntries].Trustee.ptstrName = (LPWSTR)pUntrustedSID;
+    nEntries++;
+    
+    // Add the new entries to the existing DACL
+    dwRes = SetEntriesInAcl(nEntries, ea, pOldDacl, &pNewDacl);
+    if (dwRes != ERROR_SUCCESS)
+        goto Cleanup;
+    
+    // Set the new DACL for the registry key
+    dwRes = SetSecurityInfo((HANDLE)hKey, SE_REGISTRY_KEY,
+                           DACL_SECURITY_INFORMATION,
+                           NULL, NULL, pNewDacl, NULL);
+    
+    if (dwRes == ERROR_SUCCESS)
+    {
+        bResult = TRUE;
+    }
+    
+Cleanup:
+    if (pEveryoneSID) FreeSid(pEveryoneSID);
+    if (pAllAppsSID) FreeSid(pAllAppsSID);
+    if (pLowIntegritySID) FreeSid(pLowIntegritySID);
+    if (pUntrustedSID) FreeSid(pUntrustedSID);
+    if (pTokenUser) LocalFree(pTokenUser);  // This also frees pCurrentUserSID
+    if (pNewDacl) LocalFree(pNewDacl);
+    if (pSD) LocalFree(pSD);
+    
+    return bResult;
+}
+
+// Helper function to apply permissions to KeyMagic registry keys
+static void ApplyKeyMagicRegistryPermissions()
+{
+    HKEY hKeyMagic = NULL;
+    HKEY hSubKey = NULL;
+    
+    // Open the main KeyMagic key
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic", 0, KEY_ALL_ACCESS, &hKeyMagic) == ERROR_SUCCESS)
+    {
+        // Set permissions on main key
+        SetRegistryPermissions(hKeyMagic);
+        
+        // Set permissions on Settings subkey
+        if (RegOpenKeyExW(hKeyMagic, L"Settings", 0, KEY_ALL_ACCESS, &hSubKey) == ERROR_SUCCESS)
+        {
+            SetRegistryPermissions(hSubKey);
+            RegCloseKey(hSubKey);
+        }
+        
+        // Set permissions on Keyboards subkey
+        if (RegOpenKeyExW(hKeyMagic, L"Keyboards", 0, KEY_ALL_ACCESS, &hSubKey) == ERROR_SUCCESS)
+        {
+            SetRegistryPermissions(hSubKey);
+            
+            // Enumerate and set permissions on each keyboard entry
+            DWORD dwIndex = 0;
+            WCHAR szKeyName[256];
+            DWORD cchKeyName;
+            HKEY hKbKey = NULL;
+            
+            while (TRUE)
+            {
+                cchKeyName = ARRAYSIZE(szKeyName);
+                if (RegEnumKeyExW(hSubKey, dwIndex, szKeyName, &cchKeyName, 
+                                 NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
+                    break;
+                
+                if (RegOpenKeyExW(hSubKey, szKeyName, 0, KEY_ALL_ACCESS, &hKbKey) == ERROR_SUCCESS)
+                {
+                    SetRegistryPermissions(hKbKey);
+                    RegCloseKey(hKbKey);
+                }
+                
+                dwIndex++;
+            }
+            
+            RegCloseKey(hSubKey);
+        }
+        
+        RegCloseKey(hKeyMagic);
+    }
 }
 
 // Helper function to check if we're loaded through an ARM64X forwarder
@@ -556,5 +766,10 @@ BOOL UpdateLanguageProfiles()
     }
 
     pInputProcessProfiles->Release();
+    
+    // Apply permissions to registry keys for low integrity access
+    // This allows SearchHost.exe and other sandboxed processes to read our settings
+    ApplyKeyMagicRegistryPermissions();
+    
     return TRUE;
 }
