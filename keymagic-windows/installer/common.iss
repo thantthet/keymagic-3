@@ -227,12 +227,70 @@ begin
   end;
 end;
 
+// Fix directory permissions broken by v0.0.8
+procedure FixBrokenDirectoryPermissions();
+var
+  AppDir: String;
+  LocalAppDataDir: String;
+  ResultCode: Integer;
+begin
+  // Get the installation directory and LOCALAPPDATA\KeyMagic directory
+  AppDir := ExpandConstant('{autopf}\{#MyAppName}');
+  LocalAppDataDir := ExpandConstant('{localappdata}\KeyMagic');
+  
+  // Check if directories exist (indicates upgrade scenario)
+  if DirExists(AppDir) then
+  begin
+    Log('Fixing permissions for installation directory: ' + AppDir);
+    
+    // First, take ownership of the directory tree (requires admin privileges)
+    // This is necessary if permissions are completely broken
+    Exec('cmd.exe', '/C "takeown /F "' + AppDir + '" /R /D Y >nul 2>&1"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Log('Takeown completed with code: ' + IntToStr(ResultCode));
+    
+    // Reset permissions to inherited defaults
+    // /T applies to all subdirectories and files
+    // /Q suppresses success messages
+    // /C continues on errors
+    Exec('cmd.exe', '/C "icacls "' + AppDir + '" /reset /T /Q /C"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Log('Reset permissions completed with code: ' + IntToStr(ResultCode));
+    
+    // Grant full control to Administrators group (installer is running as admin)
+    Exec('cmd.exe', '/C "icacls "' + AppDir + '" /grant Administrators:F /T /Q /C"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    // Also grant full control to the Users group to ensure regular user access
+    Exec('cmd.exe', '/C "icacls "' + AppDir + '" /grant Users:F /T /Q /C"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    Log('Permission fix completed with code: ' + IntToStr(ResultCode));
+  end;
+  
+  // Also fix LOCALAPPDATA\KeyMagic if it exists
+  if DirExists(LocalAppDataDir) then
+  begin
+    Log('Fixing permissions for LOCALAPPDATA\KeyMagic: ' + LocalAppDataDir);
+    
+    // Take ownership first
+    Exec('cmd.exe', '/C "takeown /F "' + LocalAppDataDir + '" /R /D Y >nul 2>&1"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    // Reset and fix permissions
+    Exec('cmd.exe', '/C "icacls "' + LocalAppDataDir + '" /reset /T /Q /C"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    // Grant full control to current user (using %USERNAME%)
+    Exec('cmd.exe', '/C "icacls "' + LocalAppDataDir + '" /grant "%USERNAME%":F /T /Q /C"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    Log('LOCALAPPDATA permission fix completed with code: ' + IntToStr(ResultCode));
+  end;
+end;
+
 // Custom initialization
 function InitializeSetup(): Boolean;
 var
   ErrorCode: Integer;
 begin
   Result := True;
+  
+  // Fix broken permissions from v0.0.8 before any other operations
+  FixBrokenDirectoryPermissions();
   
   // Check for Windows 10 or later
   if not IsWindows10OrLater then
