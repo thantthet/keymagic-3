@@ -2,7 +2,7 @@
 ; Inno Setup 6.x
 
 #define MyAppName "KeyMagic 3"
-#define MyAppVersion "0.0.8"
+#define MyAppVersion "0.0.9"
 #define MyAppPublisher "KeyMagic"
 #define MyAppURL "https://github.com/thantthet/keymagic-v3"
 #define MyAppExeName "keymagic.exe"
