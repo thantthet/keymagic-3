@@ -416,22 +416,29 @@ static void ApplyKeyMagicRegistryPermissions()
 {
     HKEY hKeyMagic = NULL;
     HKEY hSubKey = NULL;
+    DWORD dwDisposition;
     
-    // Open the main KeyMagic key
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic", 0, KEY_ALL_ACCESS, &hKeyMagic) == ERROR_SUCCESS)
+    // Create or open the main KeyMagic key
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\KeyMagic", 0, NULL, 
+                        REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, 
+                        &hKeyMagic, &dwDisposition) == ERROR_SUCCESS)
     {
         // Set permissions on main key
         SetRegistryPermissions(hKeyMagic);
         
-        // Set permissions on Settings subkey
-        if (RegOpenKeyExW(hKeyMagic, L"Settings", 0, KEY_ALL_ACCESS, &hSubKey) == ERROR_SUCCESS)
+        // Create or open Settings subkey
+        if (RegCreateKeyExW(hKeyMagic, L"Settings", 0, NULL,
+                           REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL,
+                           &hSubKey, &dwDisposition) == ERROR_SUCCESS)
         {
             SetRegistryPermissions(hSubKey);
             RegCloseKey(hSubKey);
         }
         
-        // Set permissions on Keyboards subkey
-        if (RegOpenKeyExW(hKeyMagic, L"Keyboards", 0, KEY_ALL_ACCESS, &hSubKey) == ERROR_SUCCESS)
+        // Create or open Keyboards subkey
+        if (RegCreateKeyExW(hKeyMagic, L"Keyboards", 0, NULL,
+                           REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL,
+                           &hSubKey, &dwDisposition) == ERROR_SUCCESS)
         {
             SetRegistryPermissions(hSubKey);
             
@@ -525,26 +532,6 @@ static BOOL GetKeyboardIconPath(LPWSTR pszIconPath, DWORD cchIconPath)
         }
     }
     
-    // Construct the KeyMagic directory path
-    WCHAR szKeyMagicDir[MAX_PATH];
-    StringCchPrintf(szKeyMagicDir, ARRAYSIZE(szKeyMagicDir), L"%s\\KeyMagic", szAppData);
-    
-    // Create the directory if it doesn't exist
-    if (GetFileAttributes(szKeyMagicDir) == INVALID_FILE_ATTRIBUTES)
-    {
-        if (CreateDirectory(szKeyMagicDir, NULL))
-        {
-            // Set permissions for EVERYONE and ALL APPLICATION PACKAGES
-            SetDirectoryPermissions(szKeyMagicDir);
-        }
-    }
-    else
-    {
-        // Directory exists, ensure it has correct permissions
-        // This is important for upgrades or if permissions were changed
-        SetDirectoryPermissions(szKeyMagicDir);
-    }
-    
     // Construct the icon file path (same as GUI: %LOCALAPPDATA%\KeyMagic\keymagic-keyboard.ico)
     StringCchPrintf(pszIconPath, cchIconPath, L"%s\\KeyMagic\\keymagic-keyboard.ico", szAppData);
     
@@ -587,6 +574,33 @@ BOOL RegisterServer()
 
     if (!SetRegValue(HKEY_CLASSES_ROOT, szInprocServer, L"ThreadingModel", TEXTSERVICE_MODEL))
         return FALSE;
+
+    // Set directory permissions for KeyMagic folder
+    // This ensures the owner has write access (fixes crash from buggy permission code)
+    WCHAR szAppData[MAX_PATH];
+    if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, szAppData) == S_OK)
+    {
+        WCHAR szKeyMagicDir[MAX_PATH];
+        StringCchPrintf(szKeyMagicDir, ARRAYSIZE(szKeyMagicDir), L"%s\\KeyMagic", szAppData);
+        
+        // Create the directory if it doesn't exist
+        if (GetFileAttributes(szKeyMagicDir) == INVALID_FILE_ATTRIBUTES)
+        {
+            if (CreateDirectory(szKeyMagicDir, NULL))
+            {
+                SetDirectoryPermissions(szKeyMagicDir);
+            }
+        }
+        else
+        {
+            // Directory exists, ensure it has correct permissions
+            SetDirectoryPermissions(szKeyMagicDir);
+        }
+    }
+    
+    // Apply registry permissions for low integrity access
+    // This allows SearchHost.exe and other sandboxed processes to read our settings
+    ApplyKeyMagicRegistryPermissions();
 
     return TRUE;
 }
@@ -766,10 +780,5 @@ BOOL UpdateLanguageProfiles()
     }
 
     pInputProcessProfiles->Release();
-    
-    // Apply permissions to registry keys for low integrity access
-    // This allows SearchHost.exe and other sandboxed processes to read our settings
-    ApplyKeyMagicRegistryPermissions();
-    
     return TRUE;
 }
