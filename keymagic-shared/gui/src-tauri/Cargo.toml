@@ -32,6 +32,7 @@ dirs = "5.0"
 toml = "0.8"
 sha2 = "0.10"
 base64 = "0.22"
+regex = "1.10"
 futures = "0.3"
 keymagic-core = { path = "../../../keymagic-core" }
 kms2km2 = { path = "../../../kms2km2" }
