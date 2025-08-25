@@ -38,7 +38,7 @@ jobs:
 
   build-windows:
     needs: prepare
-    uses: ./.github/workflows/build-windows-signed.yml
+    uses: ./.github/workflows/build-windows.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
       sign: true

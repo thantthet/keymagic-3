@@ -7,17 +7,17 @@ on:
 
 jobs:
   # Test with dual signing (binaries + installer)
-  test-build-dual-signed:
+  test-build-signed:
     name: Test Windows Build (Dual Signed)
-    uses: ./.github/workflows/build-windows-dual-signed.yml
+    uses: ./.github/workflows/build-windows.yml
     with:
-      version: '0.0.1-test-dual-signed'
+      version: '0.0.1-test-signed'
       sign: true
     secrets: inherit
 
   verify-artifacts:
     name: Verify Build Artifacts
-    needs: test-build-dual-signed
+    needs: test-build-signed
     runs-on: ubuntu-latest
     
     steps:
@@ -41,12 +41,12 @@ jobs:
       - name: Check build status
         run: |
           echo "=== Build Status ==="
-          echo "Dual-signed build: ${{ needs.test-build-dual-signed.result }}"
+          echo "Dual-signed build: ${{ needs.test-build-signed.result }}"
           echo ""
           echo "Note: Signature verification requires Windows environment."
           echo "Verify on Windows using:"
           echo "  # Check installer signature"
-          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-0.0.1-test-dual-signed.exe'"
+          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-0.0.1-test-signed.exe'"
           echo ""
           echo "  # Extract and check binary signatures"
           echo "  # After installation, check individual binaries:"
@@ -59,12 +59,12 @@ jobs:
           # Windows Build Test Summary
           
           ## Build Configuration
-          - **Dual-Signed Build**: 0.0.1-test-dual-signed (Status: ${{ needs.test-build-dual-signed.result }})
+          - **Dual-Signed Build**: 0.0.1-test-signed (Status: ${{ needs.test-build-signed.result }})
           - **Signing**: Dual-signing enabled (binaries + installer)
           - **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           
           ## Artifacts
-          - Signed Installer: KeyMagic3-Setup-0.0.1-test-dual-signed.exe
+          - Signed Installer: KeyMagic3-Setup-0.0.1-test-signed.exe
           - Contains individually signed: EXEs (keymagic-gui, keymagic-tray) and DLLs (KeyMagicTSF)
           
           ## Next Steps
@@ -73,7 +73,7 @@ jobs:
           3. Verify signatures with PowerShell:
              \`\`\`powershell
              # Check installer signature (should show "Valid")
-             Get-AuthenticodeSignature "KeyMagic3-Setup-0.0.1-test-dual-signed.exe"
+             Get-AuthenticodeSignature "KeyMagic3-Setup-0.0.1-test-signed.exe"
              
              # After installation, check individual binary signatures
              Get-AuthenticodeSignature "C:\Program Files\KeyMagic\keymagic-gui.exe"
