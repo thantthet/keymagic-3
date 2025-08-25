@@ -276,12 +276,13 @@ jobs:
           Copy-Item ./signed-binaries/x64/keymagic-tray.exe keymagic-windows/tray-manager/build-x64/bin/Release/
           
           # Copy ARM64 binaries
-          Copy-Item ./signed-binaries/arm64/KeyMagicTSF_arm64.dll keymagic-windows/tsf/build-arm64/Release/
           Copy-Item ./signed-binaries/arm64/keymagic-gui.exe target/aarch64-pc-windows-msvc/release/
           Copy-Item ./signed-binaries/arm64/keymagic-tray.exe keymagic-windows/tray-manager/build-arm64/bin/Release/
           
-          # Copy ARM64X forwarder DLLs
+          # Copy ARM64X forwarder DLLs (these are used for ARM64 systems)
           Copy-Item ./signed-binaries/arm64x/* keymagic-windows/tsf/build-arm64x/
+          
+          # Note: There's no separate ARM64 native TSF DLL - ARM64 systems use the ARM64X forwarder
           
           Write-Host "Binaries placed for installer build"
         shell: pwsh
