@@ -121,7 +121,7 @@ jobs:
 
   sign-binaries:
     needs: build-binaries
-    if: ${{ inputs.sign == true }}
+    if: inputs.sign
     runs-on: windows-latest
     name: Sign Individual Binaries
     
@@ -156,7 +156,6 @@ jobs:
           github-artifact-id: '${{ steps.upload-binaries.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: './signed-binaries/'
-          download-signed-artifact: true
       
       - name: Organize signed binaries
         run: |
@@ -193,7 +192,7 @@ jobs:
   # Fallback job when signing is disabled - just reorganize unsigned binaries
   prepare-unsigned-binaries:
     needs: build-binaries
-    if: ${{ inputs.sign != true }}
+    if: inputs.sign
     runs-on: windows-latest
     name: Prepare Unsigned Binaries
     
@@ -310,7 +309,7 @@ jobs:
 
   sign-installer:
     needs: build-installer
-    if: ${{ inputs.sign == true }}
+    if: inputs.sign
     runs-on: windows-latest
     name: Sign Final Installer
     
@@ -345,7 +344,6 @@ jobs:
           github-artifact-id: '${{ steps.upload-installer.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: './signed-installer/'
-          download-signed-artifact: true
       
       - name: Upload signed installer
         uses: actions/upload-artifact@v4
@@ -356,7 +354,7 @@ jobs:
   # Finalize unsigned installer when signing is disabled
   finalize-unsigned:
     needs: build-installer
-    if: ${{ inputs.sign != true }}
+    if: inputs.sign
     runs-on: ubuntu-latest
     name: Finalize Unsigned Installer
     
