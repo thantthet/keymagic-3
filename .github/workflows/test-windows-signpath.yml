@@ -1,0 +1,100 @@
+name: Test Windows SignPath Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 0.0.1-test)'
+        required: false
+        type: string
+        default: '0.0.1-test'
+      sign:
+        description: 'Enable SignPath signing'
+        required: true
+        type: boolean
+        default: false
+      signpath_policy:
+        description: 'SignPath signing policy'
+        required: false
+        type: choice
+        default: 'test-signing'
+        options:
+          - test-signing
+          - release-signing
+
+jobs:
+  test-build:
+    name: Test Windows Build
+    uses: ./.github/workflows/build-windows-signed.yml
+    with:
+      version: ${{ inputs.version }}
+      sign: ${{ inputs.sign }}
+    secrets: inherit
+
+  verify-artifacts:
+    name: Verify Build Artifacts
+    needs: test-build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: ./installer/
+      
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Downloaded Artifacts ==="
+          ls -la ./installer/
+          echo ""
+          echo "=== File Details ==="
+          file ./installer/KeyMagic3-Setup-*.exe || true
+          echo ""
+          echo "=== File Size ==="
+          du -h ./installer/KeyMagic3-Setup-*.exe || true
+      
+      - name: Check if signed (if applicable)
+        if: inputs.sign == true
+        run: |
+          echo "Signing was requested. The installer should be signed."
+          echo "Note: Signature verification requires Windows environment."
+          echo "Please download and verify on Windows using:"
+          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-${{ inputs.version }}.exe'"
+      
+      - name: Upload test results summary
+        run: |
+          cat > test-summary.md << EOF
+          # Windows Build Test Summary
+          
+          ## Build Configuration
+          - **Version**: ${{ inputs.version }}
+          - **Signing Enabled**: ${{ inputs.sign }}
+          - **Signing Policy**: ${{ inputs.signpath_policy }}
+          - **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ## Artifacts
+          - Windows Installer: KeyMagic3-Setup-${{ inputs.version }}.exe
+          
+          ## Next Steps
+          1. Download the installer from the workflow artifacts
+          2. Test installation on Windows (x64 and ARM64 if possible)
+          3. If signed, verify signature with PowerShell:
+             \`\`\`powershell
+             Get-AuthenticodeSignature "KeyMagic3-Setup-${{ inputs.version }}.exe"
+             \`\`\`
+          
+          ## SignPath Dashboard
+          If signing was enabled, check the SignPath dashboard for:
+          - Signing request status
+          - Certificate details
+          - Any policy violations or warnings
+          EOF
+          
+          cat test-summary.md
+      
+      - name: Save test summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary
+          path: test-summary.md
