@@ -152,6 +152,7 @@ jobs:
           organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
           signing-policy-slug: '${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          artifact-configuration-slug: 'application-binaries'
           github-artifact-id: '${{ steps.upload-binaries.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: './signed-binaries/'
@@ -333,6 +334,7 @@ jobs:
           organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
           signing-policy-slug: '${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          artifact-configuration-slug: 'installer'
           github-artifact-id: '${{ steps.upload-installer.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: './signed-installer/'
