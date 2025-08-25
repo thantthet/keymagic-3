@@ -1,0 +1,280 @@
+name: Build Windows with Code Signing
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version number'
+        type: string
+        required: false
+        default: '0.0.1'
+      sign:
+        description: 'Sign the installer'
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      SIGNPATH_API_TOKEN:
+        required: false
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    name: Windows Build (x64 + ARM64)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
+      
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-multi-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-multi-
+      
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+      
+      - name: Update version
+        run: |
+          echo ${{ inputs.version }} > version.txt
+          ./update-version.ps1
+        shell: pwsh
+      
+      - name: Build x64 TSF DLL and GUI
+        working-directory: keymagic-windows
+        run: |
+          call make.bat build x64 Release
+        shell: cmd
+      
+      - name: Build x64 Tray Manager
+        working-directory: keymagic-windows/tray-manager
+        run: |
+          call make.bat build x64 Release
+        shell: cmd
+      
+      - name: Build ARM64 TSF DLL and GUI
+        working-directory: keymagic-windows
+        run: |
+          call make.bat build arm64 Release
+        shell: cmd
+      
+      - name: Build ARM64 Tray Manager
+        working-directory: keymagic-windows/tray-manager
+        run: |
+          call make.bat build arm64 Release
+        shell: cmd
+      
+      - name: Build ARM64X forwarder
+        working-directory: keymagic-windows
+        run: |
+          call make-arm64x.bat Release
+        shell: cmd
+      
+      - name: Upload x64 TSF DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsf-dll-x64
+          path: keymagic-windows/tsf/build-x64/Release/KeyMagicTSF_x64.dll
+      
+      - name: Upload ARM64 TSF DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsf-dll-arm64
+          path: keymagic-windows/tsf/build-arm64/Release/KeyMagicTSF_arm64.dll
+      
+      - name: Upload x64 GUI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-exe-x64
+          path: target/x86_64-pc-windows-msvc/release/keymagic-gui.exe
+      
+      - name: Upload ARM64 GUI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-exe-arm64
+          path: target/aarch64-pc-windows-msvc/release/keymagic-gui.exe
+      
+      - name: Upload x64 Tray Manager artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tray-exe-x64
+          path: keymagic-windows/tray-manager/build-x64/bin/Release/keymagic-tray.exe
+      
+      - name: Upload ARM64 Tray Manager artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tray-exe-arm64
+          path: keymagic-windows/tray-manager/build-arm64/bin/Release/keymagic-tray.exe
+      
+      - name: Upload ARM64X forwarder artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64x-forwarder
+          path: |
+            keymagic-windows/tsf/build-arm64x/KeyMagicTSF.dll
+            keymagic-windows/tsf/build-arm64x/KeyMagicTSF_arm64.dll
+            keymagic-windows/tsf/build-arm64x/KeyMagicTSF_x64.dll
+
+  build-installer:
+    needs: build-windows
+    runs-on: windows-latest
+    name: Windows Installer
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+        shell: pwsh
+      
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tsf-dll-x64
+          path: keymagic-windows/tsf/build-x64/Release/
+      
+      - name: Download ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tsf-dll-arm64
+          path: keymagic-windows/tsf/build-arm64/Release/
+      
+      - name: Download x64 GUI
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-exe-x64
+          path: target/x86_64-pc-windows-msvc/release/
+      
+      - name: Download ARM64 GUI
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-exe-arm64
+          path: target/aarch64-pc-windows-msvc/release/
+      
+      - name: Download x64 Tray
+        uses: actions/download-artifact@v4
+        with:
+          name: tray-exe-x64
+          path: keymagic-windows/tray-manager/build-x64/bin/Release/
+      
+      - name: Download ARM64 Tray
+        uses: actions/download-artifact@v4
+        with:
+          name: tray-exe-arm64
+          path: keymagic-windows/tray-manager/build-arm64/bin/Release/
+      
+      - name: Download ARM64X forwarder
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64x-forwarder
+          path: keymagic-windows/tsf/build-arm64x/
+      
+      - name: Update version
+        run: |
+          echo ${{ inputs.version }} > version.txt
+          ./update-version.ps1
+        shell: pwsh
+      
+      - name: Build installer
+        working-directory: keymagic-windows/installer
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q setup.iss
+        shell: cmd
+      
+      - name: Upload unsigned installer artifact
+        id: upload-unsigned-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: keymagic-windows/installer/output/KeyMagic3-Setup-*.exe
+
+  sign-installer:
+    needs: build-installer
+    if: inputs.sign == true
+    runs-on: windows-latest
+    name: Sign Windows Installer
+    
+    steps:
+      - name: Download unsigned installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: ./unsigned-installer/
+      
+      - name: Upload installer to GitHub artifacts for SignPath
+        id: upload-for-signpath
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-for-signing
+          path: ./unsigned-installer/KeyMagic3-Setup-*.exe
+      
+      - name: Submit to SignPath for signing
+        id: signpath-sign
+        uses: signpath/github-action-submit-signing-request@v1.1
+        env:
+          # Use different signing policies based on whether this is a release or test build
+          SIGNPATH_SIGNING_POLICY_SLUG: |
+            ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) 
+            && 'release-signing' 
+            || 'test-signing' }}
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
+          signing-policy-slug: '${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          github-artifact-id: '${{ steps.upload-for-signpath.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: './signed-installer/'
+          download-signed-artifact: true
+      
+      - name: Upload signed installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: ./signed-installer/KeyMagic3-Setup-*.exe
+
+  # This job handles the case when signing is not requested
+  finalize-unsigned:
+    needs: build-installer
+    if: inputs.sign != true
+    runs-on: ubuntu-latest
+    name: Finalize Unsigned Installer
+    
+    steps:
+      - name: Download unsigned installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: ./installer/
+      
+      - name: Upload as final installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: ./installer/KeyMagic3-Setup-*.exe
