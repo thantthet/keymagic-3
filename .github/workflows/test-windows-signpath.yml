@@ -4,20 +4,6 @@ on:
   push:
     branches:
       - feature/signpath-integration
-    paths:
-      - '.github/workflows/build-windows-signed.yml'
-      - '.github/workflows/test-windows-signpath.yml'
-      - 'keymagic-windows/**'
-      - 'keymagic-core/**'
-      - 'keymagic-gui/**'
-  pull_request:
-    branches:
-      - master
-    paths:
-      - '.github/workflows/build-windows-signed.yml'
-      - 'keymagic-windows/**'
-      - 'keymagic-core/**'
-      - 'keymagic-gui/**'
 
 jobs:
   # Test with dual signing (binaries + installer)
