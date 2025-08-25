@@ -1,39 +1,49 @@
 name: Test Windows SignPath Build
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to build (e.g., 0.0.1-test)'
-        required: false
-        type: string
-        default: '0.0.1-test'
-      sign:
-        description: 'Enable SignPath signing'
-        required: true
-        type: boolean
-        default: false
-      signpath_policy:
-        description: 'SignPath signing policy'
-        required: false
-        type: choice
-        default: 'test-signing'
-        options:
-          - test-signing
-          - release-signing
+  push:
+    branches:
+      - feature/signpath-integration
+    paths:
+      - '.github/workflows/build-windows-signed.yml'
+      - '.github/workflows/test-windows-signpath.yml'
+      - 'keymagic-windows/**'
+      - 'keymagic-core/**'
+      - 'keymagic-gui/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/build-windows-signed.yml'
+      - 'keymagic-windows/**'
+      - 'keymagic-core/**'
+      - 'keymagic-gui/**'
 
 jobs:
-  test-build:
-    name: Test Windows Build
+  # Test without signing first
+  test-build-unsigned:
+    name: Test Windows Build (Unsigned)
     uses: ./.github/workflows/build-windows-signed.yml
     with:
-      version: ${{ inputs.version }}
-      sign: ${{ inputs.sign }}
+      version: '0.0.1-test'
+      sign: false
+    secrets: inherit
+  
+  # Test with signing if secrets are configured
+  test-build-signed:
+    name: Test Windows Build (Signed)
+    # Only run if SignPath secrets are configured
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/feature/signpath-integration'
+    uses: ./.github/workflows/build-windows-signed.yml
+    with:
+      version: '0.0.1-test-signed'
+      sign: true
     secrets: inherit
 
   verify-artifacts:
     name: Verify Build Artifacts
-    needs: test-build
+    needs: [test-build-unsigned, test-build-signed]
+    if: always()
     runs-on: ubuntu-latest
     
     steps:
@@ -54,13 +64,15 @@ jobs:
           echo "=== File Size ==="
           du -h ./installer/KeyMagic3-Setup-*.exe || true
       
-      - name: Check if signed (if applicable)
-        if: inputs.sign == true
+      - name: Check build status
         run: |
-          echo "Signing was requested. The installer should be signed."
+          echo "=== Build Status ==="
+          echo "Unsigned build: ${{ needs.test-build-unsigned.result }}"
+          echo "Signed build: ${{ needs.test-build-signed.result }}"
+          echo ""
           echo "Note: Signature verification requires Windows environment."
-          echo "Please download and verify on Windows using:"
-          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-${{ inputs.version }}.exe'"
+          echo "For signed builds, verify on Windows using:"
+          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-0.0.1-test-signed.exe'"
       
       - name: Upload test results summary
         run: |
@@ -68,20 +80,24 @@ jobs:
           # Windows Build Test Summary
           
           ## Build Configuration
-          - **Version**: ${{ inputs.version }}
-          - **Signing Enabled**: ${{ inputs.sign }}
-          - **Signing Policy**: ${{ inputs.signpath_policy }}
+          - **Unsigned Build**: 0.0.1-test (Status: ${{ needs.test-build-unsigned.result }})
+          - **Signed Build**: 0.0.1-test-signed (Status: ${{ needs.test-build-signed.result }})
           - **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           
           ## Artifacts
-          - Windows Installer: KeyMagic3-Setup-${{ inputs.version }}.exe
+          - Unsigned Installer: KeyMagic3-Setup-0.0.1-test.exe
+          - Signed Installer: KeyMagic3-Setup-0.0.1-test-signed.exe (if signing succeeded)
           
           ## Next Steps
           1. Download the installer from the workflow artifacts
           2. Test installation on Windows (x64 and ARM64 if possible)
-          3. If signed, verify signature with PowerShell:
+          3. Verify signatures with PowerShell:
              \`\`\`powershell
-             Get-AuthenticodeSignature "KeyMagic3-Setup-${{ inputs.version }}.exe"
+             # Check unsigned version (should show "NotSigned")
+             Get-AuthenticodeSignature "KeyMagic3-Setup-0.0.1-test.exe"
+             
+             # Check signed version (should show "Valid" if signing worked)
+             Get-AuthenticodeSignature "KeyMagic3-Setup-0.0.1-test-signed.exe"
              \`\`\`
           
           ## SignPath Dashboard
