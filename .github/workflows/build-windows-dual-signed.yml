@@ -235,7 +235,9 @@ jobs:
 
   build-installer:
     needs: [sign-binaries, prepare-unsigned-binaries]
-    if: always() && (needs.sign-binaries.result == 'success' || needs.prepare-unsigned-binaries.result == 'success')
+    if: |
+      !cancelled() && 
+      (needs.sign-binaries.result == 'success' || needs.prepare-unsigned-binaries.result == 'success')
     runs-on: windows-latest
     name: Build Installer with Signed Binaries
     
