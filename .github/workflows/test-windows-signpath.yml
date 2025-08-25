@@ -20,18 +20,18 @@ on:
       - 'keymagic-gui/**'
 
 jobs:
-  # Test with signing
-  test-build-signed:
-    name: Test Windows Build (Signed)
-    uses: ./.github/workflows/build-windows-signed.yml
+  # Test with dual signing (binaries + installer)
+  test-build-dual-signed:
+    name: Test Windows Build (Dual Signed)
+    uses: ./.github/workflows/build-windows-dual-signed.yml
     with:
-      version: '0.0.1-test-signed'
+      version: '0.0.1-test-dual-signed'
       sign: true
     secrets: inherit
 
   verify-artifacts:
     name: Verify Build Artifacts
-    needs: test-build-signed
+    needs: test-build-dual-signed
     runs-on: ubuntu-latest
     
     steps:
@@ -55,11 +55,17 @@ jobs:
       - name: Check build status
         run: |
           echo "=== Build Status ==="
-          echo "Signed build: ${{ needs.test-build-signed.result }}"
+          echo "Dual-signed build: ${{ needs.test-build-dual-signed.result }}"
           echo ""
           echo "Note: Signature verification requires Windows environment."
           echo "Verify on Windows using:"
-          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-0.0.1-test-signed.exe'"
+          echo "  # Check installer signature"
+          echo "  Get-AuthenticodeSignature 'KeyMagic3-Setup-0.0.1-test-dual-signed.exe'"
+          echo ""
+          echo "  # Extract and check binary signatures"
+          echo "  # After installation, check individual binaries:"
+          echo "  Get-AuthenticodeSignature 'C:\Program Files\KeyMagic\keymagic-gui.exe'"
+          echo "  Get-AuthenticodeSignature 'C:\Program Files\KeyMagic\KeyMagicTSF_x64.dll'"
       
       - name: Upload test results summary
         run: |
@@ -67,20 +73,25 @@ jobs:
           # Windows Build Test Summary
           
           ## Build Configuration
-          - **Signed Build**: 0.0.1-test-signed (Status: ${{ needs.test-build-signed.result }})
-          - **Signing**: Enabled with SignPath
+          - **Dual-Signed Build**: 0.0.1-test-dual-signed (Status: ${{ needs.test-build-dual-signed.result }})
+          - **Signing**: Dual-signing enabled (binaries + installer)
           - **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           
           ## Artifacts
-          - Signed Installer: KeyMagic3-Setup-0.0.1-test-signed.exe
+          - Signed Installer: KeyMagic3-Setup-0.0.1-test-dual-signed.exe
+          - Contains individually signed: EXEs (keymagic-gui, keymagic-tray) and DLLs (KeyMagicTSF)
           
           ## Next Steps
           1. Download the installer from the workflow artifacts
           2. Test installation on Windows (x64 and ARM64 if possible)
-          3. Verify signature with PowerShell:
+          3. Verify signatures with PowerShell:
              \`\`\`powershell
-             # Should show "Valid" if signing worked
-             Get-AuthenticodeSignature "KeyMagic3-Setup-0.0.1-test-signed.exe"
+             # Check installer signature (should show "Valid")
+             Get-AuthenticodeSignature "KeyMagic3-Setup-0.0.1-test-dual-signed.exe"
+             
+             # After installation, check individual binary signatures
+             Get-AuthenticodeSignature "C:\Program Files\KeyMagic\keymagic-gui.exe"
+             Get-AuthenticodeSignature "C:\Program Files\KeyMagic\KeyMagicTSF_x64.dll"
              \`\`\`
           
           ## SignPath Dashboard
