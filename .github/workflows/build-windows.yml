@@ -118,6 +118,7 @@ jobs:
         with:
           name: unsigned-binaries
           path: ./binaries-to-sign/*
+          overwrite: true
 
   sign-binaries:
     needs: build-binaries
@@ -138,6 +139,7 @@ jobs:
         with:
           name: binaries-for-signing
           path: ./unsigned-binaries/*
+          overwrite: true
       
       - name: Submit binaries to SignPath for signing
         id: signpath-sign-binaries
@@ -188,6 +190,7 @@ jobs:
         with:
           name: signed-binaries
           path: ./organized-binaries/
+          overwrite: true
 
   # Fallback job when signing is disabled - just reorganize unsigned binaries
   prepare-unsigned-binaries:
@@ -231,6 +234,7 @@ jobs:
         with:
           name: signed-binaries  # Use same name for compatibility
           path: ./organized-binaries/
+          overwrite: true
 
   build-installer:
     needs: [sign-binaries, prepare-unsigned-binaries]
@@ -306,6 +310,7 @@ jobs:
         with:
           name: windows-installer-unsigned
           path: keymagic-windows/installer/output/KeyMagic3-Setup-*.exe
+          overwrite: true
 
   sign-installer:
     needs: build-installer
@@ -326,6 +331,7 @@ jobs:
         with:
           name: installer-for-final-signing
           path: ./unsigned-installer/KeyMagic3-Setup-*.exe
+          overwrite: true
       
       - name: Submit installer to SignPath for signing
         id: signpath-sign-installer
@@ -350,6 +356,7 @@ jobs:
         with:
           name: windows-installer
           path: ./signed-installer/KeyMagic3-Setup-*.exe
+          overwrite: true
 
   # Finalize unsigned installer when signing is disabled
   finalize-unsigned:
@@ -370,3 +377,4 @@ jobs:
         with:
           name: windows-installer
           path: ./installer/KeyMagic3-Setup-*.exe
+          overwrite: true
