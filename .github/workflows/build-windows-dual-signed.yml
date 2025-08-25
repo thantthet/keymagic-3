@@ -107,7 +107,7 @@ jobs:
           # ARM64X forwarder DLLs (used on ARM64 systems)
           Copy-Item keymagic-windows/tsf/build-arm64x/KeyMagicTSF.dll ./binaries-to-sign/
           Copy-Item keymagic-windows/tsf/build-arm64x/KeyMagicTSF_arm64.dll ./binaries-to-sign/
-          Copy-Item keymagic-windows/tsf/build-arm64x/KeyMagicTSF_x64.dll ./binaries-to-sign/KeyMagicTSF_arm64x_x64.dll
+          Copy-Item keymagic-windows/tsf/build-arm64x/KeyMagicTSF_x64.dll ./binaries-to-sign/
           
           Write-Host "Binaries collected for signing (only those included in installer):"
           Get-ChildItem ./binaries-to-sign
@@ -172,10 +172,10 @@ jobs:
           Move-Item ./signed-binaries/keymagic-gui-arm64.exe ./organized-binaries/arm64/keymagic-gui.exe
           Move-Item ./signed-binaries/keymagic-tray-arm64.exe ./organized-binaries/arm64/keymagic-tray.exe
           
-          # Move ARM64X forwarder DLLs
+          # Move ARM64X forwarder DLLs (keep original names)
           Move-Item ./signed-binaries/KeyMagicTSF.dll ./organized-binaries/arm64x/
           Move-Item ./signed-binaries/KeyMagicTSF_arm64.dll ./organized-binaries/arm64x/
-          Move-Item ./signed-binaries/KeyMagicTSF_arm64x_x64.dll ./organized-binaries/arm64x/KeyMagicTSF_x64.dll
+          Move-Item ./signed-binaries/KeyMagicTSF_x64.dll ./organized-binaries/arm64x/
           
           Write-Host "Signed binaries organized:"
           Get-ChildItem -Recurse ./organized-binaries
@@ -216,10 +216,10 @@ jobs:
           Move-Item ./unsigned-binaries/keymagic-gui-arm64.exe ./organized-binaries/arm64/keymagic-gui.exe
           Move-Item ./unsigned-binaries/keymagic-tray-arm64.exe ./organized-binaries/arm64/keymagic-tray.exe
           
-          # Move ARM64X forwarder DLLs
+          # Move ARM64X forwarder DLLs (keep original names)
           Move-Item ./unsigned-binaries/KeyMagicTSF.dll ./organized-binaries/arm64x/
           Move-Item ./unsigned-binaries/KeyMagicTSF_arm64.dll ./organized-binaries/arm64x/
-          Move-Item ./unsigned-binaries/KeyMagicTSF_arm64x_x64.dll ./organized-binaries/arm64x/KeyMagicTSF_x64.dll
+          Move-Item ./unsigned-binaries/KeyMagicTSF_x64.dll ./organized-binaries/arm64x/
         shell: pwsh
       
       - name: Upload organized binaries
