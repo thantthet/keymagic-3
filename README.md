@@ -204,3 +204,6 @@ After installation:
 ## License
 
 GPL-2.0
+
+## Sponsors
+Free code signing on Windows provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
