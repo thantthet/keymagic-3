@@ -41,6 +41,8 @@ jobs:
     uses: ./.github/workflows/build-windows.yml
     with:
       version: ${{ needs.prepare.outputs.version }}
+      sign: true
+    secrets: inherit
 
   build-linux:
     needs: prepare
