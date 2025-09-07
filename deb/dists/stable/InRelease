@@ -9,26 +9,26 @@ Version: 1.0
 Architectures: amd64 arm64
 Components: main
 Description: KeyMagic Input Method Repository
-Date: Wed, 13 Aug 2025 05:06:02 +0000
+Date: Sun, 07 Sep 2025 07:46:59 +0000
 SHA256:
- 9776df90c431745d38d4dc5ba61b0165a7c18405f963f9e87199cd6a0bae9cac 779 main/binary-amd64/Packages
- f75ae0ac891fbd45d1f1ac166dad1b007260efc75a419c373a767c1a35b08b5b 545 main/binary-amd64/Packages.gz
- 097f57b56569c14b1e908cfc76d7d52e55be048495539b2782f19f0a42160bad 779 main/binary-arm64/Packages
- fb8bd4c2a302a5630f0bc821a4a0fe35f195afffd0a7dfe70ea623cd0e326e5e 548 main/binary-arm64/Packages.gz
+ fc2e79f5777dffcaac4b754f18f3129dceedf1d25e1832ddc5d79f764c85a0e6 781 main/binary-amd64/Packages
+ 4b17e08312d8727d8612f2d357481ad1f632c74fde3589f7690bed9ff55102fa 551 main/binary-amd64/Packages.gz
+ 913a4f6d03834ccd4bacacb16817bcfad71f860e62e11b45994ecfb1827ec2dd 781 main/binary-arm64/Packages
+ ab5f465c7520866d6dee73c569d61f6bd593448eeb4351a04d9059bd9c03a288 547 main/binary-arm64/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQJIBAEBCgAyFiEEnqdZ8qM1Uo35QP/NzWApiYqvdFoFAmicHToUHHNpZ25lckBr
-ZXltYWdpYy5uZXQACgkQzWApiYqvdFroMQ//Se2kCi+OywrwCP8uRxx6aYqrBjCt
-XVKWkFVb/FNqaeuCOEu38MxzfW7sVGyb+sXyakxsUw2XN8Soylro4BBY+WzfOrLT
-dDDRY4n+glwMs7mLA5MSyAaiLYtlVZoDlnUr9wKlTtyGKIZxM+/K/acGZqJRUdgI
-FkRNfIxsK9nH4BMeswK3sHjqgjux2Xvx+gsUefc/8IV1kyEAjdpz+av23s0EqjT7
-7DqjDX9/sPv6b8K/izqXrt2I49U/tdZtunIEKLZOusQ8eWO8OqjMCQKbkGUqUOWe
-DcNaVxLcATxPoqnEQt12IuQCCEY1cSZvOaJOPgasOi33hjt7yLy5DKpkHDgyDX2k
-eR2keQdozhw3moVfeHMRu8niY5D3oVIesRlbu9vnoVhRAhDSVlV2FElwsX0N8kwu
-A42KCAyB/RNSqjh1yZzxhcw4t7KKGI2kxzBw1YiRblQOT14DRq2sGyCs9P1aO5At
-hPQ96pT0CM7CeuaB9FOcIC960yPzWGwPdlKA+zZ1/Si6+vWwmbrPRMwo31twjTOs
-YLWnb0OhA3HQ8UKoTyCq4cuaFwcQxCJcGkcwHhZkS86kC6S/t+xZAcT0NirsV7zt
-hfhGjHEXn9NAlMhqTMyaxWY+CWCgiy5TFWPCg1vERBNvopjiX9q0wtBFj+vqg/mH
-JvtJyCbQx2Tg7HA=
-=Fsrm
+iQJIBAEBCgAyFiEEnqdZ8qM1Uo35QP/NzWApiYqvdFoFAmi9OHMUHHNpZ25lckBr
+ZXltYWdpYy5uZXQACgkQzWApiYqvdFqW8A//dnwb93yMsqnGXo0Qbwf8ZMY4L4IM
+EKzPIFnfNJoLcQxkFhihwmx+BA1xG2oq22FiuW13ZocGIeY58YXpm61+XP51IhBW
+U2rwoUEwtjAMiSxjJ2r7y2sR6JLCVhO/6/D/ppNFokGH0Gfa8/iqV/XnZf8ddEgQ
+bdGq3mrd/1+UoZ3p8PNKQqxU9URw6EKvxpy4jJ3++hJMIEGoQqw+h5S1GgY4q8qP
+aTF1szOE5Eo4uyQxkQu5Y32wKEJHC0bMR4/2evG8nRb1GXIPiEx0gNOBqcgwBg5S
+cz/gUSckqEyRCC0Mdh8f/Et7yMRb3+1rksfgdeUpV+9V1gqOEkss7eZHZT/IVbs5
++kzJl3sMkgRebs5LEMJbEpgyvBCqW4IvCdC6cfrXTeXIt3TlVIc5A/zVzSeZTOb8
+OJ39fBkzXgNj9VGLCWhXqV86lLilMr0FQyowk6E6KpV2sjQcPBdj/8SFV5ODrlFc
+tjA9lOHL2zH4RWIpSnp0aTlP2rcMS4goY5ll8c9He9AurjpnlXMYgD6+AfDcB0gP
+3B5jf9SMUUVdRmqV/JfTwFour0geP4yh0xWRlVl+FiJF9/fbLe6ZiRZZj4q3mZAC
+xhoQhObJ0VaDAEKGPtGig0oV5S/0D4ir5QxSdCl2FmAYpELILX00Rz80ZEXN90Xj
+cHEaSLocb2NnX3g=
+=gyVa
 -----END PGP SIGNATURE-----
