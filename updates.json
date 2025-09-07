@@ -3,90 +3,84 @@
   "platforms": {
     "windows": {
       "x86_64": {
-        "version": "0.0.9",
-        "releaseDate": "2025-08-12T16:32:40Z",
+        "version": "0.0.10",
+        "releaseDate": "2025-09-07T07:46:11Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/KeyMagic3-Setup-0.0.9.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-Setup-0.0.10.exe",
         "signature": "",
-        "size": 6469867,
-        "sha256": "db263f44bb54b1e99ea98108d412606298e9bfd6a8c7bdc6c88668ef5bab6854"
+        "size": 7618984,
+        "sha256": "bace7026bac71699fe26a3748dc8152a8546792b12c0d833731f241f74f86a8f"
       },
       "aarch64": {
-        "version": "0.0.9",
-        "releaseDate": "2025-08-12T16:32:40Z",
+        "version": "0.0.10",
+        "releaseDate": "2025-09-07T07:46:11Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/KeyMagic3-Setup-0.0.9.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-Setup-0.0.10.exe",
         "signature": "",
-        "size": 6469867,
-        "sha256": "db263f44bb54b1e99ea98108d412606298e9bfd6a8c7bdc6c88668ef5bab6854"
+        "size": 7618984,
+        "sha256": "bace7026bac71699fe26a3748dc8152a8546792b12c0d833731f241f74f86a8f"
       }
     },
     "macos": {
       "x86_64": {
-        "version": "0.0.9",
-        "releaseDate": "2025-08-12T16:32:40Z",
+        "version": "0.0.10",
+        "releaseDate": "2025-09-07T07:46:11Z",
         "minimumSystemVersion": "10.15",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/KeyMagic3-0.0.9.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-0.0.10.dmg",
         "signature": "",
-        "size": 10886034,
-        "sha256": "48f9f839cff2782f355044e7bd12767e6eb474ecdfa0a9965f09563d127067a6"
+        "size": 10875917,
+        "sha256": "3d3120537d9a44cd0723e37627fd0e492b1ae3956038823b7cab206f8b87eaae"
       },
       "aarch64": {
-        "version": "0.0.9",
-        "releaseDate": "2025-08-12T16:32:40Z",
+        "version": "0.0.10",
+        "releaseDate": "2025-09-07T07:46:11Z",
         "minimumSystemVersion": "11.0",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/KeyMagic3-0.0.9.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-0.0.10.dmg",
         "signature": "",
-        "size": 10886034,
-        "sha256": "48f9f839cff2782f355044e7bd12767e6eb474ecdfa0a9965f09563d127067a6"
+        "size": 10875917,
+        "sha256": "3d3120537d9a44cd0723e37627fd0e492b1ae3956038823b7cab206f8b87eaae"
       }
     },
     "linux": {
       "aarch64": {
-        "version": "0.0.9",
-        "releaseDate": "2025-08-12T16:32:40Z",
+        "version": "0.0.10",
+        "releaseDate": "2025-09-07T07:46:11Z",
         "minimumSystemVersion": "",
-        "url": "",
-        "signature": "",
-        "size": 0,
         "packages": {
           "rpm": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/keymagic3-0.0.9-1.aarch64.rpm",
-            "size": 5698801,
-            "sha256": "a9d522def9e5f44602c6fd4f9438612517491ee4dec95c2ee9c7fe60a81edc05"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3-0.0.10-1.aarch64.rpm",
+            "size": 5700089,
+            "sha256": "de59d2bbe062c3debc07e7e83fb7f282652a919a16ef55fa1538a58bafa02467"
           },
           "deb": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/keymagic3_0.0.9_arm64.deb",
-            "size": 5252352,
-            "sha256": "57243cb242862cbb4dc9ef95841ffd8f95a543ab098b4146474376f373c36ec2"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3_0.0.10_arm64.deb",
+            "size": 5282924,
+            "sha256": "225ed5def5e65d94d45dba1d2025f9e5920d933cf45183276ccbd064aff48e01"
           }
         }
       },
       "x86_64": {
-        "version": "0.0.9",
-        "releaseDate": "2025-08-12T16:32:40Z",
+        "version": "0.0.10",
+        "releaseDate": "2025-09-07T07:46:11Z",
         "minimumSystemVersion": "",
-        "url": "",
-        "signature": "",
-        "size": 0,
         "packages": {
           "rpm": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/keymagic3-0.0.9-1.x86_64.rpm",
-            "size": 5495133,
-            "sha256": "d16d299058a477ba8887113dcf0dc3dfeef1b7d35bd2f10748a777ef3efb6d3b"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3-0.0.10-1.x86_64.rpm",
+            "size": 5492514,
+            "sha256": "74fe746cc7e3de332b85564da6feb1d0c5017b06ec3683999439a9a755b0dc21"
           },
           "deb": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.9/keymagic3_0.0.9_amd64.deb",
-            "size": 5063020,
-            "sha256": "03660d30e0f86f3671c3ae96bead2d49732360f10ed5240c4c025d9962e1fb89"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3_0.0.10_amd64.deb",
+            "size": 5067000,
+            "sha256": "30fdf6e23f88648a1c7f9e2b65a9a6940ba6da244fba0f7d9b3f93b5fc2c2571"
           }
         }
       }
     }
   },
   "releaseNotes": {
-    "0.0.9": {
-      "en": "**What's New in v0.0.9**\n\n**All Platforms**\n- Redesigned settings with cleaner tabbed interface\n- Platform-specific features only\n\n**Windows**\n- Fixed crashes when accessing keyboard files\n- Fixed compatibility with sandboxed apps\n- Fixed Windows 10 tray icon issues\n\n**macOS**\n- Added input method bundle management\n\n**Linux**\n- Fixed dock icon display (Fedora/GNOME)\n- Fixed installation on Debian and RPM systems\n"
+    "0.0.10": {
+      "en": "## What's New 🎉\r\n\r\n**All Platforms**\r\n- Auto-activation feature - Ensures a keyboard is always active when keyboards are available\r\n\r\n**Windows**\r\n- Windows code signing - Integration with SignPath for digitally signed installers\r\n"
     }
   }
 }
