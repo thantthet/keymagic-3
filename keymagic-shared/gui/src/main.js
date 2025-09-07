@@ -92,6 +92,21 @@ async function loadKeyboards() {
   try {
     keyboards = await invoke('get_keyboards');
     activeKeyboardId = await invoke('get_active_keyboard');
+    
+    // Auto-activate first keyboard if none is active and keyboards exist
+    if (!activeKeyboardId && keyboards.length > 0) {
+      console.log('No active keyboard found, auto-activating first keyboard');
+      const firstKeyboard = keyboards[0];
+      try {
+        await invoke('set_active_keyboard', { keyboardId: firstKeyboard.id });
+        activeKeyboardId = firstKeyboard.id;
+        await updateTrayMenu();
+        showToast(`Activated keyboard: ${firstKeyboard.name}`, 'info');
+      } catch (error) {
+        console.error('Failed to auto-activate keyboard:', error);
+      }
+    }
+    
     renderKeyboardList();
   } catch (error) {
     console.error('Failed to load keyboards:', error);
@@ -271,7 +286,24 @@ window.removeKeyboard = async function(keyboardId) {
   
   if (confirmed) {
     try {
+      const wasActive = keyboardId === activeKeyboardId;
       await invoke('remove_keyboard', { keyboardId });
+      
+      // If we removed the active keyboard and there are other keyboards, activate one
+      if (wasActive) {
+        const remainingKeyboards = await invoke('get_keyboards');
+        if (remainingKeyboards.length > 0) {
+          console.log('Active keyboard was removed, activating another keyboard');
+          const nextKeyboard = remainingKeyboards[0];
+          try {
+            await invoke('set_active_keyboard', { keyboardId: nextKeyboard.id });
+            showToast(`Activated keyboard: ${nextKeyboard.name}`, 'info');
+          } catch (error) {
+            console.error('Failed to activate next keyboard:', error);
+          }
+        }
+      }
+      
       await loadKeyboards();
       await updateTrayMenu();
       showSuccess('Keyboard removed');
@@ -341,9 +373,23 @@ function setupEventListeners() {
       
       if (selected) {
         try {
+          // Check if this will be the first keyboard
+          const wasEmpty = keyboards.length === 0;
+          
           const keyboard = await invoke('import_keyboard', { filePath: selected });
           // Mark this keyboard as recently added
           recentlyAddedKeyboardIds.add(keyboard.id);
+          
+          // Auto-activate if it's the first keyboard
+          if (wasEmpty) {
+            try {
+              await invoke('set_active_keyboard', { keyboardId: keyboard.id });
+              showToast(`Activated first keyboard: ${keyboard.name}`, 'info');
+            } catch (error) {
+              console.error('Failed to auto-activate first keyboard:', error);
+            }
+          }
+          
           await loadKeyboards();
           await updateTrayMenu();
           showSuccess('Keyboard added successfully');
@@ -1830,10 +1876,24 @@ async function init() {
     const filePath = event.payload;
     
     try {
+      // Check if this will be the first keyboard
+      const wasEmpty = keyboards.length === 0;
+      
       // Add the keyboard
       const keyboard = await invoke('import_keyboard', { filePath: filePath });
       // Mark this keyboard as recently added
       recentlyAddedKeyboardIds.add(keyboard.id);
+      
+      // Auto-activate if it's the first keyboard
+      if (wasEmpty) {
+        try {
+          await invoke('set_active_keyboard', { keyboardId: keyboard.id });
+          showToast(`Activated first keyboard: ${keyboard.name}`, 'info');
+        } catch (error) {
+          console.error('Failed to auto-activate first keyboard:', error);
+        }
+      }
+      
       await loadKeyboards();
       await updateTrayMenu();
       showSuccess('Keyboard added successfully');
@@ -2142,10 +2202,23 @@ async function convertKmsFile(shouldImport) {
     if (shouldImport) {
       // Import the converted keyboard
       try {
+        // Check if this will be the first keyboard
+        const wasEmpty = keyboards.length === 0;
+        
         const keyboard = await invoke('import_keyboard', { filePath: outputPath });
         
         // Mark this keyboard as recently added
         recentlyAddedKeyboardIds.add(keyboard.id);
+        
+        // Auto-activate if it's the first keyboard
+        if (wasEmpty) {
+          try {
+            await invoke('set_active_keyboard', { keyboardId: keyboard.id });
+            showToast(`Activated first keyboard: ${keyboard.name}`, 'info');
+          } catch (error) {
+            console.error('Failed to auto-activate first keyboard:', error);
+          }
+        }
         
         // Switch to keyboards page
         switchPage('keyboards');
