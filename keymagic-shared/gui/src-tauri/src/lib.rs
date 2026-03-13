@@ -144,7 +144,6 @@ pub fn run() {
             commands::remove_keyboard,
             commands::update_hotkey,
             commands::set_keyboard_enabled,
-            commands::open_keyboard_layout_window,
             commands::validate_hotkey,
             commands::check_for_updates,
             commands::restart_app,

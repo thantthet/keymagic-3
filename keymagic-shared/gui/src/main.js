@@ -342,17 +342,47 @@ window.viewKeyboardLayout = async function(keyboardId) {
   if (!keyboard) return;
 
   try {
-    // Create the layout window via Rust command (handles platform-specific title bar)
-    await invoke('open_keyboard_layout_window', {
-      keyboardId: keyboard.id,
-      keyboardName: keyboard.name,
+    const { WebviewWindow } = window.__TAURI__.webviewWindow;
+
+    // Create a unique label for the window
+    const windowLabel = `keyboard-layout-${keyboardId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+
+    // Check if window already exists and focus it
+    const existing = await WebviewWindow.getByLabel(windowLabel);
+    if (existing) {
+      await existing.setFocus();
+      return;
+    }
+
+    // Detect platform for decorations
+    const platformInfo = await invoke('get_platform_info');
+    const isMac = platformInfo && platformInfo.os === 'macos';
+
+    // Use custom titlebar (decorations: false) on Windows/Linux
+    // macOS uses native decorations with overlay titlebar style
+    const layoutWindow = new WebviewWindow(windowLabel, {
+      url: `keyboard-layout.html?keyboardId=${encodeURIComponent(keyboardId)}`,
+      title: `${keyboard.name} - Keyboard Layout`,
+      width: 1000,
+      height: 600,
+      minWidth: 400,
+      minHeight: 200,
+      center: true,
+      resizable: true,
+      minimizable: true,
+      maximizable: true,
+      decorations: isMac,
+      alwaysOnTop: false,
+      skipTaskbar: false
+    });
+
+    layoutWindow.once('tauri://error', (error) => {
+      console.error('Failed to create keyboard layout window:', error);
+      showError('Failed to open keyboard layout window');
     });
   } catch (error) {
-    // Window may already exist (focused instead), or actual error
-    if (!error.toString().includes('already exists')) {
-      console.error('Failed to open keyboard layout:', error);
-      showError('Failed to open keyboard layout');
-    }
+    console.error('Failed to open keyboard layout:', error);
+    showError('Failed to open keyboard layout');
   }
 }
 

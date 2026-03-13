@@ -21,18 +21,25 @@
       -ms-user-select: none;
       user-select: none;
     }
-    
-    .layout-header {
-      text-align: center;
-      margin-bottom: 30px;
+
+    body.macos {
+      padding-top: 48px;
     }
-    
+
+    .layout-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+
     .layout-header h1 {
       color: #333;
       font-size: 24px;
-      margin-bottom: 10px;
     }
-    
+
+    /* Custom titlebar: shown by default for Windows/Linux (decorations: false) */
     .titlebar {
       position: fixed;
       top: 0;
@@ -104,10 +111,8 @@
 
     .layout-actions {
       display: flex;
-      justify-content: flex-end;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 15px;
-      padding-right: 20px;
     }
     
     .btn {
@@ -385,6 +390,11 @@
       padding-right: 12px;
     }
 
+    /* Hide inline actions — buttons are in the titlebar on all platforms */
+    .layout-actions {
+      display: none;
+    }
+
     .loading {
       text-align: center;
       color: #666;
@@ -471,9 +481,12 @@
 
   <div class="layout-header">
     <h1 id="keyboard-name">Loading...</h1>
-  </div>
-
-  <div class="layout-actions">
+    <div class="layout-actions" id="layout-actions">
+      <button class="btn btn-pin" id="pin-button-inline" onclick="togglePin()" title="Pin window on top">
+        📌
+      </button>
+      <button class="btn btn-primary" onclick="exportPDF()">Export as PDF</button>
+    </div>
   </div>
   
   <div class="keyboard-container" id="keyboard-container">
@@ -688,22 +701,21 @@
     window.togglePin = async function() {
       const currentWindow = WebviewWindow.getCurrent();
       isPinned = !isPinned;
-      
+
       try {
         await currentWindow.setAlwaysOnTop(isPinned);
-        
-        // Update UI
-        const pinButton = document.getElementById('pin-button');
-        const pinText = document.getElementById('pin-text');
-        
-        if (isPinned) {
-          pinButton.classList.add('pinned');
-          pinButton.title = 'Unpin window';
-          pinText.textContent = '📌';
-        } else {
-          pinButton.classList.remove('pinned');
-          pinButton.title = 'Pin window on top';
-          pinText.textContent = '📌';
+
+        // Update all pin buttons
+        for (const id of ['pin-button', 'pin-button-inline']) {
+          const btn = document.getElementById(id);
+          if (!btn) continue;
+          if (isPinned) {
+            btn.classList.add('pinned');
+            btn.title = 'Unpin window';
+          } else {
+            btn.classList.remove('pinned');
+            btn.title = 'Pin window on top';
+          }
         }
       } catch (error) {
         console.error('Failed to toggle pin state:', error);
