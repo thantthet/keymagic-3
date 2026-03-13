@@ -226,6 +226,64 @@ pub fn set_keyboard_enabled(
 }
 
 #[tauri::command]
+pub fn open_keyboard_layout_window(
+    app: AppHandle,
+    keyboard_id: String,
+    keyboard_name: String,
+) -> Result<(), String> {
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    let window_label = format!(
+        "keyboard-layout-{}",
+        keyboard_id.replace(|c: char| !c.is_alphanumeric(), "-")
+    );
+
+    // Close existing window with same keyboard if any
+    if let Some(existing) = app.get_webview_window(&window_label) {
+        let _ = existing.set_focus();
+        return Ok(());
+    }
+
+    // Simple percent-encoding for the keyboard ID in the URL
+    let encoded_id: String = keyboard_id
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c.to_string()
+            } else {
+                format!("%{:02X}", c as u32)
+            }
+        })
+        .collect();
+
+    let url = WebviewUrl::App(
+        format!("keyboard-layout.html?keyboardId={}", encoded_id).into(),
+    );
+
+    let builder = WebviewWindowBuilder::new(&app, &window_label, url)
+        .title(format!("{} - Keyboard Layout", keyboard_name))
+        .inner_size(1000.0, 600.0)
+        .min_inner_size(400.0, 200.0)
+        .center()
+        .resizable(true)
+        .minimizable(true)
+        .maximizable(true);
+
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.decorations(false);
+
+    builder.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub fn update_hotkey(
     state: State<AppState>,
     keyboard_id: String,

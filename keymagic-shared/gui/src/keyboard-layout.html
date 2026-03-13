@@ -15,6 +15,7 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f5f5f5;
       padding: 20px;
+      padding-top: 45px;
       -webkit-user-select: none;
       -moz-user-select: none;
       -ms-user-select: none;
@@ -32,6 +33,75 @@
       margin-bottom: 10px;
     }
     
+    .titlebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 36px;
+      background: #e8e8e8;
+      border-bottom: 1px solid #d0d0d0;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .titlebar-drag {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+    }
+
+    .titlebar-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .titlebar-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 4px;
+    }
+
+    .titlebar-controls {
+      display: flex;
+      align-items: center;
+    }
+
+    .titlebar-controls button {
+      appearance: none;
+      border: none;
+      background: transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      color: #555;
+    }
+
+    .titlebar-controls button:hover {
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .titlebar-controls button.close:hover {
+      background: #e81123;
+      color: white;
+    }
+
+    .titlebar-controls button svg {
+      width: 10px;
+      height: 10px;
+    }
+
     .layout-actions {
       display: flex;
       justify-content: flex-end;
@@ -72,24 +142,30 @@
     }
     
     .btn-pin {
-      background: #f5f5f5;
-      color: #666;
-      border: 1px solid #ddd;
+      appearance: none;
+      border: none;
+      background: transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 14px;
+      border-radius: 6px;
+      transition: background 0.15s;
     }
-    
+
     .btn-pin:hover {
-      background: #e8e8e8;
-      border-color: #ccc;
+      background: rgba(0, 0, 0, 0.08);
     }
-    
+
     .btn-pin.pinned {
-      background: #FFC107;
-      color: #333;
-      border-color: #FFA000;
+      background: rgba(255, 193, 7, 0.25);
     }
-    
+
     .btn-pin.pinned:hover {
-      background: #FFB300;
+      background: rgba(255, 193, 7, 0.35);
     }
     
     .keyboard-container {
@@ -231,6 +307,15 @@
       .info-footer {
         display: none;
       }
+
+      .titlebar {
+        height: 30px;
+      }
+
+      .titlebar-controls button {
+        width: 30px;
+        height: 30px;
+      }
       
       .keyboard-container {
         min-height: unset;
@@ -271,6 +356,35 @@
       }
     }
     
+    /* macOS: overlay title bar — traffic lights are native, content extends behind */
+    body.macos {
+      padding-top: 48px;
+    }
+
+    body.macos .titlebar {
+      background: transparent;
+      border-bottom: none;
+      height: 38px;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+    }
+
+    body.macos .titlebar-drag {
+      /* Keep drag region but leave space for traffic lights */
+      padding-left: 76px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    body.macos .titlebar-controls {
+      display: none;
+    }
+
+    body.macos .titlebar-actions {
+      padding-right: 12px;
+    }
+
     .loading {
       text-align: center;
       color: #666;
@@ -297,8 +411,10 @@
       body {
         background: white;
         padding: 10px;
+        padding-top: 10px;
       }
-      
+
+      .titlebar,
       .layout-actions {
         display: none;
       }
@@ -330,15 +446,34 @@
   </style>
 </head>
 <body>
+  <div class="titlebar">
+    <div class="titlebar-drag" data-tauri-drag-region>
+      <span class="titlebar-title" id="titlebar-name" data-tauri-drag-region>Keyboard Layout</span>
+    </div>
+    <div class="titlebar-actions">
+      <button class="btn-pin" id="pin-button" onclick="togglePin()" title="Pin window on top">
+        <span id="pin-text">📌</span>
+      </button>
+      <button class="btn btn-primary" onclick="exportPDF()" style="font-size:11px; padding:4px 10px;">PDF</button>
+    </div>
+    <div class="titlebar-controls">
+      <button id="titlebar-minimize" title="Minimize">
+        <svg viewBox="0 0 12 12"><path fill="currentColor" d="M2 6h8v1H2z"/></svg>
+      </button>
+      <button id="titlebar-maximize" title="Maximize">
+        <svg viewBox="0 0 12 12"><path fill="currentColor" d="M2 2h8v8H2zm1 1v6h6V3z"/></svg>
+      </button>
+      <button id="titlebar-close" class="close" title="Close">
+        <svg viewBox="0 0 12 12"><path fill="currentColor" d="M1.5 0L6 4.5 10.5 0 12 1.5 7.5 6 12 10.5 10.5 12 6 7.5 1.5 12 0 10.5 4.5 6 0 1.5z"/></svg>
+      </button>
+    </div>
+  </div>
+
   <div class="layout-header">
     <h1 id="keyboard-name">Loading...</h1>
   </div>
-  
+
   <div class="layout-actions">
-    <button class="btn btn-pin" id="pin-button" onclick="togglePin()">
-      <span id="pin-text">📌 Pin window to top</span>
-    </button>
-    <button class="btn btn-primary" onclick="exportPDF()">Export as PDF</button>
   </div>
   
   <div class="keyboard-container" id="keyboard-container">
@@ -353,7 +488,27 @@
   <script type="module">
     const { invoke } = window.__TAURI__.core;
     const { WebviewWindow } = window.__TAURI__.webviewWindow;
-    
+    const { getCurrentWindow } = window.__TAURI__.window;
+
+    // Window controls
+    const appWindow = getCurrentWindow();
+    document.getElementById('titlebar-minimize')?.addEventListener('click', () => appWindow.minimize());
+    document.getElementById('titlebar-maximize')?.addEventListener('click', () => appWindow.toggleMaximize());
+    document.getElementById('titlebar-close')?.addEventListener('click', () => appWindow.close());
+
+    // On macOS, native decorations are used - hide custom controls and adjust titlebar
+    async function detectPlatform() {
+      try {
+        const info = await invoke('get_platform_info');
+        if (info && info.os === 'macos') {
+          document.body.classList.add('macos');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    detectPlatform();
+
     let layoutData = null;
     
     // Get keyboard ID from URL parameters
@@ -386,6 +541,7 @@
       }
       
       nameElement.textContent = `${layoutData.keyboard_name} - Keyboard Layout`;
+      document.getElementById('titlebar-name').textContent = layoutData.keyboard_name;
       
       const { keys } = layoutData;
       
@@ -534,10 +690,12 @@
         
         if (isPinned) {
           pinButton.classList.add('pinned');
-          pinText.textContent = '📌 Unpin window';
+          pinButton.title = 'Unpin window';
+          pinText.textContent = '📌';
         } else {
           pinButton.classList.remove('pinned');
-          pinText.textContent = '📌 Pin window to top';
+          pinButton.title = 'Pin window on top';
+          pinText.textContent = '📌';
         }
       } catch (error) {
         console.error('Failed to toggle pin state:', error);

@@ -340,42 +340,22 @@ window.removeKeyboard = async function(keyboardId) {
 window.viewKeyboardLayout = async function(keyboardId) {
   const keyboard = keyboards.find(k => k.id === keyboardId);
   if (!keyboard) return;
-  
+
   try {
-    // Create a new window for keyboard layout
-    const { WebviewWindow } = window.__TAURI__.webviewWindow;
-    
-    // Create a unique label for the window (only alphanumeric, -, /, :, _)
-    const windowLabel = `keyboard-layout-${keyboardId.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}`;
-    
-    // Create the window with keyboard ID as URL parameter
-    const layoutWindow = new WebviewWindow(windowLabel, {
-      url: `keyboard-layout.html?keyboardId=${encodeURIComponent(keyboardId)}`,
-      title: `${keyboard.name} - Keyboard Layout`,
-      width: 1000,
-      height: 600,
-      minWidth: 400,
-      minHeight: 200,
-      center: true,
-      resizable: true,
-      minimizable: true,
-      maximizable: true,
-      decorations: true,
-      alwaysOnTop: false,
-      skipTaskbar: false
+    // Create the layout window via Rust command (handles platform-specific title bar)
+    await invoke('open_keyboard_layout_window', {
+      keyboardId: keyboard.id,
+      keyboardName: keyboard.name,
     });
-    
-    // Handle errors
-    layoutWindow.once('tauri://error', (error) => {
-      console.error('Failed to create keyboard layout window:', error);
-      showError('Failed to open keyboard layout window');
-    });
-    
   } catch (error) {
-    console.error('Failed to open keyboard layout window:', error);
-    showError('Failed to open keyboard layout window');
+    // Window may already exist (focused instead), or actual error
+    if (!error.toString().includes('already exists')) {
+      console.error('Failed to open keyboard layout:', error);
+      showError('Failed to open keyboard layout');
+    }
   }
 }
+
 
 
 // Event listener setup function
