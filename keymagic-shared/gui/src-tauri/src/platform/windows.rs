@@ -333,12 +333,16 @@ impl Platform for WindowsBackend {
                         continue;
                     };
                     
+                    let enabled = kb_key.get_value::<u32, _>(KEYBOARD_ENABLED_VALUE)
+                        .map(|v| v != 0)
+                        .unwrap_or(true);
                     let keyboard = InstalledKeyboard {
                         id: name.clone(),
                         name: kb_key.get_value(KEYBOARD_NAME_VALUE).unwrap_or(name),
                         filename,
                         hotkey: kb_key.get_value(KEYBOARD_HOTKEY_VALUE).ok(),
                         hash: kb_key.get_value(KEYBOARD_HASH_VALUE).unwrap_or_default(),
+                        enabled,
                     };
                     config.keyboards.installed.push(keyboard);
                 }
@@ -446,7 +450,7 @@ impl Platform for WindowsBackend {
             let _ = kb_key.delete_value(KEYBOARD_PATH_VALUE);
             
             kb_key.set_value(KEYBOARD_HASH_VALUE, &keyboard.hash)?;
-            kb_key.set_value(KEYBOARD_ENABLED_VALUE, &1u32)?; // Always enabled for now
+            kb_key.set_value(KEYBOARD_ENABLED_VALUE, &(keyboard.enabled as u32))?;
             
             if let Some(ref hotkey) = keyboard.hotkey {
                 kb_key.set_value(KEYBOARD_HOTKEY_VALUE, hotkey)?;

@@ -478,6 +478,23 @@ body {
   color: var(--success-color);
 }
 
+.keyboard-status.disabled-status {
+  background-color: rgba(128, 128, 128, 0.1);
+  color: var(--text-secondary);
+}
+
+.keyboard-card.disabled {
+  opacity: 0.6;
+}
+
+.keyboard-card.disabled:hover {
+  transform: none;
+}
+
+.keyboard-card.disabled .keyboard-name {
+  color: var(--text-secondary);
+}
+
 .keyboard-hotkey {
   font-size: 12px;
   color: var(--text-secondary);

@@ -210,6 +210,22 @@ pub fn remove_keyboard(
 }
 
 #[tauri::command]
+pub fn set_keyboard_enabled(
+    app: AppHandle,
+    state: State<AppState>,
+    keyboard_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    state
+        .set_keyboard_enabled(&keyboard_id, enabled)
+        .map_err(|e| e.to_string())?;
+
+    // Emit event so UI and tray can refresh
+    let _ = app.emit("keyboards_changed", ());
+    Ok(())
+}
+
+#[tauri::command]
 pub fn update_hotkey(
     state: State<AppState>,
     keyboard_id: String,

@@ -93,17 +93,20 @@ async function loadKeyboards() {
     keyboards = await invoke('get_keyboards');
     activeKeyboardId = await invoke('get_active_keyboard');
     
-    // Auto-activate first keyboard if none is active and keyboards exist
+    // Auto-activate first enabled keyboard if none is active and keyboards exist
     if (!activeKeyboardId && keyboards.length > 0) {
-      console.log('No active keyboard found, auto-activating first keyboard');
-      const firstKeyboard = keyboards[0];
-      try {
-        await invoke('set_active_keyboard', { keyboardId: firstKeyboard.id });
-        activeKeyboardId = firstKeyboard.id;
-        await updateTrayMenu();
-        showToast(`Activated keyboard: ${firstKeyboard.name}`, 'info');
-      } catch (error) {
-        console.error('Failed to auto-activate keyboard:', error);
+      const enabledKeyboards = keyboards.filter(kb => kb.enabled !== false);
+      if (enabledKeyboards.length > 0) {
+        console.log('No active keyboard found, auto-activating first enabled keyboard');
+        const firstKeyboard = enabledKeyboards[0];
+        try {
+          await invoke('set_active_keyboard', { keyboardId: firstKeyboard.id });
+          activeKeyboardId = firstKeyboard.id;
+          await updateTrayMenu();
+          showToast(`Activated keyboard: ${firstKeyboard.name}`, 'info');
+        } catch (error) {
+          console.error('Failed to auto-activate keyboard:', error);
+        }
       }
     }
     
@@ -143,7 +146,8 @@ function createKeyboardCard(keyboard) {
   const isRecentlyAdded = recentlyAddedKeyboardIds.has(keyboard.id);
   
   const card = document.createElement('div');
-  card.className = `keyboard-card ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}`;
+  const isEnabled = keyboard.enabled !== false;
+  card.className = `keyboard-card ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''} ${!isEnabled ? 'disabled' : ''}`;
   card.dataset.keyboardId = keyboard.id;
   
   card.innerHTML = `
@@ -162,8 +166,8 @@ function createKeyboardCard(keyboard) {
       </div>
     </div>
     <div class="keyboard-meta">
-      <span class="keyboard-status ${isActive ? 'active' : ''}">
-        ${isActive ? 'Active' : 'Inactive'}
+      <span class="keyboard-status ${isActive ? 'active' : ''} ${!isEnabled ? 'disabled-status' : ''}">
+        ${!isEnabled ? 'Disabled' : isActive ? 'Active' : 'Inactive'}
       </span>
       ${(() => {
         // Determine what hotkey to display
@@ -195,11 +199,17 @@ function createKeyboardCard(keyboard) {
       })()}
     </div>
     <div class="keyboard-actions">
-      ${!isActive ? 
-        `<button class="btn btn-primary" onclick="activateKeyboard('${keyboard.id}')">Activate</button>` :
-        `<button class="btn btn-disabled" disabled>Active</button>`
+      ${!isEnabled ?
+        `<button class="btn btn-primary" onclick="toggleKeyboardEnabled('${keyboard.id}', true)">Enable</button>` :
+        !isActive ?
+          `<button class="btn btn-primary" onclick="activateKeyboard('${keyboard.id}')">Activate</button>` :
+          `<button class="btn btn-disabled" disabled>Active</button>`
       }
       <button class="btn btn-secondary" onclick="viewKeyboardLayout('${keyboard.id}')">View Layout</button>
+      ${isEnabled && !isActive ?
+        `<button class="btn btn-secondary" onclick="toggleKeyboardEnabled('${keyboard.id}', false)">Disable</button>` :
+        ''
+      }
       <button class="btn btn-secondary" onclick="removeKeyboard('${keyboard.id}')">Remove</button>
     </div>
   `;
@@ -275,6 +285,18 @@ window.activateKeyboard = async function(keyboardId) {
   }
 }
 
+window.toggleKeyboardEnabled = async function(keyboardId, enabled) {
+  try {
+    await invoke('set_keyboard_enabled', { keyboardId, enabled });
+    await loadKeyboards();
+    await updateTrayMenu();
+    showToast(enabled ? 'Keyboard enabled' : 'Keyboard disabled', 'info');
+  } catch (error) {
+    console.error('Failed to toggle keyboard:', error);
+    showError('Failed to toggle keyboard: ' + error);
+  }
+}
+
 window.removeKeyboard = async function(keyboardId) {
   const keyboard = keyboards.find(k => k.id === keyboardId);
   if (!keyboard) return;
@@ -289,12 +311,13 @@ window.removeKeyboard = async function(keyboardId) {
       const wasActive = keyboardId === activeKeyboardId;
       await invoke('remove_keyboard', { keyboardId });
       
-      // If we removed the active keyboard and there are other keyboards, activate one
+      // If we removed the active keyboard and there are other enabled keyboards, activate one
       if (wasActive) {
         const remainingKeyboards = await invoke('get_keyboards');
-        if (remainingKeyboards.length > 0) {
+        const enabledKeyboards = remainingKeyboards.filter(kb => kb.enabled !== false);
+        if (enabledKeyboards.length > 0) {
           console.log('Active keyboard was removed, activating another keyboard');
-          const nextKeyboard = remainingKeyboards[0];
+          const nextKeyboard = enabledKeyboards[0];
           try {
             await invoke('set_active_keyboard', { keyboardId: nextKeyboard.id });
             showToast(`Activated keyboard: ${nextKeyboard.name}`, 'info');

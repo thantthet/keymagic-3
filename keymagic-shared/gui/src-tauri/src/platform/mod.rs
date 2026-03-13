@@ -43,6 +43,10 @@ pub struct KeyboardsConfig {
     pub installed: Vec<InstalledKeyboard>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledKeyboard {
     pub id: String,
@@ -50,6 +54,8 @@ pub struct InstalledKeyboard {
     pub filename: String,
     pub hotkey: Option<String>,
     pub hash: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

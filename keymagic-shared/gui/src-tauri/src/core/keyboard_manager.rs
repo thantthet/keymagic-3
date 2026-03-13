@@ -57,6 +57,12 @@ pub struct KeyboardInfo {
     pub display_hotkey: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_display_hotkey: Option<String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 pub struct KeyboardManager {
@@ -151,17 +157,24 @@ impl KeyboardManager {
                         icon_data,
                         display_hotkey,
                         default_display_hotkey,
+                        enabled: installed.enabled,
                     },
                 );
             }
         }
         
-        // Set active keyboard
+        // Set active keyboard (only if it's enabled)
         if let Some(active_id) = config.keyboards.active {
+            let is_enabled = keyboards.get(&active_id).map_or(false, |kb| kb.enabled);
             drop(keyboards); // Release lock before calling set_active_keyboard
-            self.set_active_keyboard(&active_id)?;
+            if is_enabled {
+                self.set_active_keyboard(&active_id)?;
+            } else {
+                // Active keyboard is disabled, try to find next enabled one
+                self.activate_next_enabled_keyboard()?;
+            }
         }
-        
+
         Ok(())
     }
     
@@ -205,6 +218,7 @@ impl KeyboardManager {
                     icon_data,
                     display_hotkey: None,  // No custom hotkey initially
                     default_display_hotkey,
+                    enabled: true,
                 });
             }
         }
@@ -244,8 +258,11 @@ impl KeyboardManager {
     
     pub fn set_active_keyboard(&self, keyboard_id: &str) -> Result<()> {
         let keyboards = self.keyboards.lock().unwrap();
-        
+
         if let Some(keyboard_info) = keyboards.get(keyboard_id) {
+            if !keyboard_info.enabled {
+                return Err(anyhow!("Cannot activate disabled keyboard: {}", keyboard_id));
+            }
             let layout = self.load_keyboard_file(&keyboard_info.path)?;
             
             // Update engine
@@ -393,6 +410,7 @@ impl KeyboardManager {
             icon_data,
             display_hotkey: None,  // No custom hotkey initially
             default_display_hotkey,
+            enabled: true,
         };
         
         // Add to manager
@@ -436,6 +454,44 @@ impl KeyboardManager {
         Ok(())
     }
     
+    pub fn set_keyboard_enabled(&self, keyboard_id: &str, enabled: bool) -> Result<()> {
+        {
+            let mut keyboards = self.keyboards.lock().unwrap();
+            if let Some(keyboard) = keyboards.get_mut(keyboard_id) {
+                keyboard.enabled = enabled;
+            } else {
+                return Err(anyhow!("Keyboard not found: {}", keyboard_id));
+            }
+        }
+
+        // If disabling the currently active keyboard, switch to next enabled one
+        if !enabled {
+            let active = self.active_keyboard.lock().unwrap().clone();
+            if active.as_deref() == Some(keyboard_id) {
+                self.activate_next_enabled_keyboard()?;
+            }
+        }
+
+        self.save_keyboards_to_config()?;
+        Ok(())
+    }
+
+    fn activate_next_enabled_keyboard(&self) -> Result<()> {
+        let keyboards = self.keyboards.lock().unwrap();
+        let next = keyboards.values().find(|kb| kb.enabled).map(|kb| kb.id.clone());
+        drop(keyboards);
+
+        if let Some(next_id) = next {
+            self.set_active_keyboard(&next_id)?;
+        } else {
+            // No enabled keyboards, clear active
+            *self.active_keyboard.lock().unwrap() = None;
+            *self.engine.lock().unwrap() = None;
+            self.save_keyboards_to_config()?;
+        }
+        Ok(())
+    }
+
     fn save_keyboards_to_config(&self) -> Result<()> {
         let mut config = self.platform.load_config()?;
         
@@ -452,6 +508,7 @@ impl KeyboardManager {
                 filename: kb.filename.clone(),
                 hotkey: kb.hotkey.clone(),
                 hash: kb.hash.clone(),
+                enabled: kb.enabled,
             })
             .collect();
         
