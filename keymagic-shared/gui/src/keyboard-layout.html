@@ -670,8 +670,16 @@
       `;
     }
     
-    window.exportPDF = function() {
-      window.print();
+    window.exportPDF = async function() {
+      try {
+        const { getCurrentWebview } = window.__TAURI__.webview;
+        const webview = getCurrentWebview();
+        await webview.print();
+      } catch (error) {
+        console.error('Print failed:', error);
+        // Fallback to window.print()
+        window.print();
+      }
     }
     
     // Pin functionality
