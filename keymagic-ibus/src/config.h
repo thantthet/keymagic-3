@@ -16,6 +16,7 @@ typedef struct {
     gchar* filename;                    /* Filename (not full path) */
     gchar* hotkey;                      /* Hotkey string or NULL */
     gchar* hash;                        /* File hash */
+    gboolean enabled;                   /* TRUE if user has enabled this keyboard */
 } InstalledKeyboard;
 
 /**

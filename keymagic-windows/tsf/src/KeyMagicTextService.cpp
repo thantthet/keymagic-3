@@ -916,10 +916,17 @@ HRESULT CKeyMagicTextService::RegisterPreservedKeys()
     // Process each keyboard
     for (const auto& keyboard : keyboards)
     {
+        // Skip disabled keyboards — they should not be activatable via hotkey
+        if (!keyboard.enabled)
+        {
+            DEBUG_LOG(L"Skipping hotkey registration for disabled keyboard: " + keyboard.id);
+            continue;
+        }
+
         // Determine hotkey to use
         std::wstring hotkeyToUse;
         bool hotkeyFromKM2 = false;
-        
+
         // Check if keyboard has a hotkey configured
         if (!keyboard.hotkey.empty())
         {

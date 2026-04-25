@@ -979,7 +979,11 @@ keymagic_engine_update_properties(KeyMagicEngine* engine)
         for (iter = config->installed_keyboards; iter != NULL; iter = iter->next) {
             InstalledKeyboard* kb = (InstalledKeyboard*)iter->data;
             if (!kb || !kb->id) continue;
-            
+            if (!kb->enabled) {
+                g_debug("%s: Skipping disabled keyboard: %s", LOG_TAG, kb->id);
+                continue;
+            }
+
             /* Create property key */
             gchar* prop_key = g_strdup_printf("keyboard.%s", kb->id);
             

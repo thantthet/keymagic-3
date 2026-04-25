@@ -2,6 +2,7 @@
 #include "SecurityUtils.h"
 #include "../../shared/include/keymagic_ffi.h"
 #include "../../shared/include/KeyMagicUtils.h"
+#include <algorithm>
 
 RegistryMonitor::RegistryMonitor()
     : m_hKeyboardsKey(nullptr)
@@ -115,7 +116,13 @@ void RegistryMonitor::Stop() {
 std::vector<KeyboardInfo> RegistryMonitor::GetKeyboards() {
     // Use shared utility function
     std::vector<KeyboardInfo> keyboards = RegistryUtils::GetInstalledKeyboards();
-    
+
+    // Hide disabled keyboards from the tray menu and switching logic
+    keyboards.erase(
+        std::remove_if(keyboards.begin(), keyboards.end(),
+            [](const KeyboardInfo& k) { return !k.enabled; }),
+        keyboards.end());
+
     // For each keyboard, if hotkey is empty, try to load from KM2 file
     for (auto& keyboard : keyboards) {
         if (keyboard.hotkey.empty() && !keyboard.path.empty()) {

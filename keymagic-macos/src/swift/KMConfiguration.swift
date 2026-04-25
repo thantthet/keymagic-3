@@ -52,6 +52,19 @@ public class KMConfiguration {
         var filename: String
         var hotkey: String?
         var hash: String
+        var enabled: Bool = true
+
+        // Default `enabled` to true when the key is missing (backward-compat
+        // with configs written before the GUI exposed the toggle).
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            name = try container.decode(String.self, forKey: .name)
+            filename = try container.decode(String.self, forKey: .filename)
+            hotkey = try container.decodeIfPresent(String.self, forKey: .hotkey)
+            hash = try container.decode(String.self, forKey: .hash)
+            enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        }
     }
     
     private struct CompositionModeConfig: Codable {
@@ -87,7 +100,9 @@ public class KMConfiguration {
     
     public var installedKeyboards: [[String: String]] {
         guard let keyboards = config?.keyboards.installed else { return [] }
-        return keyboards.map { keyboard in
+        return keyboards.compactMap { keyboard in
+            // Hide disabled keyboards from the IMK menu and hotkey registration
+            guard keyboard.enabled else { return nil }
             var dict = [
                 "id": keyboard.id,
                 "name": keyboard.name,

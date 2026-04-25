@@ -119,7 +119,10 @@ keymagic_config_load(const gchar* config_path)
                 toml_table_t* kb_table = toml_table_at(installed, i);
                 if (kb_table) {
                     InstalledKeyboard* kb = g_new0(InstalledKeyboard, 1);
-                    
+
+                    /* Default to enabled if the field is missing (backward-compat) */
+                    kb->enabled = TRUE;
+
                     /* Parse keyboard fields */
                     datum = toml_string_in(kb_table, "id");
                     if (datum.ok) {
@@ -155,7 +158,13 @@ keymagic_config_load(const gchar* config_path)
                         kb->hash = g_strdup(datum.u.s);
                         free(datum.u.s);
                     }
-                    
+
+                    /* Parse enabled flag (defaults to TRUE for backward-compat) */
+                    datum = toml_bool_in(kb_table, "enabled");
+                    if (datum.ok) {
+                        kb->enabled = datum.u.b ? TRUE : FALSE;
+                    }
+
                     /* Add to list if we have at least an ID */
                     if (kb->id) {
                         config->installed_keyboards = g_list_append(config->installed_keyboards, kb);
@@ -459,10 +468,11 @@ keymagic_config_save(const gchar* config_path, const KeyMagicConfig* config)
                 g_string_append_printf(toml_str, "name = \"%s\"\n", kb->name);
             if (kb->filename) 
                 g_string_append_printf(toml_str, "filename = \"%s\"\n", kb->filename);
-            if (kb->hash) 
+            if (kb->hash)
                 g_string_append_printf(toml_str, "hash = \"%s\"\n", kb->hash);
-            if (kb->hotkey) 
+            if (kb->hotkey)
                 g_string_append_printf(toml_str, "hotkey = \"%s\"\n", kb->hotkey);
+            g_string_append_printf(toml_str, "enabled = %s\n", kb->enabled ? "true" : "false");
             g_string_append(toml_str, "\n");
         }
     }
