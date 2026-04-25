@@ -260,6 +260,39 @@ body {
   font-size: 13px;
 }
 
+.btn-icon {
+  appearance: none;
+  background: transparent;
+  border: 1px solid #d0d7de;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #57606a;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1f2328;
+  border-color: #afb8c1;
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-icon--danger:hover {
+  background: rgba(207, 34, 46, 0.08);
+  color: #cf222e;
+  border-color: #cf222e;
+}
+
 /* Keyboard List */
 .keyboard-hotkey {
   font-size: 13px;
@@ -502,14 +535,19 @@ body {
 
 .keyboard-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   margin-top: 15px;
 }
 
-.keyboard-actions button {
-  flex: 1;
+.keyboard-actions .btn {
   padding: 8px 16px;
   font-size: 13px;
+}
+
+/* Push icon-only secondary buttons to the right edge */
+.keyboard-actions .btn:first-child {
+  margin-right: auto;
 }
 
 /* Settings */

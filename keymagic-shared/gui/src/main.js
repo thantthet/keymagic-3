@@ -205,12 +205,32 @@ function createKeyboardCard(keyboard) {
           `<button class="btn btn-primary" onclick="activateKeyboard('${keyboard.id}')">Activate</button>` :
           `<button class="btn btn-disabled" disabled>Active</button>`
       }
-      <button class="btn btn-secondary" onclick="viewKeyboardLayout('${keyboard.id}')">View Layout</button>
+      <button class="btn-icon" onclick="viewKeyboardLayout('${keyboard.id}')" title="View Layout" aria-label="View Layout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="16" rx="2" ry="2"/>
+          <path d="M6 8h.01"/><path d="M10 8h.01"/><path d="M14 8h.01"/><path d="M18 8h.01"/>
+          <path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>
+          <path d="M7 16h10"/>
+        </svg>
+      </button>
       ${isEnabled && !isActive ?
-        `<button class="btn btn-secondary" onclick="toggleKeyboardEnabled('${keyboard.id}', false)">Disable</button>` :
+        `<button class="btn-icon" onclick="toggleKeyboardEnabled('${keyboard.id}', false)" title="Disable" aria-label="Disable">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2v10"/>
+            <path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>
+          </svg>
+        </button>` :
         ''
       }
-      <button class="btn btn-secondary" onclick="removeKeyboard('${keyboard.id}')">Remove</button>
+      <button class="btn-icon btn-icon--danger" onclick="removeKeyboard('${keyboard.id}')" title="Remove" aria-label="Remove">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </button>
     </div>
   `;
   
