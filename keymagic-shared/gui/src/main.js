@@ -358,8 +358,10 @@ window.viewKeyboardLayout = async function(keyboardId) {
     const platformInfo = await invoke('get_platform_info');
     const isMac = platformInfo && platformInfo.os === 'macos';
 
-    // Use custom titlebar (decorations: false) on Windows/Linux
-    // macOS uses native decorations with overlay titlebar style
+    // Custom titlebar on all platforms.
+    // Windows/Linux: decorations: false hides native chrome — we draw the whole bar.
+    // macOS: keep native chrome for traffic lights, but use Overlay style + hiddenTitle
+    //        so our custom titlebar shares the same row as the traffic lights.
     const layoutWindow = new WebviewWindow(windowLabel, {
       url: `keyboard-layout.html?keyboardId=${encodeURIComponent(keyboardId)}`,
       title: `${keyboard.name} - Keyboard Layout`,
@@ -372,6 +374,8 @@ window.viewKeyboardLayout = async function(keyboardId) {
       minimizable: true,
       maximizable: true,
       decorations: isMac,
+      titleBarStyle: isMac ? 'Overlay' : undefined,
+      hiddenTitle: isMac ? true : undefined,
       alwaysOnTop: false,
       skipTaskbar: false
     });

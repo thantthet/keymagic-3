@@ -13,7 +13,7 @@
     
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
+      background: #ffffff;
       padding: 20px;
       padding-top: 45px;
       -webkit-user-select: none;
@@ -26,12 +26,9 @@
       padding-top: 48px;
     }
 
+    /* Header is hidden on screen (name lives in titlebar) and only shown in print */
     .layout-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      gap: 12px;
+      display: none;
     }
 
     .layout-header h1 {
@@ -62,12 +59,18 @@
     }
 
     .titlebar-title {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 60%;
       font-size: 13px;
       font-weight: 600;
       color: #555;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      pointer-events: none;
     }
 
     .titlebar-actions {
@@ -146,7 +149,7 @@
       background: #d0d0d0;
     }
     
-    .btn-pin {
+    .icon-btn {
       appearance: none;
       border: none;
       background: transparent;
@@ -156,20 +159,26 @@
       width: 32px;
       height: 32px;
       cursor: pointer;
-      font-size: 14px;
+      color: #555;
       border-radius: 6px;
-      transition: background 0.15s;
+      transition: background 0.15s, color 0.15s;
     }
 
-    .btn-pin:hover {
+    .icon-btn:hover {
       background: rgba(0, 0, 0, 0.08);
     }
 
-    .btn-pin.pinned {
-      background: rgba(255, 193, 7, 0.25);
+    .icon-btn svg {
+      width: 16px;
+      height: 16px;
     }
 
-    .btn-pin.pinned:hover {
+    .icon-btn.pinned {
+      background: rgba(255, 193, 7, 0.25);
+      color: #b8860b;
+    }
+
+    .icon-btn.pinned:hover {
       background: rgba(255, 193, 7, 0.35);
     }
     
@@ -178,16 +187,16 @@
       justify-content: center;
       align-items: center;
       min-height: 200px;
-      padding: 20px;
+      padding: 20px 20px 0;
     }
     
     .keyboard-layout {
       max-width: 1085px;
       width: 100%;
-      background: #e5e5e5;
+      background: #efeff2;
+      border: 1px solid #e8e8ed;
       border-radius: 16px;
       padding: 20px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
       display: grid;
       grid-template-columns: repeat(30, 1fr);
       grid-template-rows: repeat(5, 60px);
@@ -195,26 +204,20 @@
     }
     
     .key {
-      background: #fafafa;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+      border: 1px solid #d2d2d7;
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
       position: relative;
       font-size: 15px;
-      transition: all 0.1s;
+      transition: border-color 0.1s, background 0.1s;
       grid-column: span 2;
       min-width: 0; /* Prevent grid blowout */
     }
-    
+
     .key:hover {
-      background: #f0f0f0;
-      transform: translateY(-1px);
-      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-      border-color: #bbb;
+      background: #fafafa;
+      border-color: #b8b8bd;
     }
     
     /* Key size modifiers using grid spans */
@@ -231,27 +234,40 @@
     .key.menu { grid-column: span 3; }
     .key.space { grid-column: span 9; }
     
-    .key-shifted {
+    .key-ascii,
+    .key-label {
       position: absolute;
       top: 5px;
       left: 7px;
-      font-size: 12px;
-      color: #666;
-      line-height: 1;
-    }
-    
-    .key-unshifted {
-      font-size: 18px;
-      font-weight: 500;
-      color: #222;
-      line-height: 1;
-    }
-    
-    .key-label {
-      font-size: 11px;
+      font-size: 10px;
       color: #888;
       font-weight: 500;
+      line-height: 1;
+    }
+
+    .key-label {
       text-transform: uppercase;
+    }
+
+    .key-shifted {
+      position: absolute;
+      top: 5px;
+      right: 7px;
+      font-size: 13px;
+      color: #444;
+      line-height: 1;
+    }
+
+    .key-unshifted {
+      position: absolute;
+      bottom: 6px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 500;
+      color: #1d1d1f;
+      line-height: 1;
     }
     
     /* Responsive adjustments */
@@ -260,39 +276,43 @@
         grid-template-columns: repeat(30, minmax(0, 1fr));
         grid-template-rows: repeat(5, max(50px, 5vw));
       }
-      
+
       .key-shifted {
-        font-size: 10px;
+        font-size: 11px;
       }
-      
+
       .key-unshifted {
         font-size: 14px;
       }
-      
+
+      .key-ascii,
       .key-label {
         font-size: 9px;
       }
     }
-    
+
     @media (max-width: 800px) {
       .keyboard-layout {
         grid-template-rows: repeat(5, minmax(25px, max(40px, 4vw)));
         gap: 3px;
         padding: 10px;
       }
-      
+
       .key-shifted {
-        font-size: 8px;
+        font-size: 9px;
         top: 3px;
-        left: 4px;
+        right: 4px;
       }
-      
+
       .key-unshifted {
         font-size: 12px;
       }
-      
+
+      .key-ascii,
       .key-label {
         font-size: 8px;
+        top: 3px;
+        left: 4px;
       }
     }
     
@@ -347,17 +367,20 @@
       }
       
       .key-shifted {
-        font-size: 7px;
+        font-size: 8px;
         top: 2px;
-        left: 3px;
+        right: 3px;
       }
-      
+
       .key-unshifted {
         font-size: 10px;
       }
-      
+
+      .key-ascii,
       .key-label {
         font-size: 7px;
+        top: 2px;
+        left: 3px;
       }
     }
     
@@ -367,11 +390,32 @@
     }
 
     body.macos .titlebar {
-      background: transparent;
+      background: linear-gradient(
+        to bottom,
+        #ffffff 0%,
+        #ffffff 60%,
+        rgba(255, 255, 255, 0.85) 100%
+      );
       border-bottom: none;
       height: 38px;
       grid-template-columns: 1fr auto;
       align-items: center;
+    }
+
+    /* Soft fade strip below the titlebar so content gradually appears as it scrolls out */
+    body.macos .titlebar::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.85) 0%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      pointer-events: none;
     }
 
     body.macos .titlebar-drag {
@@ -406,15 +450,15 @@
     }
     
     .info-footer {
-      margin-top: 30px;
+      margin-top: 14px;
       text-align: center;
-      color: #666;
-      font-size: 14px;
-      padding: 10px;
+      color: #888;
+      font-size: 11px;
+      padding: 0;
     }
-    
+
     .info-footer p {
-      margin: 5px 0;
+      margin: 2px 0;
     }
     
     @media print {
@@ -427,6 +471,14 @@
       .titlebar,
       .layout-actions {
         display: none;
+      }
+
+      .layout-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        gap: 12px;
       }
       
       .keyboard-container {
@@ -461,10 +513,20 @@
       <span class="titlebar-title" id="titlebar-name" data-tauri-drag-region>Keyboard Layout</span>
     </div>
     <div class="titlebar-actions">
-      <button class="btn-pin" id="pin-button" onclick="togglePin()" title="Pin window on top">
-        <span id="pin-text">📌</span>
+      <button class="icon-btn" id="pin-button" onclick="togglePin()" title="Pin window on top" aria-label="Pin window on top">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="8" y1="4" x2="16" y2="4"/>
+          <path d="M9 4v6l-2 3v2h10v-2l-2-3V4"/>
+          <line x1="12" y1="15" x2="12" y2="20"/>
+        </svg>
       </button>
-      <button class="btn btn-primary" onclick="exportPDF()" style="font-size:11px; padding:4px 10px;">PDF</button>
+      <button class="icon-btn" onclick="exportPDF()" title="Export as PDF" aria-label="Export as PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
     </div>
     <div class="titlebar-controls">
       <button id="titlebar-minimize" title="Minimize">
@@ -509,34 +571,31 @@
     document.getElementById('titlebar-maximize')?.addEventListener('click', () => appWindow.toggleMaximize());
     document.getElementById('titlebar-close')?.addEventListener('click', () => appWindow.close());
 
-    // On macOS, native decorations are used - hide custom controls and adjust titlebar
-    async function detectPlatform() {
-      try {
-        const info = await invoke('get_platform_info');
-        if (info && info.os === 'macos') {
-          document.body.classList.add('macos');
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    detectPlatform();
-
     let layoutData = null;
-    
+    let platformOs = 'windows';
+
     // Get keyboard ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const keyboardId = urlParams.get('keyboardId');
-    
+
     // Load keyboard layout data on window load
     async function loadKeyboardLayout() {
       if (!keyboardId) {
         document.getElementById('keyboard-container').innerHTML = '<div class="error">No keyboard ID provided</div>';
         return;
       }
-      
+
       try {
-        layoutData = await invoke('get_keyboard_layout', { keyboardId });
+        const [info, data] = await Promise.all([
+          invoke('get_platform_info').catch(() => null),
+          invoke('get_keyboard_layout', { keyboardId })
+        ]);
+
+        platformOs = info?.os || 'windows';
+        if (platformOs === 'macos') {
+          document.body.classList.add('macos');
+        }
+        layoutData = data;
         displayKeyboardLayout();
       } catch (error) {
         console.error('Failed to load keyboard layout:', error);
@@ -555,98 +614,119 @@
       
       nameElement.textContent = `${layoutData.keyboard_name} - Keyboard Layout`;
       document.getElementById('titlebar-name').textContent = layoutData.keyboard_name;
-      
+
       const { keys } = layoutData;
-      
+
+      // Platform-specific modifier labels
+      const altLabel = platformOs === 'macos' ? 'OPT' : 'ALT';
+      const winLabel = platformOs === 'macos' ? 'CMD'
+                     : platformOs === 'linux' ? 'SUPER'
+                     : 'WIN';
+
       container.innerHTML = `
         <div class="keyboard-layout">
           <!-- Number row -->
           <div class="key">
+            <span class="key-ascii">${'`'}</span>
             <span class="key-shifted">${keys['Backquote']?.shifted || '~'}</span>
             <span class="key-unshifted">${keys['Backquote']?.unshifted || '`'}</span>
           </div>
           ${[1,2,3,4,5,6,7,8,9,0].map(n => `
             <div class="key">
+              <span class="key-ascii">${n}</span>
               <span class="key-shifted">${keys['Digit' + n]?.shifted || ''}</span>
               <span class="key-unshifted">${keys['Digit' + n]?.unshifted || n}</span>
             </div>
           `).join('')}
           <div class="key">
+            <span class="key-ascii">-</span>
             <span class="key-shifted">${keys['Minus']?.shifted || '_'}</span>
             <span class="key-unshifted">${keys['Minus']?.unshifted || '-'}</span>
           </div>
           <div class="key">
+            <span class="key-ascii">=</span>
             <span class="key-shifted">${keys['Equal']?.shifted || '+'}</span>
             <span class="key-unshifted">${keys['Equal']?.unshifted || '='}</span>
           </div>
           <div class="key backspace">
             <span class="key-label">BACKSPACE</span>
           </div>
-          
+
           <!-- Top row -->
           <div class="key tab">
             <span class="key-label">TAB</span>
           </div>
           ${['Q','W','E','R','T','Y','U','I','O','P'].map(letter => `
             <div class="key">
+              <span class="key-ascii">${letter}</span>
               <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
               <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
             </div>
           `).join('')}
           <div class="key">
+            <span class="key-ascii">[</span>
             <span class="key-shifted">${keys['BracketLeft']?.shifted || '{'}</span>
             <span class="key-unshifted">${keys['BracketLeft']?.unshifted || '['}</span>
           </div>
           <div class="key">
+            <span class="key-ascii">]</span>
             <span class="key-shifted">${keys['BracketRight']?.shifted || '}'}</span>
             <span class="key-unshifted">${keys['BracketRight']?.unshifted || ']'}</span>
           </div>
           <div class="key backslash">
+            <span class="key-ascii">\\</span>
             <span class="key-shifted">${keys['Backslash']?.shifted || '|'}</span>
             <span class="key-unshifted">${keys['Backslash']?.unshifted || '\\\\'}</span>
           </div>
-          
+
           <!-- Home row -->
           <div class="key caps">
             <span class="key-label">CAPS LOCK</span>
           </div>
           ${['A','S','D','F','G','H','J','K','L'].map(letter => `
             <div class="key">
+              <span class="key-ascii">${letter}</span>
               <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
               <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
             </div>
           `).join('')}
           <div class="key">
+            <span class="key-ascii">;</span>
             <span class="key-shifted">${keys['Semicolon']?.shifted || ':'}</span>
             <span class="key-unshifted">${keys['Semicolon']?.unshifted || ';'}</span>
           </div>
           <div class="key">
+            <span class="key-ascii">'</span>
             <span class="key-shifted">${keys['Quote']?.shifted || '"'}</span>
             <span class="key-unshifted">${keys['Quote']?.unshifted || "'"}</span>
           </div>
           <div class="key enter">
             <span class="key-label">ENTER</span>
           </div>
-          
+
           <!-- Bottom row -->
           <div class="key shift-left">
             <span class="key-label">SHIFT</span>
           </div>
           ${['Z','X','C','V','B','N','M'].map(letter => `
             <div class="key">
+              <span class="key-ascii">${letter}</span>
               <span class="key-shifted">${keys['Key' + letter]?.shifted || letter}</span>
               <span class="key-unshifted">${keys['Key' + letter]?.unshifted || letter.toLowerCase()}</span>
             </div>
           `).join('')}
           <div class="key">
+            <span class="key-ascii">,</span>
             <span class="key-shifted">${keys['Comma']?.shifted || '<'}</span>
             <span class="key-unshifted">${keys['Comma']?.unshifted || ','}</span>
           </div>
           <div class="key">
+            <span class="key-ascii">.</span>
             <span class="key-shifted">${keys['Period']?.shifted || '>'}</span>
             <span class="key-unshifted">${keys['Period']?.unshifted || '.'}</span>
           </div>
           <div class="key">
+            <span class="key-ascii">/</span>
             <span class="key-shifted">${keys['Slash']?.shifted || '?'}</span>
             <span class="key-unshifted">${keys['Slash']?.unshifted || '/'}</span>
           </div>
@@ -659,19 +739,19 @@
             <span class="key-label">CTRL</span>
           </div>
           <div class="key win">
-            <span class="key-label">WIN</span>
+            <span class="key-label">${winLabel}</span>
           </div>
           <div class="key alt">
-            <span class="key-label">ALT</span>
+            <span class="key-label">${altLabel}</span>
           </div>
           <div class="key space">
             <span class="key-unshifted">${keys['Space']?.unshifted || ' '}</span>
           </div>
           <div class="key alt">
-            <span class="key-label">ALT</span>
+            <span class="key-label">${altLabel}</span>
           </div>
           <div class="key win">
-            <span class="key-label">WIN</span>
+            <span class="key-label">${winLabel}</span>
           </div>
           <div class="key menu">
             <span class="key-label">MENU</span>
