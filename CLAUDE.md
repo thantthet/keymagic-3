@@ -8,9 +8,9 @@ KeyMagic 3 is a Rust rewrite of the KeyMagic input method editor (IME), targetin
 
 ## Documentation
 
-- KeyMagic Script format: @KMS_FORMAT.md
-- KeyMagic Binary format: @KM2_FORMAT.md
-- Engine processing logic: @keymagic-core/ENGINE_LOGIC.md
+- KeyMagic Script format: @docs/KMS_FORMAT.md
+- KeyMagic Binary format: @docs/KM2_FORMAT.md
+- Engine processing logic: @docs/ENGINE_LOGIC.md
 
 ## Build & Test Commands
 

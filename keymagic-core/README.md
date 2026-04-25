@@ -143,7 +143,7 @@ See the `examples/` directory:
 
 ## Documentation
 
-For detailed engine logic and behavior, see the [Engine Logic Documentation](ENGINE_LOGIC.md).
+For detailed engine logic and behavior, see the [Engine Logic Documentation](../docs/ENGINE_LOGIC.md).
 
 ## License
 
