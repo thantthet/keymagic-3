@@ -394,6 +394,19 @@ window.viewKeyboardLayout = async function(keyboardId) {
 
 // Event listener setup function
 function setupEventListeners() {
+  // Route external links (target="_blank") through the OS browser via the
+  // opener plugin. WKWebView on macOS does not open _blank links on its own.
+  document.addEventListener('click', async (e) => {
+    const link = e.target.closest('a[target="_blank"]');
+    if (!link || !link.href) return;
+    e.preventDefault();
+    try {
+      await invoke('plugin:opener|open_url', { url: link.href });
+    } catch (err) {
+      console.error('Failed to open URL:', err);
+    }
+  });
+
   // Add keyboard
   addKeyboardBtn.addEventListener('click', async () => {
     try {
