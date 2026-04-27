@@ -3,76 +3,76 @@
   "platforms": {
     "windows": {
       "x86_64": {
-        "version": "0.0.10",
-        "releaseDate": "2025-09-07T07:46:11Z",
+        "version": "0.0.11",
+        "releaseDate": "2026-04-27T20:00:04Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-Setup-0.0.10.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/KeyMagic3-Setup-0.0.11.exe",
         "signature": "",
-        "size": 7618984,
-        "sha256": "bace7026bac71699fe26a3748dc8152a8546792b12c0d833731f241f74f86a8f"
+        "size": 7811608,
+        "sha256": "d07d3a56ea7c0c05ab49b19940d3e65cf500bea6320e7b18be91ca18cf7b6ce3"
       },
       "aarch64": {
-        "version": "0.0.10",
-        "releaseDate": "2025-09-07T07:46:11Z",
+        "version": "0.0.11",
+        "releaseDate": "2026-04-27T20:00:04Z",
         "minimumSystemVersion": "10.0.17763",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-Setup-0.0.10.exe",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/KeyMagic3-Setup-0.0.11.exe",
         "signature": "",
-        "size": 7618984,
-        "sha256": "bace7026bac71699fe26a3748dc8152a8546792b12c0d833731f241f74f86a8f"
+        "size": 7811608,
+        "sha256": "d07d3a56ea7c0c05ab49b19940d3e65cf500bea6320e7b18be91ca18cf7b6ce3"
       }
     },
     "macos": {
       "x86_64": {
-        "version": "0.0.10",
-        "releaseDate": "2025-09-07T07:46:11Z",
+        "version": "0.0.11",
+        "releaseDate": "2026-04-27T20:00:04Z",
         "minimumSystemVersion": "10.15",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-0.0.10.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/KeyMagic3-0.0.11.dmg",
         "signature": "",
-        "size": 10875917,
-        "sha256": "3d3120537d9a44cd0723e37627fd0e492b1ae3956038823b7cab206f8b87eaae"
+        "size": 10576117,
+        "sha256": "8c09a118b901b9e622fd7934c198b2320dd56c58bbb3ac311aada839df6216a0"
       },
       "aarch64": {
-        "version": "0.0.10",
-        "releaseDate": "2025-09-07T07:46:11Z",
+        "version": "0.0.11",
+        "releaseDate": "2026-04-27T20:00:04Z",
         "minimumSystemVersion": "11.0",
-        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/KeyMagic3-0.0.10.dmg",
+        "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/KeyMagic3-0.0.11.dmg",
         "signature": "",
-        "size": 10875917,
-        "sha256": "3d3120537d9a44cd0723e37627fd0e492b1ae3956038823b7cab206f8b87eaae"
+        "size": 10576117,
+        "sha256": "8c09a118b901b9e622fd7934c198b2320dd56c58bbb3ac311aada839df6216a0"
       }
     },
     "linux": {
       "aarch64": {
-        "version": "0.0.10",
-        "releaseDate": "2025-09-07T07:46:11Z",
+        "version": "0.0.11",
+        "releaseDate": "2026-04-27T20:00:04Z",
         "minimumSystemVersion": "",
         "packages": {
           "rpm": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3-0.0.10-1.aarch64.rpm",
-            "size": 5700089,
-            "sha256": "de59d2bbe062c3debc07e7e83fb7f282652a919a16ef55fa1538a58bafa02467"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/keymagic3-0.0.11-1.aarch64.rpm",
+            "size": 5547860,
+            "sha256": "eab0134fbffb02ac702090310b5a9da62c1f76ac2ef615e14cd7b761f64a1db8"
           },
           "deb": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3_0.0.10_arm64.deb",
-            "size": 5282924,
-            "sha256": "225ed5def5e65d94d45dba1d2025f9e5920d933cf45183276ccbd064aff48e01"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/keymagic3_0.0.11_arm64.deb",
+            "size": 5136976,
+            "sha256": "a2e454c99e056b8bd159cfe78ed993a5435322975de12d614e10ca882f8a4cdb"
           }
         }
       },
       "x86_64": {
-        "version": "0.0.10",
-        "releaseDate": "2025-09-07T07:46:11Z",
+        "version": "0.0.11",
+        "releaseDate": "2026-04-27T20:00:04Z",
         "minimumSystemVersion": "",
         "packages": {
           "rpm": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3-0.0.10-1.x86_64.rpm",
-            "size": 5492514,
-            "sha256": "74fe746cc7e3de332b85564da6feb1d0c5017b06ec3683999439a9a755b0dc21"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/keymagic3-0.0.11-1.x86_64.rpm",
+            "size": 4994300,
+            "sha256": "46529ef5f481dd8bca3556f13dcea5cf1a6b05b023d92fee352de0f184bd52eb"
           },
           "deb": {
-            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.10/keymagic3_0.0.10_amd64.deb",
-            "size": 5067000,
-            "sha256": "30fdf6e23f88648a1c7f9e2b65a9a6940ba6da244fba0f7d9b3f93b5fc2c2571"
+            "url": "https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/keymagic3_0.0.11_amd64.deb",
+            "size": 4701176,
+            "sha256": "fa6df41841f570f782a170e13bc80ffa376dfa92628b9ad8e6c68f7a7b3c6682"
           }
         }
       }
@@ -81,6 +81,9 @@
   "releaseNotes": {
     "0.0.10": {
       "en": "## What's New 🎉\r\n\r\n**All Platforms**\r\n- Auto-activation feature - Ensures a keyboard is always active when keyboards are available\r\n\r\n**Windows**\r\n- Windows code signing - Integration with SignPath for digitally signed installers\r\n"
+    },
+    "0.0.11": {
+      "en": "## What's New 🎉 \r\n\r\n**All Platforms**\r\n- Added an enable/disable toggle for installed keyboards. Disabled keyboards stay in the list but are hidden from hotkeys, the IME switcher, auto-activation, and tray/property menus.\r\n- Keyboard cards now show secondary actions (View Layout, Disable, Remove) as compact 38×38 icon buttons with tooltips; Remove has a red danger hover.\r\n- Keyboard layout viewer redesigned:\r\n  - Pin and PDF buttons moved into the title bar as SVG icons under a unified ghost-button style.\r\n  - New per-key label layout: ASCII top-left, shifted top-right, unshifted bottom-center.\r\n  - Platform-aware modifier labels: CMD/OPT on macOS, SUPER on Linux, WIN/ALT on Windows.\r\n  - New visual style — white window, light-gray chassis, softly-shadowed keys.\r\n- External links (Website, GitHub) from the About page now open in the system browser. Previously broken on macOS where WKWebView silently ignored target=\"_blank\" clicks.\r\n\r\n**Linux**\r\n- IBus layout/property menu now refreshes immediately when keyboards are enabled/disabled or installed/removed via the GUI — no need to deactivate and reactivate KeyMagic.\r\n- Instructional code blocks (e.g. the IBus symbol customization commands) gained a one-click copy button.\r\n\r\n## Downloads\r\n\r\n**Windows**\r\n<a href=\"https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/KeyMagic3-Setup-0.0.11.exe\">\r\n<img src=\"https://upload.wikimedia.org/wikipedia/commons/5/5f/Windows_logo_-_2012.svg\" width=34 alt=\"download for windows\"/>\r\n</a>\r\n\r\n**macOS**\r\n<a href=\"https://github.com/thantthet/keymagic-3/releases/download/v0.0.11/KeyMagic3-0.0.11.dmg\">\r\n<img src=\"https://upload.wikimedia.org/wikipedia/commons/1/1b/Apple_logo_grey.svg\" width=34 alt=\"download for macos\"/>\r\n</a>\r\n\r\n**Linux**\r\n- **Debian (amd64)**: `keymagic3_0.0.11_amd64.deb`\r\n- **Debian (arm64)**: `keymagic3_0.0.11_arm64.deb`\r\n- **RPM (x86_64)**: `keymagic3-0.0.11-1.x86_64.rpm`\r\n- **RPM (aarch64)**: `keymagic3-0.0.11-1.aarch64.rpm`\r\n\r\n## Installation Instructions\r\n\r\n#### Windows\r\n1. Download and run the installer\r\n2. Follow the installation wizard\r\n3. KeyMagic will be available in your system tray\r\n\r\n#### macOS\r\n1. Download and open the DMG file\r\n2. Drag KeyMagic to your Applications folder\r\n3. Launch KeyMagic from Applications\r\n4. Add KeyMagic in System Settings > Keyboard > Input Sources\r\n\r\n#### Linux\r\n\r\n**Quick Install (Recommended):**\r\n```bash\r\ncurl -fsSL https://thantthet.github.io/keymagic-3/install.sh | bash\r\n```\r\n\r\nThis will automatically:\r\n- Detect your Linux distribution\r\n- Add the KeyMagic repository\r\n- Install the latest version\r\n- Keep KeyMagic updated through your package manager\r\n\r\n**Manual Installation:**\r\n\r\n*Debian/Ubuntu:*\r\n```bash\r\nsudo dpkg -i keymagic3_0.0.11_*.deb\r\nsudo apt-get install -f  # Install any missing dependencies\r\n```\r\n\r\n*Fedora/RHEL:*\r\n```bash\r\nsudo rpm -i keymagic3-0.0.11-1.*.rpm\r\n```\r\n\r\n**Post-Installation:**\r\n1. Restart IBus: `ibus restart`\r\n2. Or log out and log back in\r\n3. Add KeyMagic in your system's input method settings\r\n"
     }
   }
 }
