@@ -1876,6 +1876,34 @@ window.toggleCollapsible = function(header) {
   section.classList.toggle('collapsed');
 }
 
+// Copy code to clipboard
+window.copyCode = async function(button) {
+  const codeBlock = button.parentElement.querySelector('code');
+  const text = codeBlock.textContent;
+  
+  try {
+    await navigator.clipboard.writeText(text);
+    
+    // Show success feedback
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>';
+    button.classList.add('copied');
+    
+    // Reset after 2 seconds
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.classList.remove('copied');
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy:', err);
+    // Fallback: select text
+    const range = document.createRange();
+    range.selectNode(codeBlock);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  }
+}
+
 
 // Settings Tab Management
 function initSettingsTabs() {

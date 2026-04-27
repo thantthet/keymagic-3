@@ -1372,6 +1372,48 @@ pre code {
   color: var(--text-primary);
 }
 
+/* Code block with copy button */
+.code-block {
+  position: relative;
+  margin: 8px 0;
+}
+
+.code-block pre {
+  padding-right: 48px; /* Make room for copy button */
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+  border-color: var(--primary-color);
+}
+
+.copy-btn.copied {
+  color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.copy-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .update-actions {
   display: flex;
   gap: 10px;

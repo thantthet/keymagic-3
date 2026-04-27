@@ -205,11 +205,27 @@
                         <p>To change the KeyMagic display symbol in IBus:</p>
                         <ol>
                           <li>Edit the configuration file with sudo:
-                            <pre><code>sudo nano /usr/share/ibus/component/keymagic3.xml</code></pre>
+                            <div class="code-block">
+                              <pre><code>sudo nano /usr/share/ibus/component/keymagic3.xml</code></pre>
+                              <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                  <path d="M10.5 1h-5.5c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h5.5c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1zm-.5 9h-4v-7h4v7z"/>
+                                  <path d="M14 4h-1v8c0 1.1-.9 2-2 2h-5v1c0 .55.45 1 1 1h5.5c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1z"/>
+                                </svg>
+                              </button>
+                            </div>
                           </li>
                           <li>Find the <code>&lt;symbol&gt;</code> tag and change its value</li>
                           <li>Save the file and restart IBus:
-                            <pre><code>ibus restart</code></pre>
+                            <div class="code-block">
+                              <pre><code>ibus restart</code></pre>
+                              <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                  <path d="M10.5 1h-5.5c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h5.5c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1zm-.5 9h-4v-7h4v7z"/>
+                                  <path d="M14 4h-1v8c0 1.1-.9 2-2 2h-5v1c0 .55.45 1 1 1h5.5c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1z"/>
+                                </svg>
+                              </button>
+                            </div>
                           </li>
                         </ol>
                         <p><strong>Note:</strong> This requires administrator privileges and will affect all users on the system.</p>
