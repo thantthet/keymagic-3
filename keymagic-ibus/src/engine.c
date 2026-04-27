@@ -795,6 +795,11 @@ config_file_changed_cb(GFileMonitor* monitor G_GNUC_UNUSED, GFile* file,
         
         /* Reload configuration */
         keymagic_engine_load_config(engine);
+
+        /* Rebuild IBus property menu so enabled/disabled toggles
+         * and keyboard install/remove changes are reflected without
+         * needing to re-enable the IME. */
+        keymagic_engine_update_properties(engine);
     }
 }
 
